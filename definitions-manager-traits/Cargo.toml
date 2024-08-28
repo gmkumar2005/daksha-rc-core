@@ -1,0 +1,4 @@
+[package]
+name = "definitions-manager-traits"
+
+[dependencies]
