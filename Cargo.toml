@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "definitions-manager-traits",
+    "definitions-manager-lib",
     "definitions-manager-json",
     "definitions-manager-toml",
     "definitions-cli",
@@ -13,3 +13,4 @@ edition = "2021"
 rust-version = "1.80.1"
 version = "0.1.0-SNAPSHOT"
 license = "MIT"
+
