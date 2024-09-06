@@ -24,7 +24,7 @@
           "minLength": 5
         },
         "address": {
-          "$ref": "Common.json/#/definitions/Address",
+          "$ref": "common.json/#/definitions/Address",
           "title": "Address"
         },
         "establishmentYear": {

@@ -1,0 +1,8 @@
+{
+  "Student": {
+    "identityDetails":{
+      "fullName":"John",
+      "gender":"John"
+    }
+  }
+}
