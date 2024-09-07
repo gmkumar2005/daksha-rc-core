@@ -25,7 +25,7 @@ mod tests {
             }
         }
         "#
-        .to_string();
+            .to_string();
         let schema_doc = SchemaDef::new("1".to_string(), schema.clone()).unwrap();
         assert_eq!(schema_doc.id, "1");
         assert_eq!(schema_doc.title, "Example Schema");
@@ -46,11 +46,11 @@ mod tests {
             }
         }
         "#
-        .to_string();
+            .to_string();
 
-        let mut schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
-        schema_doc.validate().expect("TODO: panic message");
+        let schema_doc = schema_doc.validate_def().expect("TODO: panic message");
         assert_eq!(schema_doc.status, Status::Valid);
     }
 
@@ -67,12 +67,12 @@ mod tests {
             }
         }
         "#
-        .to_string();
+            .to_string();
 
-        let mut schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
-        schema_doc.validate().expect("TODO: panic message");
+        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = schema_doc.validate_def().expect("TODO: panic message");
         assert_eq!(schema_doc.status, Status::Valid);
-        schema_doc.activate().expect("TODO: panic message");
+        let schema_doc = schema_doc.activate().expect("TODO: panic message");
         assert_eq!(schema_doc.status, Status::Active);
     }
 
@@ -89,11 +89,11 @@ mod tests {
             }
         }
         "#
-        .to_string();
+            .to_string();
 
-        let mut schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
-        let result = schema_doc.activate();
+        let result = schema_doc.clone().activate();
         assert!(result.is_err());
         assert_eq!(
             "SchemaDoc must be valid before activation".to_string(),
@@ -106,25 +106,25 @@ mod tests {
     async fn test_schema_def_validation_institute() {
         let schema = load_schema_from_file("tests/resources/schemas/institute.json").unwrap();
 
-        let mut schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
-        schema_doc.validate().expect("TODO: panic message");
+        let schema_doc = schema_doc.validate_def().expect("TODO: panic message");
         assert_eq!(schema_doc.status, Status::Valid);
     }
     #[tokio::test]
     async fn test_schema_def_validation_student() {
         let schema = load_schema_from_file("tests/resources/schemas/student.json").unwrap();
-        let mut schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
-        schema_doc.validate().expect("TODO: panic message");
+        let schema_doc = schema_doc.validate_def().expect("TODO: panic message");
         assert_eq!(schema_doc.status, Status::Valid);
     }
     #[tokio::test]
     async fn test_schema_def_validation_teacher() {
         let schema = load_schema_from_file("tests/resources/schemas/teacher.json").unwrap();
-        let mut schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
-        schema_doc.validate().expect("TODO: panic message");
+        let schema_doc = schema_doc.validate_def().expect("TODO: panic message");
         assert_eq!(schema_doc.status, Status::Valid);
     }
 
@@ -149,13 +149,40 @@ mod tests {
         );
     }
 
-    // #[tokio::test]
-    // async fn test_schema_def_validation_not_a_schema(){
-    //     let schema = load_schema_from_file("tests/resources/schemas/not_a_schema.json").unwrap();
-    //     let mut result = SchemaDef::new("1".to_string(), schema);
-    //     // assert_eq!(result.unwrap().status, Status::Inactive);
-    //     let mut error_message = result.unwrap().validate();
-    //     assert_that!(error_message, err());
-    //     // assert_that!(result.unwrap_err(), matches_regex(r".*Title not found in schema.*"));
-    // }
+    #[tokio::test]
+    async fn test_validate_record() {
+        let schema = r#"
+    {
+        "title": "Example Schema",
+        "type": "object",
+        "properties": {
+            "example": {
+                "type": "string"
+            }
+        },
+        "required": ["example"]
+    }
+    "#.to_string();
+
+        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let valid_record = r#"{ "example": "test" }"#;
+        let invalid_record = r#"{ "example": 123 }"#;
+        let missing_field_record = r#"{ }"#;
+
+        // Test valid record
+        let result = schema_doc.validate_record(valid_record);
+        assert!(result.is_ok());
+
+        // Test invalid record
+        let result = schema_doc.validate_record(invalid_record);
+        assert!(result.is_err());
+        let error_message: Vec<String> = result.err().unwrap().collect();
+        assert_that!(&*error_message, contains("123 is not of type \"string\"".to_string()));
+
+        // Test record with missing required field
+        let result = schema_doc.validate_record(missing_field_record);
+        assert!(result.is_err());
+        let error_message: Vec<String> = result.err().unwrap().collect();
+        assert_that!(&*error_message, contains("\"example\" is a required property".to_string()));
+    }
 }
