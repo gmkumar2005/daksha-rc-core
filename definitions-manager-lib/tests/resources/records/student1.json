@@ -2,7 +2,11 @@
   "Student": {
     "identityDetails":{
       "fullName":"John",
-      "gender":"John"
+      "gender":"Male"
+    },
+    "contactDetails":{
+      "email":"abc@abc.com",
+      "address":"line1"
     }
   }
 }

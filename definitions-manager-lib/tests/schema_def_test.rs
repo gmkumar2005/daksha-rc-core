@@ -6,7 +6,7 @@ use std::io::Read;
 mod tests {
     use super::*;
 
-    fn load_schema_from_file(file_path: &str) -> Result<String, Box<dyn std::error::Error>> {
+    fn load_contents_from_file(file_path: &str) -> Result<String, Box<dyn std::error::Error>> {
         let mut file = File::open(file_path)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
@@ -50,7 +50,7 @@ mod tests {
 
         let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
-        let schema_doc = schema_doc.validate_def().expect("TODO: panic message");
+        let schema_doc = schema_doc.validate_def().expect("Schema validation failed");
         assert_eq!(schema_doc.status, Status::Valid);
     }
 
@@ -70,15 +70,15 @@ mod tests {
             .to_string();
 
         let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
-        let schema_doc = schema_doc.validate_def().expect("TODO: panic message");
+        let schema_doc = schema_doc.validate_def().expect("Schema validation failed");
         assert_eq!(schema_doc.status, Status::Valid);
-        let schema_doc = schema_doc.activate().expect("TODO: panic message");
+        let schema_doc = schema_doc.activate().expect("Schema activation failed");
         assert_eq!(schema_doc.status, Status::Active);
     }
 
     #[tokio::test]
     async fn test_schema_def_activation_without_validation() {
-        let schema = r#"
+        let schema = r###"
         {
             "title": "Example Schema",
             "type": "object",
@@ -88,8 +88,7 @@ mod tests {
                 }
             }
         }
-        "#
-            .to_string();
+        "###.to_string();
 
         let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
@@ -104,34 +103,37 @@ mod tests {
 
     #[tokio::test]
     async fn test_schema_def_validation_institute() {
-        let schema = load_schema_from_file("tests/resources/schemas/institute.json").unwrap();
+        let schema = load_contents_from_file("tests/resources/schemas/institute.json").unwrap();
 
         let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
-        let schema_doc = schema_doc.validate_def().expect("TODO: panic message");
+        let schema_doc = schema_doc.validate_def().expect("Schema validation failed");
         assert_eq!(schema_doc.status, Status::Valid);
     }
     #[tokio::test]
     async fn test_schema_def_validation_student() {
-        let schema = load_schema_from_file("tests/resources/schemas/student.json").unwrap();
+        let schema = load_contents_from_file("tests/resources/schemas/student.json").unwrap();
         let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
-        let schema_doc = schema_doc.validate_def().expect("TODO: panic message");
+        let schema_doc = schema_doc.validate_def().expect("Schema validation failed");
         assert_eq!(schema_doc.status, Status::Valid);
     }
     #[tokio::test]
     async fn test_schema_def_validation_teacher() {
-        let schema = load_schema_from_file("tests/resources/schemas/teacher.json").unwrap();
+        let schema = load_contents_from_file("tests/resources/schemas/teacher.json").unwrap();
         let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
-        let schema_doc = schema_doc.validate_def().expect("TODO: panic message");
+        let schema_doc = schema_doc.validate_def().expect("Schema validation failed");
         assert_eq!(schema_doc.status, Status::Valid);
     }
 
     #[tokio::test]
     async fn test_schema_def_validation_not_a_json() {
-        let schema = load_schema_from_file("tests/resources/schemas/not_a_json.json").unwrap();
-        let result = SchemaDef::new("1".to_string(), schema);
+        let schema_not_a_json = r###"
+            This is not a json file. It is a text file. It is not a valid json
+             "###.to_string();
+
+        let result = SchemaDef::new("1".to_string(), schema_not_a_json);
         assert_that!(result.clone(), err());
         let error_message = result.err().unwrap();
         assert_that!(error_message, matches_regex(r".*Invalid JSON schema.*"));
@@ -139,7 +141,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_schema_def_no_title_schema() {
-        let schema = load_schema_from_file("tests/resources/schemas/not_title.json").unwrap();
+        let schema = load_contents_from_file("tests/resources/schemas/not_title.json").unwrap();
         let result = SchemaDef::new("1".to_string(), schema);
         assert_that!(result.clone(), err());
         let error_message = result.err().unwrap();
@@ -149,20 +151,21 @@ mod tests {
         );
     }
 
+
     #[tokio::test]
     async fn test_validate_record() {
-        let schema = r#"
-    {
-        "title": "Example Schema",
-        "type": "object",
-        "properties": {
-            "example": {
-                "type": "string"
+        let schema = r###"
+            {
+                "title": "Example Schema",
+                "type": "object",
+                "properties": {
+                    "example": {
+                        "type": "string"
+                    }
+                },
+                "required": ["example"]
             }
-        },
-        "required": ["example"]
-    }
-    "#.to_string();
+            "###.to_string();
 
         let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
         let valid_record = r#"{ "example": "test" }"#;
@@ -184,5 +187,209 @@ mod tests {
         assert!(result.is_err());
         let error_message: Vec<String> = result.err().unwrap().collect();
         assert_that!(&*error_message, contains("\"example\" is a required property".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_validate_record_student1() {
+        let schema_with_out_references = r###"
+            {
+          "$schema": "http://json-schema.org/draft-07/schema",
+          "type": "object",
+          "properties": {
+            "Student": {
+              "$ref": "#/definitions/Student"
+            }
+          },
+          "required": [
+            "Student"
+          ],
+          "title": "Student",
+          "definitions": {
+            "Student": {
+              "$id": "#/properties/Student",
+              "type": "object",
+              "title": "The Student Schema",
+              "required": [],
+              "properties": {
+                "identityDetails": {
+                  "type": "object",
+                  "title": "Identity Details",
+                  "description": "Identity Details",
+                  "required": [],
+                  "properties": {
+                    "fullName": {
+                      "$id": "#/properties/fullName",
+                      "type": "string",
+                      "title": "Full name"
+                    },
+                    "gender": {
+                      "$id": "#/properties/gender",
+                      "type": "string",
+                      "enum": [
+                        "Male",
+                        "Female",
+                        "Other"
+                      ],
+                      "title": "Gender"
+                    },
+                    "dob": {
+                      "$id": "#/properties/dob",
+                      "type": "string",
+                      "format": "date",
+                      "title": "DOB"
+                    },
+                    "identityHolder": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "$id": "#/properties/type",
+                          "type": "string",
+                          "$comment": "Nationality",
+                          "title": "ID Type",
+                          "enum": [
+                            "AADHAR",
+                            "PAN",
+                            "LICENSE",
+                            "OTHER"
+                          ]
+                        },
+                        "value": {
+                          "$id": "#/properties/value",
+                          "type": "string",
+                          "$comment": "Nationality",
+                          "title": "ID Value"
+                        }
+                      }
+                    }
+                  }
+                },
+                "contactDetails": {
+                  "type": "object",
+                  "title": "Contact Details",
+                  "description": "Contact Details",
+                  "required": [],
+                  "properties": {
+                    "email": {
+                      "$id": "#/properties/email",
+                      "type": "string",
+                      "title": "Email"
+                    },
+                    "mobile": {
+                      "$id": "#/properties/mobile",
+                      "type": "string",
+                      "title": "Mobile"
+                    },
+                    "address": {
+                      "$id": "#/properties/address",
+                      "type": "string",
+                      "title": "Address"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "_osConfig": {
+            "osComment": [
+              "This section contains the OpenSABER specific configuration information",
+              "privateFields: Optional; list of field names to be encrypted and stored in database",
+              "signedFields: Optional; list of field names that must be pre-signed",
+              "indexFields: Optional; list of field names used for creating index. Enclose within braces to indicate it is a composite index. In this definition, (serialNum, studentCode) is a composite index and studentName is a single column index.",
+              "uniqueIndexFields: Optional; list of field names used for creating unique index. Field names must be different from index field name",
+              "systemFields: Optional; list of fields names used for system standard information like created, updated timestamps and userid"
+            ],
+            "privateFields": [
+              "$.identityDetails.dob",
+              "$.identityDetails.identityType",
+              "$.identityDetails.identityValue"
+            ],
+            "internalFields": [
+              "$.contactDetails.email",
+              "$.contactDetails.mobile",
+              "$.contactDetails.address"
+            ],
+            "signedFields": [],
+            "indexFields": [
+              "studentName"
+            ],
+            "uniqueIndexFields": [
+              "identityValue"
+            ],
+            "systemFields": [
+              "_osCreatedAt",
+              "_osUpdatedAt",
+              "_osCreatedBy",
+              "_osUpdatedBy",
+              "_osAttestedData",
+              "_osClaimId",
+              "_osState"
+            ],
+            "attestationAttributes": [
+              "educationDetails",
+              "nationalIdentifier"
+            ],
+            "attestationPolicies": [
+              {
+                "name": "attestationEducationDetails",
+                "properties": [
+                  "educationDetails/[]"
+                ],
+                "paths": [
+                  "$.educationDetails[?(@.osid == 'PROPERTY_ID')]['instituteName', 'program', 'graduationYear', 'marks']",
+                  "$.identityDetails['fullName']"
+                ],
+                "type": "MANUAL",
+                "attestorEntity": "Teacher",
+                "attestorPlugin": "did:internal:Claim?entity=Teacher",
+                "conditions": "(ATTESTOR#$.experience.[*].instituteOSID#.contains(REQUESTER#$.instituteOSID#) && ATTESTOR#$.experience[?(@.instituteOSID == REQUESTER#$.instituteOSID#)]['_osState']#.contains('PUBLISHED'))"
+              }
+            ],
+            "autoAttestationPolicies": [
+              {
+                "parentProperty": "identityDetails",
+                "property": "identityHolder",
+                "nodeRef": "$.identityDetails.identityHolder",
+                "valuePath": "$.identityDetails.identityHolder.value",
+                "typePath": "$.identityDetails.identityHolder.type"
+              }
+            ],
+            "subjectJsonPath": "mobile",
+            "ownershipAttributes": [
+              {
+                "email": "/contactDetails/email",
+                "mobile": "/contactDetails/mobile",
+                "userId": "/contactDetails/mobile"
+              }
+            ],
+            "inviteRoles": [
+              "anonymous"
+            ],
+            "roles": [
+              "anonymous"
+            ]
+          }
+        }
+    "###.to_string();
+
+        let valid_student_record = r###"
+            {
+              "Student": {
+                "identityDetails":{
+                  "fullName":"John",
+                  "gender":"Male"
+                },
+                "contactDetails":{
+                  "email":"abc@abc.com",
+                  "address":"line1"
+                }
+              }
+            }
+            "###.to_string();
+        let schema_doc = SchemaDef::new("1".to_string(), schema_with_out_references).unwrap();
+        assert_eq!(schema_doc.status, Status::Inactive);
+        let schema_doc = schema_doc.validate_def().expect("Schema validation failed");
+        assert_eq!(schema_doc.status, Status::Valid);
+        let result = schema_doc.validate_record(&valid_student_record);
+        assert!(result.is_ok());
     }
 }
