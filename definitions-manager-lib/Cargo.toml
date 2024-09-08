@@ -12,3 +12,5 @@ jsonschema = "0.18.1"
 tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread", "time"] }
 demonstrate = { version = "0.4.5"}
 hamcrest2 = "0.3.0"
+cqrs-es = "0.4.11"
+async-trait = "0.1.82"
