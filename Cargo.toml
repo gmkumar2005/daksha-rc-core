@@ -4,7 +4,7 @@ members = [
     "definitions-manager-json",
     "definitions-manager-toml",
     "definitions-cli",
-    "rc-web"
+    "rc-web",
 ]
 resolver = "2"
 
@@ -14,3 +14,5 @@ rust-version = "1.80.1"
 version = "0.1.0-SNAPSHOT"
 license = "MIT"
 
+[profile.dev]
+split-debuginfo = "unpacked"

@@ -171,7 +171,7 @@ mod aggregate_tests {
         let aggregate_id = "aggregate-instance-A";
         let valid_schema_with_title = r###"
         {
-            "title": "Example Schema",
+            "title": "Example_Schema",
             "type": "object",
             "properties": {
                 "example": {
@@ -183,6 +183,7 @@ mod aggregate_tests {
         let valid_schema_single_line = remove_spaces_and_returns(&valid_schema_with_title);
 
         let create_def_command = CreateDef { id: "123".to_string(), schema: valid_schema_single_line.clone() };
+        let aggregate_id = "Example_Schema";
         let validate_def_command = ValidateDef;
         let activate_def_command = ActivateDef;
         let activate_def_command2 = ActivateDef;
@@ -190,6 +191,5 @@ mod aggregate_tests {
         let _ = cqrs.execute_with_metadata(aggregate_id, validate_def_command,metadata.clone()).await;
         let _ = cqrs.execute_with_metadata(aggregate_id, activate_def_command,metadata.clone()).await;
         let _ = cqrs.execute_with_metadata(aggregate_id, activate_def_command2,metadata.clone()).await;
-
     }
 }
