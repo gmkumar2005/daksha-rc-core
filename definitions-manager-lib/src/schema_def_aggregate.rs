@@ -48,7 +48,7 @@ impl Aggregate for SchemaDef {
                         message: e,
                         code: 400,
                     })?;
-                Ok(vec![SchemaDefEvent::DefValidated])
+                Ok(vec![SchemaDefEvent::DefValidated{id: schema_def.id,}])
             }
             SchemaDefCommand::ValidateDef => {
                 let schema_def = self.clone();
@@ -58,7 +58,7 @@ impl Aggregate for SchemaDef {
                         code: 400,
                     });
                 }
-                Ok(vec![SchemaDefEvent::DefValidated])
+                Ok(vec![SchemaDefEvent::DefValidated{id: schema_def.id,}])
             }
             SchemaDefCommand::ActivateDef => {
                 let schema_def = self.clone();
@@ -68,12 +68,17 @@ impl Aggregate for SchemaDef {
                         code: 400,
                     });
                 }
-                Ok(vec![SchemaDefEvent::DefActivated])
+                Ok(vec![SchemaDefEvent::DefActivated{id: schema_def.id,}])
             }
             SchemaDefCommand::DeactivateDef => {
                 let schema_def = self.clone();
-                let schema_def = schema_def.clone().de_activate();
-                Ok(vec![SchemaDefEvent::DefDeactivated])
+                if let Err(e) = schema_def.clone().de_activate() {
+                    return Err(SchemaDefError {
+                        message: e.to_string(),
+                        code: 400,
+                    });
+                }
+                Ok(vec![SchemaDefEvent::DefDeactivated{id: schema_def.id,}])
             }
         }
     }
@@ -86,13 +91,13 @@ impl Aggregate for SchemaDef {
                 self.status = Status::Inactive;
             }
 
-            SchemaDefEvent::DefValidated => {
+            SchemaDefEvent::DefValidated{id} => {
                 self.status = Status::Valid;
             }
-            SchemaDefEvent::DefActivated => {
+            SchemaDefEvent::DefActivated{id}  => {
                 self.status = Status::Active;
             }
-            SchemaDefEvent::DefDeactivated => {
+            SchemaDefEvent::DefDeactivated{id}  => {
                 self.status = Status::Inactive;
             }
             SchemaDefEvent::DefCreatedAndValidated { id, schema } => {

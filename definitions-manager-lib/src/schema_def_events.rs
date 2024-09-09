@@ -12,9 +12,15 @@ pub enum SchemaDefEvent {
         id: String,
         schema: String,
     },
-    DefValidated,
-    DefActivated,
-    DefDeactivated,
+    DefValidated{
+        id: String,
+    },
+    DefActivated{
+        id: String,
+    },
+    DefDeactivated{
+        id: String,
+    },
 }
 
 impl DomainEvent for SchemaDefEvent {
