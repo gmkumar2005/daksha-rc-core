@@ -95,7 +95,7 @@ mod tests {
         let result = schema_doc.clone().activate();
         assert!(result.is_err());
         assert_eq!(
-            "SchemaDoc must be valid before activation".to_string(),
+            "SchemaDoc must be valid before activation; cannot move status from Inactive to Active".to_string(),
             result.err().unwrap()
         );
         assert_eq!(schema_doc.status, Status::Inactive);

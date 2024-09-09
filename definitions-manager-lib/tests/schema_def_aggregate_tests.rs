@@ -14,22 +14,13 @@ mod aggregate_tests {
 
 
     pub struct MockSchemaDefServices {
-        pub create_def: Mutex<Result<(), SchemaValidationError>>,
-        pub validate_def: Mutex<Result<(), SchemaValidationError>>,
-        pub activate_def: Mutex<Result<(), SchemaValidationError>>,
-        pub deactivate_def: Mutex<Result<(), SchemaValidationError>>,
-        pub create_and_validate_def: Mutex<Result<(), SchemaValidationError>>,
+        pub get_user_id: Mutex<Result<(), SchemaValidationError>>,
     }
 
     impl Default for MockSchemaDefServices {
         fn default() -> Self {
             Self {
-                create_def: Mutex::new(Ok(())),
-                validate_def: Mutex::new(Ok(())),
-                activate_def: Mutex::new(Ok(())),
-                deactivate_def: Mutex::new(Ok(())),
-                create_and_validate_def: Mutex::new(Ok(())),
-
+                get_user_id: Mutex::new(Ok(())),
             }
         }
     }
@@ -38,41 +29,13 @@ mod aggregate_tests {
             Self::default()
         }
         fn create_def(&self, _id: &str, _schema: &str) -> Result<(), SchemaValidationError> {
-            self.create_def.lock().unwrap().clone()
-        }
-        fn validate_def(&self, _id: &str) -> Result<(), SchemaValidationError> {
-            self.validate_def.lock().unwrap().clone()
-        }
-        fn activate_def(&self, _id: &str) -> Result<(), SchemaValidationError> {
-            self.activate_def.lock().unwrap().clone()
-        }
-        fn deactivate_def(&self, _id: &str) -> Result<(), SchemaValidationError> {
-            self.deactivate_def.lock().unwrap().clone()
-        }
-        fn create_and_validate_def(&self, _id: &str, _schema: &str) -> Result<(), SchemaValidationError> {
-            self.create_and_validate_def.lock().unwrap().clone()
+            self.get_user_id.lock().unwrap().clone()
         }
     }
     #[async_trait]
     impl SchemaDefServicesApi for MockSchemaDefServices {
-        async fn create_def(&self, _id: &str, _schema: &str) -> Result<(), SchemaValidationError> {
-            self.create_def.lock().unwrap().clone()
-        }
-
-
-        async fn validate_def(&self, _id: &str) -> Result<(), SchemaValidationError> {
-            self.validate_def.lock().unwrap().clone()
-        }
-
-        async fn activate_def(&self, _id: &str) -> Result<(), SchemaValidationError> {
-            self.activate_def.lock().unwrap().clone()
-        }
-
-        async fn deactivate_def(&self, _id: &str) -> Result<(), SchemaValidationError> {
-            self.deactivate_def.lock().unwrap().clone()
-        }
-        async fn create_and_validate_def(&self, _id: &str, _schema: &str) -> Result<(), SchemaValidationError> {
-            self.create_and_validate_def.lock().unwrap().clone()
+        async fn get_user_id(&self, user_id: &str) -> Result<(), SchemaValidationError> {
+            self.get_user_id.lock().unwrap().clone()
         }
     }
 

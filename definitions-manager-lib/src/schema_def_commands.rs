@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub enum SchemaDefCommand {
     CreateDef { id: String, schema: String },
     ValidateDef,
