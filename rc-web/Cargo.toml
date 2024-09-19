@@ -11,7 +11,20 @@ chrono = { version = "0.4.38", features = ["serde"] }
 serde_json = "1.0.128"
 validator = { version = "0.18.1", features = ["derive"] }
 definitions-manager-lib = { path = "../definitions-manager-lib" }
-[dev-dependencies]
+env_logger = "0.11.5"
+log = "0.4.22"
+ctor = "0.2.8"
+async-trait = "0.1.82"
 actix-rt = "2.10.0"
-[profile.dev]
-split-debuginfo = "unpacked"
+cqrs-es = "0.4.12"
+postgres-es = "0.4.12"
+sqlx = { version = "0.8.2", features = [ "postgres" , "runtime-tokio-rustls", "json"] }
+tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread", "time"] }
+futures = "0.3.30"
+config = "0.14.0"
+dotenv = "0.15.0"
+[dev-dependencies]
+hamcrest2 = "0.3.0"
+
+
+

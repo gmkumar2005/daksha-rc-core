@@ -1,51 +1,39 @@
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use serde::{Deserialize, Serialize};
-use validator::Validate;
-use definitions_manager_lib::schema_def_commands::SchemaDefCommand;
+// The main entry point of the application. This file starts the Actix-Web server and configures the routes, middleware, and app state.
+mod app;
+mod command_extractor;
 
-#[get("/")]
-async fn hello() -> impl Responder {
-    "Hello, Actix web!"
-}
-
-#[post("/create")]
-async fn create() -> impl Responder {
-    HttpResponse::Created().body("Resource created successfully!")
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, Validate)]
-struct CreateDefRequest {
-    #[validate(length(
-        min = 3,
-        message = "id is required and must be at least 3 characters"
-    ))]
-    id: String,
-    #[validate(length(
-        max = 4096,
-        message = "schema is required and must be at less than 4096 characters"
-    ))]
-    schema: String,
-}
-
-
-async fn create_def(data: web::Json<CreateDefRequest>) -> impl Responder {
-    let command = SchemaDefCommand::CreateDef {
-        id: data.id.clone(),
-        schema: data.schema.clone(),
-    };
-    // Handle the command (e.g., send it to a command handler)
-    HttpResponse::Ok().body("CreateDef command received")
-}
+use actix_web::{App, HttpServer};
+use rc_web::handlers::schema_def_handlers::{hello, create, application_state_factory, create_def};
+use dotenv::dotenv;
+use rc_web::config::AppConfig;
 
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| {
+    std::env::set_var("RUST_LOG", "debug");
+    dotenv().ok();
+    // Load the configuration
+    let config = AppConfig::from_env().expect("Failed to load configuration");
+    // Build the connection URL
+    let db_url = format!(
+        "postgres://{}:{}@{}:{}/{}",
+        config.database.user,
+        config.database.password,
+        config.database.host,
+        config.database.port,
+        config.database.dbname
+    );
+    println!("Database URL: {}", db_url);
+    env_logger::init();
+    let app_state = application_state_factory(&db_url).await;
+    HttpServer::new(move || {
         App::new()
+            .app_data(app_state.clone())
             .service(hello)
             .service(create)
+            .service(create_def)
     })
-        .bind("127.0.0.1:8080")?
+        .bind(("127.0.0.1", 8080))?
         .run()
         .await
 }

@@ -1,0 +1,6 @@
+[database]
+host = "prod-db-server"
+port = 5432
+user = "prod_user"
+password = "prod_password"
+dbname = "prod_database"

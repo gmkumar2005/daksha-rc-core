@@ -1,0 +1,6 @@
+#[database]
+#host = "test-db-server"
+#port = 5432
+#user = "test_user"
+#password = "test_password"
+#dbname = "test_database"

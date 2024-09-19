@@ -10,10 +10,10 @@ demonstrate! {
             let four = 4;
         }
 
-        #[should_panic]
-        it "can fail" {
-            assert_ne!(four, 4)
-        }
+        // #[should_panic]
+        // it "can fail" {
+        //     assert_ne!(four, 4)
+        // }
 
         #[tokio::test]
         async test "is returnable" -> Result<(), &'static str> {

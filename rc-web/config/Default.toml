@@ -1,0 +1,10 @@
+[database]
+host = "localhost"
+port = 5432
+user = "daksha_rc"
+password = "daksha_rc"
+dbname = "daksha_rc"
+
+
+#"postgresql://daksha_rc:daksha_rc@localhost:5432/daksha_rc"
+#postgres://daksha_rc:daksha_rc@localhost:5432/daksha_rc

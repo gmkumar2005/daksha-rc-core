@@ -8,9 +8,16 @@ license = "MIT"
 serde = { version = "1.0.209", features = ["derive"] }
 chrono = { version = "0.4.38", features = ["serde"] }
 serde_json = "1.0.127"
-jsonschema = "0.18.1"
+jsonschema = "0.20.0"
 tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread", "time"] }
 demonstrate = { version = "0.4.5"}
-hamcrest2 = "0.3.0"
+
 cqrs-es = "0.4.11"
 async-trait = "0.1.82"
+anyhow = "1.0.86"
+url = "2.5.2"
+reqwest = { version = "0.12.7", features = ["json"] }
+sqlx = { version = "0.8.2", features = ["chrono", "runtime-async-std-native-tls", "postgres"] }
+regex = "1.10.6"
+[dev-dependencies]
+hamcrest2 = "0.3.0"

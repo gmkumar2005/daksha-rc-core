@@ -1,4 +1,4 @@
-use jsonschema::{Draft, JSONSchema};
+use jsonschema::{Draft, Validator as JSONSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

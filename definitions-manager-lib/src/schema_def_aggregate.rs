@@ -21,15 +21,21 @@ impl Aggregate for SchemaDef {
     async fn handle(
         &self,
         command: Self::Command,
-        services: &Self::Services,
+        _services: &Self::Services,
     ) -> Result<Vec<Self::Event>, Self::Error> {
         match command {
             SchemaDefCommand::CreateDef { id, schema } => {
                 //TODO error handling
+                if self.id == id {
+                    return Err(SchemaDefError::ExistsError {
+                        error_message: format!("Aggregate with id {} already exists", id),
+                        error_code: 400,
+                    });
+                }
                 let schema_def = SchemaDef::new(id, schema)
-                    .map_err(|e| SchemaDefError {
-                        message: e,
-                        code: 400,
+                    .map_err(|e| SchemaDefError ::ValidationError{
+                        error_message: e,
+                        error_code: 400,
                     })?;
                 Ok(vec![SchemaDefEvent::DefCreated {
                     id: schema_def.id,
@@ -39,46 +45,64 @@ impl Aggregate for SchemaDef {
             SchemaDefCommand::CreateAndValidateDef { id, schema } => {
                 //TODO error handling
                 let schema_def = SchemaDef::new(id, schema)
-                    .map_err(|e| SchemaDefError {
-                        message: e,
-                        code: 400,
+                    .map_err(|e| SchemaDefError ::GeneralError {
+                        error_message: e,
+                        error_code: 400,
                     })?;
                 schema_def.clone().validate_def()
-                    .map_err(|e| SchemaDefError {
-                        message: e,
-                        code: 400,
+                    .map_err(|e| SchemaDefError::ValidationError {
+                        error_message: e,
+                        error_code: 400,
                     })?;
-                Ok(vec![SchemaDefEvent::DefValidated{id: schema_def.id,}])
+                Ok(vec![SchemaDefEvent::DefValidated { id: schema_def.id, }])
             }
-            SchemaDefCommand::ValidateDef => {
+            SchemaDefCommand::ValidateDef { id } => {
                 let schema_def = self.clone();
+                if schema_def.id != id {
+                    return Err(SchemaDefError::ValidationError{
+                        error_message: format!("The id:{} in the aggregate does not match with id: {} in the command", id, schema_def.id.to_string()),
+                        error_code: 400,
+                    });
+                }
                 if let Err(e) = schema_def.clone().validate_def() {
-                    return Err(SchemaDefError {
-                        message: e.to_string(),
-                        code: 400,
+                    return Err(SchemaDefError::ValidationError {
+                        error_message: e.to_string(),
+                        error_code: 400,
                     });
                 }
-                Ok(vec![SchemaDefEvent::DefValidated{id: schema_def.id,}])
+                Ok(vec![SchemaDefEvent::DefValidated { id: schema_def.id, }])
             }
-            SchemaDefCommand::ActivateDef => {
+            SchemaDefCommand::ActivateDef{ id } => {
                 let schema_def = self.clone();
+                if schema_def.id != id {
+                    return Err(SchemaDefError::ActivationError{
+                        error_message: format!("The id:{} in the aggregate does not match with id: {} in the command", id, schema_def.id.to_string()),
+                        error_code: 400,
+                    });
+                }
                 if let Err(e) = schema_def.clone().activate() {
-                    return Err(SchemaDefError {
-                        message: e.to_string(),
-                        code: 400,
+                    return Err(SchemaDefError::ActivationError {
+                        error_message: e.to_string(),
+                        error_code: 400,
                     });
                 }
-                Ok(vec![SchemaDefEvent::DefActivated{id: schema_def.id,}])
+                Ok(vec![SchemaDefEvent::DefActivated { id: schema_def.id, }])
             }
-            SchemaDefCommand::DeactivateDef => {
+            SchemaDefCommand::DeactivateDef{ id } => {
                 let schema_def = self.clone();
-                if let Err(e) = schema_def.clone().de_activate() {
-                    return Err(SchemaDefError {
-                        message: e.to_string(),
-                        code: 400,
+                if schema_def.id != id {
+                    return Err(SchemaDefError::DeactivationError {
+                        error_message: format!("The id:{} in the aggregate does not match with id: {} in the command", id, schema_def.id.to_string()),
+                        error_code: 400,
                     });
                 }
-                Ok(vec![SchemaDefEvent::DefDeactivated{id: schema_def.id,}])
+                if let Err(e) = schema_def.clone().de_activate() {
+                    return Err(SchemaDefError::DeactivationError {
+                        error_message: e.to_string(),
+                        error_code: 400,
+                    });
+                }
+                Ok(vec![SchemaDefEvent::DefDeactivated { id: schema_def.id, }])
             }
         }
     }
@@ -91,13 +115,13 @@ impl Aggregate for SchemaDef {
                 self.status = Status::Inactive;
             }
 
-            SchemaDefEvent::DefValidated{id} => {
+            SchemaDefEvent::DefValidated { .. } => {
                 self.status = Status::Valid;
             }
-            SchemaDefEvent::DefActivated{id}  => {
+            SchemaDefEvent::DefActivated { .. } => {
                 self.status = Status::Active;
             }
-            SchemaDefEvent::DefDeactivated{id}  => {
+            SchemaDefEvent::DefDeactivated { .. } => {
                 self.status = Status::Inactive;
             }
             SchemaDefEvent::DefCreatedAndValidated { id, schema } => {
