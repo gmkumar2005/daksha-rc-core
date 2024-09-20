@@ -1,12 +1,16 @@
 // The main entry point of the application. This file starts the Actix-Web server and configures the routes, middleware, and app state.
 mod app;
 mod command_extractor;
+mod db;
+mod config;
+mod handlers;
+mod models;
 
 use actix_web::{App, HttpServer};
-use rc_web::handlers::schema_def_handlers::{hello, create, application_state_factory, create_def};
+use app::application_state_factory;
+use config::AppConfig;
 use dotenv::dotenv;
-use rc_web::config::AppConfig;
-
+use handlers::schema_def_handlers::{create, create_def, hello};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
