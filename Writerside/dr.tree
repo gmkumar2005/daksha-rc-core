@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE instance-profile
+        SYSTEM "https://resources.jetbrains.com/writerside/1.0/product-profile.dtd">
+
+<instance-profile id="dr"
+                 name="Daksha-RC Registry"
+                 start-page="Overview.md">
+
+    <toc-element topic="daksha-rc-registry.md"/>
+    <toc-element topic="Overview.md">
+        <toc-element topic="Why-do-we-need-Daksha-RC.md"/>
+    </toc-element>
+    <toc-element topic="Technical-Overview.md">
+        <toc-element topic="High-Level-Architecture.md"/>
+    </toc-element>
+</instance-profile>
