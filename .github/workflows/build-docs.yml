@@ -11,7 +11,7 @@ permissions:
 
 env:
   INSTANCE: 'Writerside/dr'
-  ARTIFACT: 'webHelpHI2-all.zip'
+  ARTIFACT: 'docs.zip'
   DOCKER_VERSION: '242.21870'
 
 jobs:
