@@ -1,3 +1,4 @@
+use crate::app::SimpleLoggingQuery;
 use async_trait::async_trait;
 use cqrs_es::persist::GenericQuery;
 use cqrs_es::Query;
@@ -8,7 +9,6 @@ use postgres_es::{
     PostgresCqrs, PostgresViewRepository};
 use sqlx::{Pool, Postgres};
 use std::sync::{Arc, Mutex};
-use crate::app::SimpleLoggingQuery;
 // pub async fn configure_repo() -> PostgresEventRepository {
 //     let connection_string = "postgresql://daksha_rc:daksha_rc@localhost:5432/daksha_rc";
 //     let pool: Pool<Postgres> = default_postgress_pool(connection_string).await;

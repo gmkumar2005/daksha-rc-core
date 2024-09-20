@@ -1,11 +1,11 @@
+use crate::db::connection::cqrs_framework;
 use actix_web::web::Data;
-use postgres_es::{default_postgress_pool, PostgresCqrs, PostgresViewRepository};
-use std::sync::Arc;
 use async_trait::async_trait;
 use cqrs_es::{EventEnvelope, Query};
 use definitions_manager_lib::schema_def::SchemaDef;
 use definitions_manager_lib::schema_def_queries::SchemaDefView;
-use crate::db::connection::cqrs_framework;
+use postgres_es::{default_postgress_pool, PostgresCqrs, PostgresViewRepository};
+use std::sync::Arc;
 
 
 pub async fn application_state_factory(connection_string: &str) -> Data<ApplicationState> {

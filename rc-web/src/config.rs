@@ -1,6 +1,6 @@
-use std::fmt;
 use config::{Config, ConfigError, File};
 use serde::Deserialize;
+use std::fmt;
 
 // Handles application configuration,
 
