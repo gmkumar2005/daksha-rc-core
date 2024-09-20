@@ -1,3 +1,5 @@
+mod common;
+mod integration_tests;
 use std::env;
 use std::sync::{Once, OnceLock};
 use rc_web::config::AppConfig;
@@ -25,8 +27,9 @@ mod tests {
     use dotenv::dotenv;
     use hamcrest2::prelude::*;
     use serde_json::Value;
+    use rc_web::app::application_state_factory;
     use rc_web::config::AppConfig;
-    use rc_web::handlers::schema_def_handlers::{application_state_factory, create_def, hello, CreateDefRequest};
+    use rc_web::handlers::schema_def_handlers::{create_def, hello, CreateDefRequest};
     use crate::CONFIG;
 
     #[actix_web::test]
@@ -134,7 +137,7 @@ mod tests {
                 .service(create_def)
         ).await;
 
-        let example_schema = r#"
+        let example_schema = r###"
         {
             "title": "Example Faulty Schema,
             "type": "object",
@@ -144,7 +147,7 @@ mod tests {
                 }
             }
         }
-        "#
+        "###
             .to_string();
 
         let payload = CreateDefRequest {
