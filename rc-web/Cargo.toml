@@ -23,6 +23,8 @@ tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread", "time"] }
 futures = "0.3.30"
 config = "0.14.0"
 dotenv = "0.15.0"
+sqlite-es = "0.4.5"
+thiserror = "1.0.63"
 [dev-dependencies]
 hamcrest2 = "0.3.0"
 
