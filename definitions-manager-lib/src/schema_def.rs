@@ -1,6 +1,8 @@
-use jsonschema::{Draft, Validator as JSONSchema};
+#[allow(deprecated)]
+use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
 
 #[derive(Serialize, Default, Deserialize, Debug, Clone, PartialEq)]
 pub enum Status {
@@ -40,12 +42,9 @@ impl SchemaDef {
     }
 
     pub fn validate_def(self) -> Result<Self, String> {
-        let schema_value: Value = serde_json::from_str(&self.schema)
+        let schema_val: Value = serde_json::from_str(&self.schema)
             .map_err(|e| format!("Invalid JSON schema: {}", e))?;
-
-        JSONSchema::options()
-            .with_draft(Draft::Draft7)
-            .compile(&schema_value)
+        jsonschema::draft7::new(&schema_val)
             .map_err(|e| format!("Schema compilation error: {:?}", e))?;
 
         Ok(Self {
@@ -61,7 +60,7 @@ impl SchemaDef {
                 ..self
             })
         } else {
-            Err(format!("SchemaDoc must be valid before activation; cannot move status from {:?} to {:?}", self.status,Status::Active).into())
+            Err(format!("SchemaDoc must be valid before activation; cannot move status from {:?} to {:?}", self.status, Status::Active).into())
         }
     }
 
@@ -75,6 +74,8 @@ impl SchemaDef {
             Err("SchemaDoc must be active before de_activation".into())
         }
     }
+
+    #[allow(deprecated)]
     pub fn validate_record<'a>(&'a self, json_record: &'a str) -> Result<(), Box<dyn Iterator<Item=String> + 'a>> {
         // Check if the json_record is a valid JSON
         let instance_val: Value = serde_json::from_str(json_record)
@@ -83,6 +84,7 @@ impl SchemaDef {
         // Check if the json_record conforms to the JSON schema
         let schema_val: Value = serde_json::from_str(&self.schema)
             .map_err(|e| Box::new(std::iter::once(format!("Invalid JSON schema: {}", e))) as Box<dyn Iterator<Item=String>>)?;
+
 
         let compiled_schema_val = JSONSchema::options()
             .with_draft(Draft::Draft7)
