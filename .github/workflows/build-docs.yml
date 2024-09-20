@@ -10,7 +10,7 @@ permissions:
   pages: write
 
 env:
-  INSTANCE: 'Writerside/Daksha-RC Registry'
+  INSTANCE: 'Writerside/dr'
   ARTIFACT: 'webHelpHI2-all.zip'
   DOCKER_VERSION: '242.21870'
 
