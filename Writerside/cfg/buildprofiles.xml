@@ -17,7 +17,7 @@
     <build-profile instance="dr">
         <variables>
             <noindex-content>true</noindex-content>
-            <header-logo>logo.jpg</header-logo>
+            <header-logo>Daksha-RC-Logo.png</header-logo>
             <product-web-url>https://daksha-rc.github.io/daksha-rc-core/overview.html</product-web-url>
         </variables>
     </build-profile>

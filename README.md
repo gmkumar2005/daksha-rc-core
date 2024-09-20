@@ -1,6 +1,10 @@
 # daksha-rc-core
 High performance Electronic Registries and Verifiable Credentials
 
+<div align="center">
+  <img src="./Writerside/images/Daksha-RC-Logo.png" alt="Daksha-RC Logo" width="50%" height="50%">
+</div>
+
 # About Daksha-RC Registry
 
 Daksha-RC Registry is an open-source framework designed for building and managing digital registries in sectors like governance, education, and public services at population scale.
