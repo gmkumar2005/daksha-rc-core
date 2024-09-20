@@ -1,3 +1,4 @@
+![Daksha-RC Logo](Daksha-RC-Logo.png)
 # About Daksha-RC Registry
 
 Daksha-RC Registry is an open-source framework designed for building and managing digital registries in sectors like governance, education, and public services at population scale. 
@@ -5,8 +6,6 @@ It provides a decentralized platform for securely storing, managing, and sharing
 
 Daksha-RC enables authorized data repositories to publish and manage data and metadata efficiently. 
 It supports rapid development of electronic registries, enables data attestation, and facilitates verifiable credentialing, all with minimal effort, making it a powerful tool for public and institutional digital transformation.
-
-
 
 > A **Registry** is a shared digital infrastructure that allows authorized data repositories to publish relevant data and metadata about a user or entity, along with a digitally signed link to the repository.
 
