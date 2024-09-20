@@ -9,9 +9,11 @@ It provides a decentralized platform for securely storing, managing, and sharing
 Daksha-RC enables authorized data repositories to publish and manage data and metadata efficiently.
 It supports rapid development of electronic registries, enables data attestation, and facilitates verifiable credentialing, all with minimal effort, making it a powerful tool for public and institutional digital transformation.
 
+More documents are available in the [Daksha-RC Documentation](https://daksha-rc.github.io/daksha-rc-core/overview.html).
 
 > A **Registry** is a shared digital infrastructure that allows authorized data repositories to publish relevant data and metadata about a user or entity, along with a digitally signed link to the repository.
 
 
 > **Daksha (दक्ष)**  in _Sanskrit_ conveys the qualities of ability, intelligence, and competence.
 > Daksha refers to someone who is skillful, capable, or proficient in their work or actions.
+
