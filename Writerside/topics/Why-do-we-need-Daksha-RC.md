@@ -48,5 +48,5 @@ For instance, in a patient registry, adopters might restrict access to fields wi
 - Unique ID generation
 
 #### VC Verification
-- Offline verification of Verifiable Credentials: Reference SDK
+- Offline verification of Verifiable Credentials
 - Consent based access: Allows users to grant consent to another system or person to access Verifiable Credentials for transactions or interactions.
