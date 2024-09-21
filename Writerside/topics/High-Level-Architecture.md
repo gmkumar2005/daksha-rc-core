@@ -13,6 +13,10 @@ It adopts a [hexagonal architecture](https://en.wikipedia.org/wiki/Hexagonal_arc
 [Functional programming](https://en.wikipedia.org/wiki/Functional_programming) principles are applied which allows for high concurrency and low latency.
 [Rust programming language](https://www.rust-lang.org/) is used for its efficient memory management performance and safety features.
 
+
+
+
+
 ## Components
 ### Core Service
 The core business logic is implemented as a definitions-manager library.
