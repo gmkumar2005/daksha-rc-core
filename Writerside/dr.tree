@@ -13,5 +13,7 @@
     <toc-element topic="Technical-Overview.md">
         <toc-element topic="High-Level-Architecture.md"/>
         <toc-element topic="High-Level-Design.md"/>
+        <toc-element topic="Domain-Driven-Design.md">
+        </toc-element>
     </toc-element>
 </instance-profile>
