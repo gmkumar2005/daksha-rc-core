@@ -7,10 +7,10 @@ mod handlers;
 mod models;
 
 use actix_web::{App, HttpServer};
-use app::application_state_factory;
 use config::AppConfig;
 use dotenv::dotenv;
-use handlers::schema_def_handlers::{create, create_def, hello};
+use handlers::schema_def_handlers::{create_def, hello};
+use crate::app::application_state_factory_pg;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -29,12 +29,11 @@ async fn main() -> std::io::Result<()> {
     );
     println!("Database URL: {}", db_url);
     env_logger::init();
-    let app_state = application_state_factory(&db_url).await;
+    let app_state = application_state_factory_pg(&db_url).await;
     HttpServer::new(move || {
         App::new()
             .app_data(app_state.clone())
             .service(hello)
-            .service(create)
             .service(create_def)
     })
         .bind(("127.0.0.1", 8080))?

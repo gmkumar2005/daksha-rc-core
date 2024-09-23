@@ -1,4 +1,4 @@
-use crate::app::ApplicationState;
+use crate::app::{SimpleApplicationState};
 use actix_web::web::Data;
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use cqrs_es::AggregateError;
@@ -9,17 +9,11 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 #[get("/")]
-async fn hello(app_state: Data<ApplicationState>) -> String {
+async fn hello(app_state: Data<SimpleApplicationState>) -> String {
     let app_name = &app_state.app_name; // <- get app_name
     format!("Hello, {app_name}!") // <- response with app_name
 }
 
-#[post("/create")]
-async fn create(app_state: Data<ApplicationState>) -> impl Responder {
-    let app_name = &app_state.app_name;
-    let message = format!("Creating resource for {}", app_name);
-    HttpResponse::Created().body(message)
-}
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct CreateDefRequest {
@@ -37,7 +31,7 @@ pub struct CreateDefRequest {
 
 
 #[post("/create_def")]
-async fn create_def(data: web::Json<CreateDefRequest>, req: HttpRequest, app_state: Data<ApplicationState>) -> impl Responder {
+async fn create_def(data: web::Json<CreateDefRequest>, req: HttpRequest, app_state: Data<SimpleApplicationState>) -> impl Responder {
     let command = SchemaDefCommand::CreateDef {
         id: data.id.clone(),
         schema: data.schema.clone(),
@@ -49,6 +43,7 @@ async fn create_def(data: web::Json<CreateDefRequest>, req: HttpRequest, app_sta
             debug!("User-Agent {}", value);
         }
     }
+
 
     let response = match app_state.cqrs.execute(&data.id, command).await {
         Ok(_) => HttpResponse::Created()
@@ -62,9 +57,13 @@ async fn create_def(data: web::Json<CreateDefRequest>, req: HttpRequest, app_sta
                 .finish()
         }
         Err(AggregateError::UserError(schema_def_error)) => {
+            log::error!("User error: {}", schema_def_error);
             HttpResponse::BadRequest().json(schema_def_error)
         }
-        Err(e) => HttpResponse::InternalServerError().body(format!("Execution failed: {}", e)),
+        Err(e) => {
+            log::error!("UnexpectedError: {}", e);
+            // print type of e
+            HttpResponse::InternalServerError().body("An unexpected error occurred while processing your request")},
     };
     response
 }

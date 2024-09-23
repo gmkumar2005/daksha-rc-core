@@ -1,11 +1,30 @@
 mod common;
 mod integration_tests;
+use rc_web::config::AppConfig;
 use std::env;
 use std::sync::{Once, OnceLock};
-use rc_web::config::AppConfig;
 
 static INIT: Once = Once::new();
 static CONFIG: OnceLock<AppConfig> = OnceLock::new();
+static DB_URL: OnceLock<DatabaseUrl> = OnceLock::new();
+
+#[derive(Debug)]
+enum DatabaseUrl {
+    SqliteInMemory,
+    SqliteInDemoDb,
+    PostgresRc,
+}
+
+impl DatabaseUrl {
+    fn value(&self) -> &str {
+        match self {
+            DatabaseUrl::SqliteInMemory => "sqlite::memory:",
+            DatabaseUrl::SqliteInDemoDb => "sqlite://target/demo.db",
+            DatabaseUrl::PostgresRc => "postgres://daksha_rc:daksha_rc@localhost:5432/daksha_rc",
+        }
+    }
+}
+
 #[ctor::ctor]
 fn init() {
     INIT.call_once(|| {
@@ -14,36 +33,33 @@ fn init() {
         let _ = env_logger::builder().is_test(true).try_init();
         let config = AppConfig::from_env().expect("Failed to load configuration");
         CONFIG.set(config).expect("Failed to set configuration");
+        DB_URL.set(DatabaseUrl::SqliteInMemory).expect("Failed to set database URL");
     });
 }
 
 #[cfg(test)]
 mod tests {
-    use actix_web::http::header::ContentType;
-    use actix_web::test::TestRequest;
+    use crate::{DatabaseUrl, DB_URL};
     use actix_web::body;
-    use actix_web::{test, App};
+    use actix_web::http::header::ContentType;
     use actix_web::http::StatusCode;
+    use actix_web::test::TestRequest;
+    use actix_web::{test, App};
     use dotenv::dotenv;
     use hamcrest2::prelude::*;
-    use serde_json::Value;
-    use rc_web::app::application_state_factory;
+    use rc_web::app::{application_state_factory_pg, application_state_factory_sqlite};
     use rc_web::config::AppConfig;
     use rc_web::handlers::schema_def_handlers::{create_def, hello, CreateDefRequest};
-    use crate::CONFIG;
+    use serde_json::Value;
 
     #[actix_web::test]
     async fn test_index_get() {
-        let config = CONFIG.get().expect("Configuration not initialized");
-        let db_url = format!(
-            "postgres://{}:{}@{}:{}/{}",
-            config.database.user,
-            config.database.password,
-            config.database.host,
-            config.database.port,
-            config.database.dbname
-        );
-        let app_state = application_state_factory(&db_url).await;
+        let db_url = DB_URL.get().expect("Database URL not initialized").value();
+        let app_state = match DB_URL.get().expect("Database URL not initialized") {
+            DatabaseUrl::PostgresRc => application_state_factory_pg(db_url).await,
+            _ => application_state_factory_sqlite(db_url).await,
+        };
+
         let app = test::init_service(
             App::new()
                 .app_data(app_state.clone()) // Inject state into the test app
@@ -69,18 +85,15 @@ mod tests {
         std::env::set_var("RUST_LOG", "debug");
         let _ = env_logger::builder().is_test(true).try_init();
     }
+
     #[actix_web::test]
     async fn test_create_def() {
-        let config = CONFIG.get().expect("Configuration not initialized");
-        let db_url = format!(
-            "postgres://{}:{}@{}:{}/{}",
-            config.database.user,
-            config.database.password,
-            config.database.host,
-            config.database.port,
-            config.database.dbname
-        );
-        let app_state = application_state_factory(&db_url).await;
+        let db_url = DB_URL.get().expect("Database URL not initialized").value();
+
+        let app_state = match DB_URL.get().expect("Database URL not initialized") {
+            DatabaseUrl::PostgresRc => application_state_factory_pg(db_url).await,
+            _ => application_state_factory_sqlite(db_url).await,
+        };
         let app = test::init_service(
             App::new()
                 .app_data(app_state)
@@ -89,7 +102,7 @@ mod tests {
 
         let example_schema = r#"
         {
-            "title": "Example Schema2",
+            "title": "Example Schema3",
             "type": "object",
             "properties": {
                 "example": {
@@ -101,7 +114,7 @@ mod tests {
             .to_string();
 
         let payload = CreateDefRequest {
-            id: String::from("Example Schema2"),
+            id: String::from("Example Schema3"),
             schema: example_schema,
         };
 
@@ -117,20 +130,17 @@ mod tests {
 
         // check location header
         let location = resp.headers().get("Location").unwrap();
-        assert_eq!(location, "/schema_def/Example Schema2");
+        assert_eq!(location, "/schema_def/Example Schema3");
     }
+
+
     #[actix_web::test]
     async fn test_create_def_with_validation_error() {
-        let config = CONFIG.get().expect("Configuration not initialized");
-        let db_url = format!(
-            "postgres://{}:{}@{}:{}/{}",
-            config.database.user,
-            config.database.password,
-            config.database.host,
-            config.database.port,
-            config.database.dbname
-        );
-        let app_state = application_state_factory(&db_url).await;
+        let db_url = DB_URL.get().expect("Database URL not initialized").value();
+        let app_state = match DB_URL.get().expect("Database URL not initialized") {
+            DatabaseUrl::PostgresRc => application_state_factory_pg(db_url).await,
+            _ => application_state_factory_sqlite(db_url).await,
+        };
         let app = test::init_service(
             App::new()
                 .app_data(app_state)
@@ -192,4 +202,5 @@ mod tests {
         The below line should print the database URL defined in the Testing.toml");
         println!("Database URL: {}", db_url);
     }
+
 }

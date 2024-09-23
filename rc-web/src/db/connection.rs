@@ -7,22 +7,18 @@ use definitions_manager_lib::schema_def_queries::SchemaDefView;
 use definitions_manager_lib::schema_def_services::{SchemaDefServices, SchemaDefServicesApi, SchemaValidationError};
 use postgres_es::{
     PostgresCqrs, PostgresViewRepository};
-use sqlx::{Pool, Postgres};
+use sqlite_es::{SqliteCqrs, SqliteViewRepository};
+use sqlx::{Pool, Postgres, Sqlite};
 use std::sync::{Arc, Mutex};
-// pub async fn configure_repo() -> PostgresEventRepository {
-//     let connection_string = "postgresql://daksha_rc:daksha_rc@localhost:5432/daksha_rc";
-//     let pool: Pool<Postgres> = default_postgress_pool(connection_string).await;
-//     PostgresEventRepository::new(pool)
-// }
 
-// type PgViewRepository = PostgresViewRepository<SchemaDefView, SchemaDef>;
-//
-// pub fn configure_view_repository(db_pool: Pool<Postgres>) -> PgViewRepository {
-//     PostgresViewRepository::new("schema_def_view", db_pool)
-// }
 
-pub type SchemaDefQuery = GenericQuery<
+pub type SchemaDefQueryPg = GenericQuery<
     PostgresViewRepository<SchemaDefView, SchemaDef>,
+    SchemaDefView,
+    SchemaDef>;
+
+pub type SchemaDefQuerySqlite = GenericQuery<
+    SqliteViewRepository<SchemaDefView, SchemaDef>,
     SchemaDefView,
     SchemaDef>;
 
@@ -47,24 +43,34 @@ impl SchemaDefServicesApi for MockSchemaDefServices {
 }
 
 
-pub fn cqrs_framework(
+pub fn cqrs_framework_pg(
     pool: Pool<Postgres>,
-) -> (
-    Arc<PostgresCqrs<SchemaDef>>,
-    Arc<PostgresViewRepository<SchemaDefView, SchemaDef>>,
-) {
+) ->
+    PostgresCqrs<SchemaDef>
+{
     let schema_def_view_repo = Arc::new(PostgresViewRepository::new("schema_def_view", pool.clone()));
-    // let mut schema_def_query = SchemaDefQuery::new(schema_def_view_repo.clone());
-    // schema_def_query.use_error_handler(Box::new(|e| error!("{}", e)));
     // TODO: Fix error handling
-    let schema_def_query = SchemaDefQuery::new(schema_def_view_repo.clone());
+    let schema_def_query = SchemaDefQueryPg::new(schema_def_view_repo.clone());
     // .use_error_handler(Box::new(|e| error!("{}", e)));
     let simple_query = SimpleLoggingQuery {};
     let queries: Vec<Box<dyn Query<SchemaDef>>> =
         vec![Box::new(schema_def_query), Box::new(simple_query)];
     let services = SchemaDefServices::new(Box::new(MockSchemaDefServices::default()));
-    (
-        Arc::new(postgres_es::postgres_cqrs(pool, queries, services)),
-        schema_def_view_repo,
-    )
+    postgres_es::postgres_cqrs(pool, queries, services)
+}
+
+pub fn cqrs_framework_sqlite(
+    pool: Pool<Sqlite>,
+) ->
+    SqliteCqrs<SchemaDef>
+{
+    let schema_def_view_repo = Arc::new(SqliteViewRepository::new("schema_def_view", pool.clone()));
+    // TODO: Fix error handling
+    let schema_def_query = SchemaDefQuerySqlite::new(schema_def_view_repo.clone());
+    // .use_error_handler(Box::new(|e| error!("{}", e)));
+    let simple_query = SimpleLoggingQuery {};
+    let queries: Vec<Box<dyn Query<SchemaDef>>> =
+        vec![Box::new(schema_def_query), Box::new(simple_query)];
+    let services = SchemaDefServices::new(Box::new(MockSchemaDefServices::default()));
+    sqlite_es::sqlite_cqrs(pool, queries, services)
 }
