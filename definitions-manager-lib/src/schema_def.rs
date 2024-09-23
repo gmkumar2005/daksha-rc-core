@@ -27,7 +27,7 @@ fn validate_lower_snake_case(value: &str) -> Result<(), ValidationError> {
     if re.is_match(value) {
         Ok(())
     } else {
-        Err(ValidationError::new("invalid_format"))
+        Err(ValidationError::new("validate_lower_snake_case"))
     }
 }
 fn validate_id_and_title(id: &str , title:&str) -> Result<(), ValidationError> {
@@ -40,7 +40,7 @@ fn validate_id_and_title(id: &str , title:&str) -> Result<(), ValidationError> {
 
 impl SchemaDef {
     pub fn new(id: String, schema: String) -> Result<Self, String> {
-        validate_lower_snake_case(&id).map_err(|_e| format!("id has to be lower_case and snake_case: {}", id))?;
+        validate_lower_snake_case(&id).map_err(|_e| format!("id has to be lower_case and snake_case and spaces not allowed: {}", id))?;
         let schema_value: Value =
             serde_json::from_str(&schema).map_err(|e| format!("Invalid JSON schema: {}", e))?;
 
