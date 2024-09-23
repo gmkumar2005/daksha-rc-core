@@ -14,7 +14,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_schema_def_initialization() {
-        let schema = r#"
+        let schema = r###"
         {
             "title": "example_schema",
             "type": "object",
@@ -24,7 +24,7 @@ mod tests {
                 }
             }
         }
-        "#
+        "###
             .to_string();
         let schema_doc = SchemaDef::new("example_schema".to_string(), schema.clone()).unwrap();
         assert_that!(schema_doc.id, is(equal_to("example_schema")));
@@ -35,7 +35,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_schema_def_validation() {
-        let schema = r#"
+        let schema = r###"
         {
             "title": "example_schema",
             "type": "object",
@@ -45,7 +45,7 @@ mod tests {
                 }
             }
         }
-        "#
+        "###
             .to_string();
 
         let schema_doc = SchemaDef::new("example_schema".to_string(), schema).unwrap();
@@ -56,7 +56,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_schema_def_activation() {
-        let schema = r#"
+        let schema = r###"
         {
             "title": "example_schema",
             "type": "object",
@@ -66,7 +66,7 @@ mod tests {
                 }
             }
         }
-        "#
+        "###
             .to_string();
 
         let schema_doc = SchemaDef::new("example_schema".to_string(), schema).unwrap();
@@ -168,9 +168,9 @@ mod tests {
             "###.to_string();
 
         let schema_doc = SchemaDef::new("example_schema".to_string(), schema).unwrap();
-        let valid_record = r#"{ "example": "test" }"#;
-        let invalid_record = r#"{ "example": 123 }"#;
-        let missing_field_record = r#"{ }"#;
+        let valid_record = r###"{ "example": "test" }"###;
+        let invalid_record = r###"{ "example": 123 }"###;
+        let missing_field_record = r###"{ }"###;
 
         // Test valid record
         let result = schema_doc.validate_record(valid_record);

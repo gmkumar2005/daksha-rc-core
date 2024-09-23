@@ -99,7 +99,7 @@ mod aggregate_tests {
 
     #[test]
     fn test_activate_def() {
-        let valid_schema_with_title = r#"
+        let valid_schema_with_title = r###"
         {
             "title": "Example Schema",
             "type": "object",
@@ -109,7 +109,7 @@ mod aggregate_tests {
                 }
             }
         }
-        "#
+        "###
             .to_string();
 
         let services = SchemaDefServices::new(Box::new(MockSchemaDefServices::default()));
@@ -126,7 +126,7 @@ mod aggregate_tests {
 
     #[test]
     fn test_activate_def_twice_should_fail() {
-        let valid_schema_with_title = r#"
+        let valid_schema_with_title = r###"
         {
             "title": "Example Schema",
             "type": "object",
@@ -136,7 +136,7 @@ mod aggregate_tests {
                 }
             }
         }
-        "#
+        "###
             .to_string();
 
 

@@ -100,7 +100,7 @@ mod tests {
                 .service(create_def)
         ).await;
 
-        let example_schema = r#"
+        let example_schema = r###"
         {
             "title": "example_schema",
             "type": "object",
@@ -110,7 +110,7 @@ mod tests {
                 }
             }
         }
-        "#
+        "###
             .to_string();
 
         let payload = CreateDefRequest {
