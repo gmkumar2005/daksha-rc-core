@@ -54,7 +54,7 @@ mod aggregate_tests {
     fn test_create_def() {
         let valid_schema_with_title = r###"
         {
-            "title": "Example Schema",
+            "title": "example_schema",
             "type": "object",
             "properties": {
                 "example": {
@@ -64,9 +64,9 @@ mod aggregate_tests {
         }
         "###.to_string();
 
-        let expected = SchemaDefEvent::DefCreated { id: "123".to_string(), schema: valid_schema_with_title.clone() };
+        let expected = SchemaDefEvent::DefCreated { id: "example_schema".to_string(), schema: valid_schema_with_title.clone() };
         let services = SchemaDefServices::new(Box::new(MockSchemaDefServices::default()));
-        let command = CreateDef { id: "123".to_string(), schema: valid_schema_with_title.clone() };
+        let command = CreateDef { id: "example_schema".to_string(), schema: valid_schema_with_title.clone() };
         SchemaDefTestFramework::with(services)
             .given_no_previous_events()
             .when(command)

@@ -75,7 +75,7 @@ mod tests {
         let body_string = String::from_utf8(body_bytes.to_vec()).unwrap();
 
         println!("Body: {:?}", body_string);
-        assert_eq!(body_string, "Hello, Actix web!");
+        // assert_eq!(body_string, "Hello, Actix web!");
         assert_that!(body_string, is(equal_to("Hello, Actix web!")));
     }
 
@@ -102,7 +102,7 @@ mod tests {
 
         let example_schema = r#"
         {
-            "title": "Example Schema3",
+            "title": "example_schema",
             "type": "object",
             "properties": {
                 "example": {
@@ -114,7 +114,7 @@ mod tests {
             .to_string();
 
         let payload = CreateDefRequest {
-            id: String::from("Example Schema3"),
+            id: String::from("example_schema"),
             schema: example_schema,
         };
 
@@ -130,7 +130,7 @@ mod tests {
 
         // check location header
         let location = resp.headers().get("Location").unwrap();
-        assert_eq!(location, "/schema_def/Example Schema3");
+        assert_that!(location, is(equal_to("/schema_def/example_schema")));
     }
 
 
@@ -161,7 +161,7 @@ mod tests {
             .to_string();
 
         let payload = CreateDefRequest {
-            id: String::from("Example Faulty Schema"),
+            id: String::from("example_faulty_schema"),
             schema: example_schema,
         };
 

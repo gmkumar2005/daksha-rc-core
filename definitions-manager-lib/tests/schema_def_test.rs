@@ -16,7 +16,7 @@ mod tests {
     async fn test_schema_def_initialization() {
         let schema = r#"
         {
-            "title": "Example Schema",
+            "title": "example_schema",
             "type": "object",
             "properties": {
                 "example": {
@@ -26,18 +26,18 @@ mod tests {
         }
         "#
             .to_string();
-        let schema_doc = SchemaDef::new("1".to_string(), schema.clone()).unwrap();
-        assert_eq!(schema_doc.id, "1");
-        assert_eq!(schema_doc.title, "Example Schema");
-        assert_eq!(schema_doc.schema, schema);
-        assert_eq!(schema_doc.status, Status::Inactive);
+        let schema_doc = SchemaDef::new("example_schema".to_string(), schema.clone()).unwrap();
+        assert_that!(schema_doc.id, is(equal_to("example_schema")));
+        assert_that!(schema_doc.title, is(equal_to("example_schema")));
+        assert_that!(schema_doc.schema, is(equal_to(schema)));
+        assert_that!(schema_doc.status, is(equal_to(Status::Inactive)));
     }
 
     #[tokio::test]
     async fn test_schema_def_validation() {
         let schema = r#"
         {
-            "title": "Example Schema",
+            "title": "example_schema",
             "type": "object",
             "properties": {
                 "example": {
@@ -48,7 +48,7 @@ mod tests {
         "#
             .to_string();
 
-        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = SchemaDef::new("example_schema".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
         let schema_doc = schema_doc.validate_def().expect("Schema validation failed");
         assert_eq!(schema_doc.status, Status::Valid);
@@ -58,7 +58,7 @@ mod tests {
     async fn test_schema_def_activation() {
         let schema = r#"
         {
-            "title": "Example Schema",
+            "title": "example_schema",
             "type": "object",
             "properties": {
                 "example": {
@@ -69,7 +69,7 @@ mod tests {
         "#
             .to_string();
 
-        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = SchemaDef::new("example_schema".to_string(), schema).unwrap();
         let schema_doc = schema_doc.validate_def().expect("Schema validation failed");
         assert_eq!(schema_doc.status, Status::Valid);
         let schema_doc = schema_doc.activate().expect("Schema activation failed");
@@ -80,7 +80,7 @@ mod tests {
     async fn test_schema_def_activation_without_validation() {
         let schema = r###"
         {
-            "title": "Example Schema",
+            "title": "example_schema",
             "type": "object",
             "properties": {
                 "example": {
@@ -90,7 +90,7 @@ mod tests {
         }
         "###.to_string();
 
-        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = SchemaDef::new("example_schema".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
         let result = schema_doc.clone().activate();
         assert!(result.is_err());
@@ -105,7 +105,7 @@ mod tests {
     async fn test_schema_def_validation_institute() {
         let schema = load_contents_from_file("tests/resources/schemas/institute.json").unwrap();
 
-        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = SchemaDef::new("institute".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
         let schema_doc = schema_doc.validate_def().expect("Schema validation failed");
         assert_eq!(schema_doc.status, Status::Valid);
@@ -113,7 +113,7 @@ mod tests {
     #[tokio::test]
     async fn test_schema_def_validation_student() {
         let schema = load_contents_from_file("tests/resources/schemas/student.json").unwrap();
-        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = SchemaDef::new("student".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
         let schema_doc = schema_doc.validate_def().expect("Schema validation failed");
         assert_eq!(schema_doc.status, Status::Valid);
@@ -121,7 +121,7 @@ mod tests {
     #[tokio::test]
     async fn test_schema_def_validation_teacher() {
         let schema = load_contents_from_file("tests/resources/schemas/teacher.json").unwrap();
-        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = SchemaDef::new("teacher".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
         let schema_doc = schema_doc.validate_def().expect("Schema validation failed");
         assert_eq!(schema_doc.status, Status::Valid);
@@ -156,7 +156,7 @@ mod tests {
     async fn test_validate_record() {
         let schema = r###"
             {
-                "title": "Example Schema",
+                "title": "example_schema",
                 "type": "object",
                 "properties": {
                     "example": {
@@ -167,7 +167,7 @@ mod tests {
             }
             "###.to_string();
 
-        let schema_doc = SchemaDef::new("1".to_string(), schema).unwrap();
+        let schema_doc = SchemaDef::new("example_schema".to_string(), schema).unwrap();
         let valid_record = r#"{ "example": "test" }"#;
         let invalid_record = r#"{ "example": 123 }"#;
         let missing_field_record = r#"{ }"#;
@@ -203,7 +203,7 @@ mod tests {
           "required": [
             "Student"
           ],
-          "title": "Student",
+          "title": "student",
           "definitions": {
             "Student": {
               "$id": "#/properties/Student",
@@ -385,7 +385,7 @@ mod tests {
               }
             }
             "###.to_string();
-        let schema_doc = SchemaDef::new("1".to_string(), schema_with_out_references).unwrap();
+        let schema_doc = SchemaDef::new("student".to_string(), schema_with_out_references).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);
         let schema_doc = schema_doc.validate_def().expect("Schema validation failed");
         assert_eq!(schema_doc.status, Status::Valid);

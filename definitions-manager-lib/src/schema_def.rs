@@ -1,9 +1,9 @@
 #[allow(deprecated)]
 use jsonschema::{Draft, JSONSchema};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-
+use validator::{Validate, ValidationError};
 #[derive(Serialize, Default, Deserialize, Debug, Clone, PartialEq)]
 pub enum Status {
     #[default]
@@ -13,7 +13,7 @@ pub enum Status {
     Invalid,
 }
 
-#[derive(Serialize, Default, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Default, Deserialize, Debug, Clone, PartialEq,Validate)]
 pub struct SchemaDef {
     pub id: String,
     pub title: String,
@@ -22,8 +22,25 @@ pub struct SchemaDef {
     pub status: Status,
 }
 
+fn validate_lower_snake_case(value: &str) -> Result<(), ValidationError> {
+    let re = Regex::new(r"^[a-z0-9]+(_[a-z0-9]+)*$").unwrap();
+    if re.is_match(value) {
+        Ok(())
+    } else {
+        Err(ValidationError::new("invalid_format"))
+    }
+}
+fn validate_id_and_title(id: &str , title:&str) -> Result<(), ValidationError> {
+    if id == title {
+        Ok(())
+    } else {
+        Err(ValidationError::new("id_and_title_mismatch"))
+    }
+}
+
 impl SchemaDef {
     pub fn new(id: String, schema: String) -> Result<Self, String> {
+        validate_lower_snake_case(&id).map_err(|_e| format!("id has to be lower_case and snake_case: {}", id))?;
         let schema_value: Value =
             serde_json::from_str(&schema).map_err(|e| format!("Invalid JSON schema: {}", e))?;
 
@@ -31,7 +48,8 @@ impl SchemaDef {
             .as_str()
             .ok_or("Title not found in schema")?
             .to_string();
-
+        validate_id_and_title(&id, &title)
+            .map_err(|_e| format!("id and title mismatch: id : {} title: {} ", id,title))?;
         Ok(Self {
             id,
             title,

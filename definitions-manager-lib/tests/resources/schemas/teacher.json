@@ -9,7 +9,7 @@
   "required": [
     "Teacher"
   ],
-  "title": "Teacher",
+  "title": "teacher",
   "definitions": {
     "Teacher": {
       "$id": "#/properties/Teacher",

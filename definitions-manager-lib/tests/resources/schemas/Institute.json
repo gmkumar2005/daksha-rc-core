@@ -9,7 +9,7 @@
   "required": [
     "Institute"
   ],
-  "title": "Institute",
+  "title": "institute",
   "definitions": {
     "Institute": {
       "$id": "#/properties/Institute",
