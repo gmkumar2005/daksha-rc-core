@@ -103,7 +103,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_schema_def_validation_institute() {
-        let schema = load_contents_from_file("tests/resources/schemas/institute.json").unwrap();
+        let schema = load_contents_from_file("tests/resources/schemas/Institute.json").unwrap();
 
         let schema_doc = SchemaDef::new("institute".to_string(), schema).unwrap();
         assert_eq!(schema_doc.status, Status::Inactive);

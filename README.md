@@ -1,6 +1,8 @@
 # daksha-rc-core
 High performance Electronic Registries and Verifiable Credentials
 
+![Build Status](https://github.com/Daksha-RC/daksha-rc-core/actions/workflows/rust.yml/badge.svg)
+
 <div align="center">
   <img src="./Writerside/images/Daksha-RC-Logo.png" alt="Daksha-RC Logo" width="50%" height="50%">
 </div>
