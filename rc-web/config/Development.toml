@@ -1,6 +1,6 @@
 [database]
 host = "localhost"
 port = 5432
-user = "dev_user"
-password = "dev_password"
-dbname = "dev_database"
+user = "daksha_rc"
+password = "daksha_rc"
+dbname = "daksha_rc"

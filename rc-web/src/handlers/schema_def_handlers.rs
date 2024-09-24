@@ -7,6 +7,11 @@ use definitions_manager_lib::schema_def_events::SchemaDefError;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
+use utoipa::{OpenApi, ToSchema};
+
+
+
+
 
 #[get("/")]
 async fn hello(app_state: Data<SimpleApplicationState>) -> String {
@@ -15,7 +20,7 @@ async fn hello(app_state: Data<SimpleApplicationState>) -> String {
 }
 
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Validate, ToSchema)]
 pub struct CreateDefRequest {
     #[validate(length(
         min = 3,
@@ -30,8 +35,20 @@ pub struct CreateDefRequest {
 }
 
 
+#[utoipa::path(
+    post,
+    path = "/create_def",
+    request_body = CreateDefRequest,
+    responses(
+        (status = 201, description = "SchemaDef created successfully"),
+        (status = BAD_REQUEST, description = "Invalid request or invalid format"),
+        (status = INTERNAL_SERVER_ERROR, description = "An unexpected error occurred while processing your request"),
+
+    )
+)]
 #[post("/create_def")]
 async fn create_def(data: web::Json<CreateDefRequest>, req: HttpRequest, app_state: Data<SimpleApplicationState>) -> impl Responder {
+
     let command = SchemaDefCommand::CreateDef {
         id: data.id.clone(),
         schema: data.schema.clone(),
