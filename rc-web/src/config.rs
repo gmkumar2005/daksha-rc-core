@@ -4,8 +4,8 @@ use std::fmt;
 
 // Handles application configuration,
 
-const CONFIG_FILE_PATH: &str = "./rc-web/config/Default.toml";
-const CONFIG_FILE_PREFIX: &str = "./rc-web/config/";
+const CONFIG_FILE_PATH: &str = "./config/Default.toml";
+const CONFIG_FILE_PREFIX: &str = "./config/";
 
 #[derive(Clone, Debug, Deserialize)]
 pub enum ENV {
