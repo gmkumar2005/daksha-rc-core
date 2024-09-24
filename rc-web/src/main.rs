@@ -45,7 +45,6 @@ async fn main() -> std::io::Result<()> {
     );
     println!("Database URL: {}", db_url);
     env_logger::init();
-    let builder: OpenApiBuilder = ApiDoc::openapi().into();
     let openapi = ApiDoc::openapi();
     let app_state = application_state_factory_pg(&db_url).await;
     HttpServer::new(move || {
