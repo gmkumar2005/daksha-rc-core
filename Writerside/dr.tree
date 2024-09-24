@@ -16,4 +16,5 @@
         <toc-element topic="Domain-Driven-Design.md">
         </toc-element>
     </toc-element>
+    <toc-element topic="Minimum-Viable-Product-MVP-Document.md"/>
 </instance-profile>
