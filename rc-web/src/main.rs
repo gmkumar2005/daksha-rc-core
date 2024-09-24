@@ -10,7 +10,6 @@ use actix_web::{App, HttpServer};
 use config::AppConfig;
 use dotenv::dotenv;
 use utoipa::OpenApi;
-use utoipa::openapi::OpenApiBuilder;
 use utoipa_rapidoc::RapiDoc;
 use utoipa_scalar::{Scalar, Servable};
 use handlers::schema_def_handlers::{create_def, hello};
