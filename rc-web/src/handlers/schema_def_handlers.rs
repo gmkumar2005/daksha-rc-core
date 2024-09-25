@@ -50,7 +50,7 @@ pub struct CreateDefRequest {
 async fn create_def(data: web::Json<CreateDefRequest>, req: HttpRequest, app_state: Data<SimpleApplicationState>) -> impl Responder {
 
     let command = SchemaDefCommand::CreateDef {
-        id: data.id.clone(),
+        os_id: data.id.clone(),
         schema: data.schema.clone(),
     };
 

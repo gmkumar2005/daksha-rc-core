@@ -27,7 +27,7 @@ mod tests {
         "###
             .to_string();
         let schema_doc = SchemaDef::new("example_schema".to_string(), schema.clone()).unwrap();
-        assert_that!(schema_doc.id, is(equal_to("example_schema")));
+        assert_that!(schema_doc.os_id, is(equal_to("example_schema")));
         assert_that!(schema_doc.title, is(equal_to("example_schema")));
         assert_that!(schema_doc.schema, is(equal_to(schema)));
         assert_that!(schema_doc.status, is(equal_to(Status::Inactive)));

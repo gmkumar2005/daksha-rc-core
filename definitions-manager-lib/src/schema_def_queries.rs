@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Default, Deserialize, Debug, Clone, PartialEq)]
 pub struct SchemaDefView {
-    pub id: String,
+    pub os_id: String,
     pub title: String,
     pub version: u32,
     pub schema: String,
@@ -15,8 +15,8 @@ pub struct SchemaDefView {
 impl View<SchemaDef> for SchemaDefView {
     fn update(&mut self, event: &EventEnvelope<SchemaDef>) {
         match &event.payload {
-            SchemaDefEvent::DefCreated { id, schema } => {
-                self.id = id.clone();
+            SchemaDefEvent::DefCreated { os_id: id, schema } => {
+                self.os_id = id.clone();
                 self.schema = schema.clone();
             }
             SchemaDefEvent::DefValidated { .. } => {
@@ -28,8 +28,8 @@ impl View<SchemaDef> for SchemaDefView {
             SchemaDefEvent::DefDeactivated { .. } => {
                 self.status = Status::Inactive;
             }
-            SchemaDefEvent::DefCreatedAndValidated { id, schema } => {
-                self.id = id.clone();
+            SchemaDefEvent::DefCreatedAndValidated { os_id: id, schema } => {
+                self.os_id = id.clone();
                 self.schema = schema.clone();
                 self.status = Status::Valid;
             }

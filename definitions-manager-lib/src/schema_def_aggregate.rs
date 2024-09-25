@@ -24,9 +24,9 @@ impl Aggregate for SchemaDef {
         _services: &Self::Services,
     ) -> Result<Vec<Self::Event>, Self::Error> {
         match command {
-            SchemaDefCommand::CreateDef { id, schema } => {
+            SchemaDefCommand::CreateDef { os_id: id, schema } => {
                 //TODO error handling
-                if self.id == id {
+                if self.os_id == id {
                     return Err(SchemaDefError::ExistsError {
                         error_message: format!("Aggregate with id {} already exists", id),
                         error_code: 400,
@@ -38,11 +38,11 @@ impl Aggregate for SchemaDef {
                         error_code: 400,
                     })?;
                 Ok(vec![SchemaDefEvent::DefCreated {
-                    id: schema_def.id,
+                    os_id: schema_def.os_id,
                     schema: schema_def.schema,
                 }])
             }
-            SchemaDefCommand::CreateAndValidateDef { id, schema } => {
+            SchemaDefCommand::CreateAndValidateDef { os_id: id, schema } => {
                 //TODO error handling
                 let schema_def = SchemaDef::new(id, schema)
                     .map_err(|e| SchemaDefError ::GeneralError {
@@ -54,13 +54,13 @@ impl Aggregate for SchemaDef {
                         error_message: e,
                         error_code: 400,
                     })?;
-                Ok(vec![SchemaDefEvent::DefValidated { id: schema_def.id, }])
+                Ok(vec![SchemaDefEvent::DefValidated { os_id: schema_def.os_id, }])
             }
-            SchemaDefCommand::ValidateDef { id } => {
+            SchemaDefCommand::ValidateDef { os_id: id } => {
                 let schema_def = self.clone();
-                if schema_def.id != id {
+                if schema_def.os_id != id {
                     return Err(SchemaDefError::ValidationError{
-                        error_message: format!("The id:{} in the aggregate does not match with id: {} in the command", id, schema_def.id.to_string()),
+                        error_message: format!("The id:{} in the aggregate does not match with id: {} in the command", id, schema_def.os_id.to_string()),
                         error_code: 400,
                     });
                 }
@@ -70,13 +70,13 @@ impl Aggregate for SchemaDef {
                         error_code: 400,
                     });
                 }
-                Ok(vec![SchemaDefEvent::DefValidated { id: schema_def.id, }])
+                Ok(vec![SchemaDefEvent::DefValidated { os_id: schema_def.os_id, }])
             }
-            SchemaDefCommand::ActivateDef{ id } => {
+            SchemaDefCommand::ActivateDef{ os_id: id } => {
                 let schema_def = self.clone();
-                if schema_def.id != id {
+                if schema_def.os_id != id {
                     return Err(SchemaDefError::ActivationError{
-                        error_message: format!("The id:{} in the aggregate does not match with id: {} in the command", id, schema_def.id.to_string()),
+                        error_message: format!("The id:{} in the aggregate does not match with id: {} in the command", id, schema_def.os_id.to_string()),
                         error_code: 400,
                     });
                 }
@@ -86,13 +86,13 @@ impl Aggregate for SchemaDef {
                         error_code: 400,
                     });
                 }
-                Ok(vec![SchemaDefEvent::DefActivated { id: schema_def.id, }])
+                Ok(vec![SchemaDefEvent::DefActivated { os_id: schema_def.os_id, }])
             }
-            SchemaDefCommand::DeactivateDef{ id } => {
+            SchemaDefCommand::DeactivateDef{ os_id: id } => {
                 let schema_def = self.clone();
-                if schema_def.id != id {
+                if schema_def.os_id != id {
                     return Err(SchemaDefError::DeactivationError {
-                        error_message: format!("The id:{} in the aggregate does not match with id: {} in the command", id, schema_def.id.to_string()),
+                        error_message: format!("The id:{} in the aggregate does not match with id: {} in the command", id, schema_def.os_id.to_string()),
                         error_code: 400,
                     });
                 }
@@ -102,16 +102,16 @@ impl Aggregate for SchemaDef {
                         error_code: 400,
                     });
                 }
-                Ok(vec![SchemaDefEvent::DefDeactivated { id: schema_def.id, }])
+                Ok(vec![SchemaDefEvent::DefDeactivated { os_id: schema_def.os_id, }])
             }
         }
     }
 
     fn apply(&mut self, event: Self::Event) {
         match event {
-            SchemaDefEvent::DefCreated { id, schema } => {
+            SchemaDefEvent::DefCreated { os_id: id, schema } => {
                 self.schema = schema;
-                self.id = id;
+                self.os_id = id;
                 self.status = Status::Inactive;
             }
 
@@ -124,9 +124,9 @@ impl Aggregate for SchemaDef {
             SchemaDefEvent::DefDeactivated { .. } => {
                 self.status = Status::Inactive;
             }
-            SchemaDefEvent::DefCreatedAndValidated { id, schema } => {
+            SchemaDefEvent::DefCreatedAndValidated { os_id: id, schema } => {
                 self.schema = schema;
-                self.id = id;
+                self.os_id = id;
                 self.status = Status::Valid;
             }
         }

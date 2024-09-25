@@ -13,9 +13,9 @@ pub enum Status {
     Invalid,
 }
 
-#[derive(Serialize, Default, Deserialize, Debug, Clone, PartialEq,Validate)]
+#[derive(Serialize, Default, Deserialize, Debug, Clone, PartialEq, Validate)]
 pub struct SchemaDef {
-    pub id: String,
+    pub os_id: String,
     pub title: String,
     pub version: u32,
     pub schema: String,
@@ -30,7 +30,7 @@ fn validate_lower_snake_case(value: &str) -> Result<(), ValidationError> {
         Err(ValidationError::new("validate_lower_snake_case"))
     }
 }
-fn validate_id_and_title(id: &str , title:&str) -> Result<(), ValidationError> {
+fn validate_id_and_title(id: &str, title: &str) -> Result<(), ValidationError> {
     if id == title {
         Ok(())
     } else {
@@ -39,8 +39,8 @@ fn validate_id_and_title(id: &str , title:&str) -> Result<(), ValidationError> {
 }
 
 impl SchemaDef {
-    pub fn new(id: String, schema: String) -> Result<Self, String> {
-        validate_lower_snake_case(&id).map_err(|_e| format!("id has to be lower_case and snake_case and spaces not allowed: {}", id))?;
+    pub fn new(os_id: String, schema: String) -> Result<Self, String> {
+        validate_lower_snake_case(&os_id).map_err(|_e| format!("id has to be lower_case and snake_case and spaces not allowed: {}", os_id))?;
         let schema_value: Value =
             serde_json::from_str(&schema).map_err(|e| format!("Invalid JSON schema: {}", e))?;
 
@@ -48,10 +48,10 @@ impl SchemaDef {
             .as_str()
             .ok_or("Title not found in schema")?
             .to_string();
-        validate_id_and_title(&id, &title)
-            .map_err(|_e| format!("id and title mismatch: id : {} title: {} ", id,title))?;
+        validate_id_and_title(&os_id, &title)
+            .map_err(|_e| format!("id and title mismatch: id : {} title: {} ", os_id, title))?;
         Ok(Self {
-            id,
+            os_id,
             title,
             version: 1,
             schema,

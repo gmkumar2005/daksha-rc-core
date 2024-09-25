@@ -18,7 +18,7 @@ async-trait = "0.1.82"
 actix-rt = "2.10.0"
 cqrs-es = "0.4.12"
 postgres-es = "0.4.12"
-sqlx = { version = "0.8.2", features = [ "postgres" , "runtime-tokio-rustls", "json","sqlite"] }
+sqlx = { version = "0.8.2", features = [ "chrono", "postgres" ,"json","sqlite"] }
 tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread", "time"] }
 futures = "0.3.30"
 config = "0.14.0"
@@ -31,6 +31,8 @@ utoipa-redoc = { version = "4.0.0", features = ["actix-web"] }
 utoipa-rapidoc =  { version = "4.0.0", features = ["actix-web"] }
 utoipa-scalar = { version = "0.1.0", features = ["actix-web"] }
 features = "0.10.0"
+anyhow = "1.0.86"
+uuid = { version = "1.10", features = ["v7"] }
 [dev-dependencies]
 hamcrest2 = "0.3.0"
 

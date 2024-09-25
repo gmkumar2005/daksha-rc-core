@@ -64,9 +64,9 @@ mod aggregate_tests {
         }
         "###.to_string();
 
-        let expected = SchemaDefEvent::DefCreated { id: "example_schema".to_string(), schema: valid_schema_with_title.clone() };
+        let expected = SchemaDefEvent::DefCreated { os_id: "example_schema".to_string(), schema: valid_schema_with_title.clone() };
         let services = SchemaDefServices::new(Box::new(MockSchemaDefServices::default()));
-        let command = CreateDef { id: "example_schema".to_string(), schema: valid_schema_with_title.clone() };
+        let command = CreateDef { os_id: "example_schema".to_string(), schema: valid_schema_with_title.clone() };
         SchemaDefTestFramework::with(services)
             .given_no_previous_events()
             .when(command)
@@ -88,9 +88,9 @@ mod aggregate_tests {
 
         let services = SchemaDefServices::new(Box::new(MockSchemaDefServices::default()));
 
-        let created = SchemaDefEvent::DefCreated { id: "123".to_string(), schema: valid_schema_with_title.clone() };
-        let command = ValidateDef { id: "123".to_string() };
-        let expected = SchemaDefEvent::DefValidated { id: "123".to_string() };
+        let created = SchemaDefEvent::DefCreated { os_id: "123".to_string(), schema: valid_schema_with_title.clone() };
+        let command = ValidateDef { os_id: "123".to_string() };
+        let expected = SchemaDefEvent::DefValidated { os_id: "123".to_string() };
         SchemaDefTestFramework::with(services)
             .given(vec![created])
             .when(command)
@@ -114,10 +114,10 @@ mod aggregate_tests {
 
         let services = SchemaDefServices::new(Box::new(MockSchemaDefServices::default()));
 
-        let created = SchemaDefEvent::DefCreated { id: "123".to_string(), schema: valid_schema_with_title.clone() };
-        let validated = SchemaDefEvent::DefValidated { id: "123".to_string() };
-        let command = ActivateDef{ id: "123".to_string() };
-        let expected = SchemaDefEvent::DefActivated { id: "123".to_string() };
+        let created = SchemaDefEvent::DefCreated { os_id: "123".to_string(), schema: valid_schema_with_title.clone() };
+        let validated = SchemaDefEvent::DefValidated { os_id: "123".to_string() };
+        let command = ActivateDef{ os_id: "123".to_string() };
+        let expected = SchemaDefEvent::DefActivated { os_id: "123".to_string() };
         SchemaDefTestFramework::with(services)
             .given(vec![created, validated])
             .when(command)
@@ -140,11 +140,11 @@ mod aggregate_tests {
             .to_string();
 
 
-        let created = SchemaDefEvent::DefCreated { id: "123".to_string(), schema: valid_schema_with_title.clone() };
-        let activated = SchemaDefEvent::DefActivated { id: "123".to_string() };
+        let created = SchemaDefEvent::DefCreated { os_id: "123".to_string(), schema: valid_schema_with_title.clone() };
+        let activated = SchemaDefEvent::DefActivated { os_id: "123".to_string() };
 
         let services = SchemaDefServices::new(Box::new(MockSchemaDefServices::default()));
-        let command = ActivateDef{ id: "123".to_string() };
+        let command = ActivateDef{ os_id: "123".to_string() };
         SchemaDefTestFramework::with(services)
             .given(vec![created,activated])
             .when(command)
@@ -173,11 +173,11 @@ mod aggregate_tests {
         "###.to_string();
         let valid_schema_single_line = remove_spaces_and_returns(&valid_schema_with_title);
 
-        let create_def_command = CreateDef { id: "123".to_string(), schema: valid_schema_single_line.clone() };
+        let create_def_command = CreateDef { os_id: "123".to_string(), schema: valid_schema_single_line.clone() };
         let aggregate_id = "Example_Schema";
-        let validate_def_command = ValidateDef{ id: "123".to_string() };
-        let activate_def_command = ActivateDef{ id: "123".to_string() };
-        let activate_def_command2 = ActivateDef{ id: "123".to_string() };
+        let validate_def_command = ValidateDef{ os_id: "123".to_string() };
+        let activate_def_command = ActivateDef{ os_id: "123".to_string() };
+        let activate_def_command2 = ActivateDef{ os_id: "123".to_string() };
         let _ = cqrs.execute_with_metadata(aggregate_id, create_def_command, metadata.clone()).await;
         let _ = cqrs.execute_with_metadata(aggregate_id, validate_def_command, metadata.clone()).await;
         let _ = cqrs.execute_with_metadata(aggregate_id, activate_def_command, metadata.clone()).await;

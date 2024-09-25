@@ -5,21 +5,21 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SchemaDefEvent {
     DefCreated {
-        id: String,
+        os_id: String,
         schema: String,
     },
     DefCreatedAndValidated {
-        id: String,
+        os_id: String,
         schema: String,
     },
     DefValidated{
-        id: String,
+        os_id: String,
     },
     DefActivated{
-        id: String,
+        os_id: String,
     },
     DefDeactivated{
-        id: String,
+        os_id: String,
     },
 }
 
@@ -60,31 +60,3 @@ impl fmt::Display for SchemaDefError {
     }
 }
 impl std::error::Error for SchemaDefError {}
-//
-// #[derive(Debug)]
-// pub struct SchemaDefExistsError {
-//     pub message: String,
-//     pub code: u32,
-// }
-//
-// impl fmt::Display for SchemaDefExistsError {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(f, "Error {}: {}", self.code, self.message)
-//     }
-// }
-//
-// impl std::error::Error for SchemaDefExistsError {}
-//
-// #[derive(Debug)]
-// pub struct SchemaDefError {
-//     pub message: String,
-//     pub code: u32,
-// }
-//
-// impl fmt::Display for SchemaDefError {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(f, "Error {}: {}", self.code, self.message)
-//     }
-// }
-//
-// impl std::error::Error for SchemaDefError {}

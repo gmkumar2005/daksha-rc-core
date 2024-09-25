@@ -1,5 +1,6 @@
 use crate::db::connection::{cqrs_framework_pg, cqrs_framework_sqlite};
 use actix_web::web::Data;
+use anyhow::Error;
 use async_trait::async_trait;
 use cqrs_es::{Aggregate, AggregateError, EventEnvelope, Query};
 use definitions_manager_lib::schema_def::SchemaDef;
@@ -7,6 +8,8 @@ use postgres_es::{default_postgress_pool, PostgresCqrs};
 use sqlite_es::{default_sqlite_pool, SqliteCqrs};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::runtime::Runtime;
+use tokio::sync::Mutex;
 
 pub struct SimpleLoggingQuery {}
 
@@ -80,12 +83,32 @@ pub async fn application_state_factory_pg(connection_string: &str) -> Data<Simpl
     })
 }
 
+pub fn run_migrations(connection_string: &str) -> Result<(), Error> {
+    let rt = Runtime::new()?;
+    if (connection_string.contains("sqlite://")) {
+        rt.block_on(async {
+            let db_pool = default_sqlite_pool(connection_string).await;
+            sqlx::migrate!().run(&db_pool).await
+        })
+    } else {
+        rt.block_on(async {
+            let db_pool = default_postgress_pool(connection_string).await;
+            sqlx::migrate!().run(&db_pool).await
+        })
+    }?;
+
+    Ok(())
+}
+
 pub async fn application_state_factory_sqlite(connection_string: &str) -> Data<SimpleApplicationState> {
     let pool =
         default_sqlite_pool(
             connection_string)
             .await;
+    let migration_lock = Arc::new(Mutex::new(()));
+    let lock = migration_lock.lock().await;
     sqlx::migrate!().run(&pool).await.unwrap();
+    drop(lock);  // Release the lock
     let cqrs = cqrs_framework_sqlite(pool);
     Data::new(SimpleApplicationState {
         app_name: String::from("Actix web"),

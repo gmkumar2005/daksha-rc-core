@@ -1,5 +1,6 @@
 mod common;
 mod integration_tests;
+use rc_web::app::run_migrations;
 use rc_web::config::AppConfig;
 use std::env;
 use std::sync::{Once, OnceLock};
@@ -33,7 +34,9 @@ fn init() {
         let _ = env_logger::builder().is_test(true).try_init();
         let config = AppConfig::from_env().expect("Failed to load configuration");
         CONFIG.set(config).expect("Failed to set configuration");
-        DB_URL.set(DatabaseUrl::SqliteInMemory).expect("Failed to set database URL");
+        DB_URL.set(DatabaseUrl::SqliteInDemoDb).expect("Failed to set database URL");
+        let db_url = DB_URL.get().expect("Database URL not initialized").value();
+        run_migrations(db_url).expect("Database Migrations failed");
     });
 }
 
@@ -79,17 +82,9 @@ mod tests {
         assert_that!(body_string, is(equal_to("Hello, Actix web!")));
     }
 
-    // Initialize the logger for tests
-    #[ctor::ctor]
-    fn init() {
-        std::env::set_var("RUST_LOG", "debug");
-        let _ = env_logger::builder().is_test(true).try_init();
-    }
-
     #[actix_web::test]
     async fn test_create_def() {
         let db_url = DB_URL.get().expect("Database URL not initialized").value();
-
         let app_state = match DB_URL.get().expect("Database URL not initialized") {
             DatabaseUrl::PostgresRc => application_state_factory_pg(db_url).await,
             _ => application_state_factory_sqlite(db_url).await,
@@ -202,5 +197,4 @@ mod tests {
         The below line should print the database URL defined in the Testing.toml");
         println!("Database URL: {}", db_url);
     }
-
 }
