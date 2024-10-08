@@ -85,7 +85,7 @@ pub async fn application_state_factory_pg(connection_string: &str) -> Data<Simpl
 
 pub fn run_migrations(connection_string: &str) -> Result<(), Error> {
     let rt = Runtime::new()?;
-    if (connection_string.contains("sqlite://")) {
+    if connection_string.contains("sqlite://") {
         rt.block_on(async {
             let db_pool = default_sqlite_pool(connection_string).await;
             sqlx::migrate!().run(&db_pool).await

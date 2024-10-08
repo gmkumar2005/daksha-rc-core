@@ -8,9 +8,11 @@ mod models;
 
 use crate::app::{application_state_factory_pg, run_migrations};
 use actix_web::{App, HttpServer};
+use anyhow::Result;
 use config::AppConfig;
 use dotenv::dotenv;
 use handlers::schema_def_handlers::{create_def, hello};
+use log::error;
 use utoipa::OpenApi;
 use utoipa_rapidoc::RapiDoc;
 use utoipa_scalar::{Scalar, Servable};
@@ -28,10 +30,12 @@ use utoipa_swagger_ui::SwaggerUi;
 struct ApiDoc;
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<()> {
     std::env::set_var("RUST_LOG", "debug");
     dotenv().ok();
     let config = AppConfig::from_env().expect("Failed to load configuration");
+    env_logger::init();
+    let openapi = ApiDoc::openapi();
     let db_url = format!(
         "postgres://{}:{}@{}:{}/{}",
         config.database.user,
@@ -43,12 +47,11 @@ async fn main() -> std::io::Result<()> {
     println!("Database URL: {}", &db_url);
     let db_url_clone = db_url.clone();
     tokio::task::spawn_blocking(move || {
-        run_migrations(&db_url_clone).expect("RC migrations failed");
-    }).await.expect("Failed to run migrations");
+        run_migrations(&db_url_clone)
+            .map_err(|e| error!("Failed to run migrations: {:?}", e))
+    });
 
-    env_logger::init();
-    let openapi = ApiDoc::openapi();
-    let app_state = application_state_factory_pg(&db_url.clone()).await;
+    let app_state = application_state_factory_pg(&db_url).await;
     HttpServer::new(move || {
         App::new()
             .app_data(app_state.clone())
@@ -63,5 +66,6 @@ async fn main() -> std::io::Result<()> {
     })
         .bind(("127.0.0.1", 8080))?
         .run()
-        .await
+        .await?;
+    Ok(())
 }
