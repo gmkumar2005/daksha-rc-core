@@ -5,12 +5,12 @@
 
 use crate::schema_def::SchemaDef;
 use actix::prelude::*;
+use anyhow::{Result};
 use async_trait::async_trait;
 use cqrs_es::{EventEnvelope, Query};
 use mockall::predicate::*;
-use mockall::*;
 use std::sync::Arc;
-
+use log::warn;
 
 pub struct SimpleReadSideProcessor {
     pub event_processor: Addr<EventProcessorActor>,
@@ -52,25 +52,33 @@ impl Handler<GetOffsetCount> for EventProcessorActor {
     }
 }
 
-#[automock]
+// #[automock]
 #[async_trait]
 pub trait OffsetStoreRepository {
-
-    async fn update_offset(&self, new_offset: u64);
-    async fn get_offset(&self) -> u64;
+    type Item;
+    type Error;
+    async fn update_offset(&self, new_offset: u64)-> Result<(), Self::Error>;
+    async fn get_offset(&self) -> Result<Option<Self::Item>, Self::Error>;
 }
 
 pub struct EventProcessorActor {
-    offset_store: Arc<dyn OffsetStoreRepository>,
+    offset_store: Arc<dyn OffsetStoreRepository<Error=anyhow::Error, Item=u64>>,
     offset_count: u64,
     offset_threshold: u64,
 }
 
 impl EventProcessorActor {
-    pub async fn new(offset_store: Arc<dyn OffsetStoreRepository>, offset_threshold: u64) -> Self {
-        let offset_count = {
-            let count = offset_store.get_offset().await;
-            if count == 0 { 1 } else { count }
+    pub async fn new(offset_store: Arc<dyn OffsetStoreRepository<Error=anyhow::Error, Item=u64>>, offset_threshold: u64) -> Self {
+        let offset_count = match offset_store.get_offset().await {
+            Ok(Some(count)) if count > 0 => count,
+            Ok(_) => {
+                warn!("Offset count is zero or not found, defaulting to 1");
+                1
+            }
+            Err(e) => {
+                warn!("Failed to get offset: {:?}", e);
+                1
+            }
         };
         Self {
             offset_store,
@@ -95,7 +103,9 @@ impl Handler<ProcessEvents> for EventProcessorActor {
         if self.offset_count % self.offset_threshold == 0 {
             self.offset_count += event_count;
             Box::pin(async move {
-                offset_store.update_offset(current_offset).await;
+                offset_store.update_offset(current_offset).await.map_err(|e| {
+                    warn!("Failed to update offset: {:?}", e);
+                }).ok();
             })
         } else {
             self.offset_count += event_count;

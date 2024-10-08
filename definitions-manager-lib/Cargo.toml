@@ -25,6 +25,7 @@ uuid = { version = "1.10", features = ["v7"] }
 actix = "0.13.5"
 shaku = "0.6.2"
 mockall = "0.13.0"
+log = "0.4.22"
 [dev-dependencies]
 hamcrest2 = "0.3.0"
 

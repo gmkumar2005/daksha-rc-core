@@ -7,7 +7,7 @@ use definitions_manager_lib::schema_def_events::SchemaDefError;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
-use utoipa::{OpenApi, ToSchema};
+use utoipa::ToSchema;
 
 
 

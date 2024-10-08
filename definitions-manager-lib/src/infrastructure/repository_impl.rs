@@ -7,13 +7,16 @@ pub struct InMemOffsetStoreRepository {
 }
 
 #[async_trait]
-impl OffsetStoreRepository for InMemOffsetStoreRepository {
-    async fn update_offset(&self, new_offset: u64) {
+impl OffsetStoreRepository for InMemOffsetStoreRepository  {
+    type Item = u64;
+    type Error = anyhow::Error;
+    async fn update_offset(&self, new_offset: u64)-> Result<(), Self::Error>{
         println!("Updating offset to {}", new_offset);
+        Ok(())
     }
-
-    async fn get_offset(&self) -> u64 {
-        self.offset_count
+    async fn get_offset(&self) -> Result<Option<Self::Item>, Self::Error>{
+        println!("Getting offset");
+        Ok(Some(self.offset_count))
     }
 }
 
