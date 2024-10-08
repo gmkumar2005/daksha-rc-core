@@ -5,3 +5,4 @@ pub mod schema_def_events;
 pub mod schema_def_services;
 pub mod schema_def_queries;
 pub mod read_side_processor;
+pub mod infrastructure;

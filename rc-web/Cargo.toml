@@ -33,6 +33,7 @@ utoipa-scalar = { version = "0.1.0", features = ["actix-web"] }
 features = "0.10.0"
 anyhow = "1.0.86"
 uuid = { version = "1.10", features = ["v7"] }
+shaku = "0.6.2"
 [dev-dependencies]
 hamcrest2 = "0.3.0"
 mockall = "0.13.0"
