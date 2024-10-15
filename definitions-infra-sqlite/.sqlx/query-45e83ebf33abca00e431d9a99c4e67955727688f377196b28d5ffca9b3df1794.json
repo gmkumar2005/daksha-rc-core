@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT projection_name, projection_key, current_offset, manifest, mergeable, last_updated\n            FROM pekko_projection_offset_store\n            WHERE projection_name = $1 AND projection_key = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "projection_name",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "projection_key",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "current_offset",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "manifest",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "mergeable",
+        "ordinal": 4,
+        "type_info": "Bool"
+      },
+      {
+        "name": "last_updated",
+        "ordinal": 5,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "45e83ebf33abca00e431d9a99c4e67955727688f377196b28d5ffca9b3df1794"
+}

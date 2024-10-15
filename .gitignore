@@ -17,4 +17,5 @@ Cargo.lock
 *.pdb
 **/*.pdb
 **/*.profraw
+**/.env
 

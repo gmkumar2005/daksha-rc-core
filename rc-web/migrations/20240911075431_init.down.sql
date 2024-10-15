@@ -1,3 +1,0 @@
-DROP TABLE IF EXISTS schema_def_view;
-DROP TABLE IF EXISTS events;
-DROP TABLE IF EXISTS snapshots;

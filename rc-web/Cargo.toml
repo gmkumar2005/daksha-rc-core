@@ -5,35 +5,37 @@ rust-version = "1.80.1"
 version = "0.1.0-SNAPSHOT"
 license = "MIT"
 [dependencies]
-actix-web = "4.9.0"
-serde = { version = "1.0.210", features = ["derive"] }
-chrono = { version = "0.4.38", features = ["serde"] }
-serde_json = "1.0.128"
-validator = { version = "0.18.1", features = ["derive"] }
-definitions-manager-lib = { path = "../definitions-manager-lib" }
-env_logger = "0.11.5"
-log = "0.4.22"
-ctor = "0.2.8"
-async-trait = "0.1.82"
+actix = "0.13.5"
 actix-rt = "2.10.0"
-cqrs-es = "0.4.12"
-postgres-es = "0.4.12"
-sqlx = { version = "0.8.2", features = [ "chrono", "postgres" ,"json","sqlite"] }
-tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread", "time"] }
-futures = "0.3.30"
-config = "0.14.0"
-dotenv = "0.15.0"
-sqlite-es = "0.4.5"
-thiserror = "1.0.63"
-utoipa = "4.2.3"
-utoipa-swagger-ui = { version = "7.1.0", features = ["actix-web"] }
-utoipa-redoc = { version = "4.0.0", features = ["actix-web"] }
-utoipa-rapidoc =  { version = "4.0.0", features = ["actix-web"] }
-utoipa-scalar = { version = "0.1.0", features = ["actix-web"] }
-features = "0.10.0"
+actix-web = "4.9.0"
 anyhow = "1.0.86"
+async-trait = "0.1.82"
+chrono = { version = "0.4.38", features = ["serde"] }
+config = "0.14.0"
+cqrs-es = "0.4.12"
+ctor = "0.2.8"
+definitions-infra-postgres = { path = "../definitions-infra-postgres" }
+definitions-infra-sqlite = { path = "../definitions-infra-sqlite" }
+definitions-manager-lib = { path = "../definitions-manager-lib" }
+dotenv = "0.15.0"
+env_logger = "0.11.5"
+features = "0.10.0"
+futures = "0.3.30"
+log = "0.4.22"
+postgres-es = "0.4.12"
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
+sqlite-es = "0.4.5"
+sqlx = { version = "0.8.2", features = [ "chrono", "postgres" ,"json","sqlite"] }
+thiserror = "1.0.63"
+tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread", "time"] }
+utoipa = "5.0.0"
+utoipa-rapidoc =  { version = "5.0.0", features = ["actix-web"] }
+utoipa-redoc = { version = "5.0.0", features = ["actix-web"] }
+utoipa-scalar = { version = "0.2.0", features = ["actix-web"] }
+utoipa-swagger-ui = { version = "8.0.0", features = ["actix-web"] }
 uuid = { version = "1.10", features = ["v7"] }
-shaku = "0.6.2"
+validator = { version = "0.18.1", features = ["derive"] }
 [dev-dependencies]
 hamcrest2 = "0.3.0"
 mockall = "0.13.0"

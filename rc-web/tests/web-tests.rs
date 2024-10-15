@@ -20,7 +20,7 @@ impl DatabaseUrl {
     fn value(&self) -> &str {
         match self {
             DatabaseUrl::SqliteInMemory => "sqlite::memory:",
-            DatabaseUrl::SqliteInDemoDb => "sqlite://target/demo.db",
+            DatabaseUrl::SqliteInDemoDb => "sqlite://target/testdb.sqlite",
             DatabaseUrl::PostgresRc => "postgres://daksha_rc:daksha_rc@localhost:5432/daksha_rc",
         }
     }

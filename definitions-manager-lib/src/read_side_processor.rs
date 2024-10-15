@@ -5,12 +5,13 @@
 
 use crate::schema_def::SchemaDef;
 use actix::prelude::*;
-use anyhow::{Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use cqrs_es::{EventEnvelope, Query};
+use log::warn;
 use mockall::predicate::*;
 use std::sync::Arc;
-use log::warn;
+
 
 pub struct SimpleReadSideProcessor {
     pub event_processor: Addr<EventProcessorActor>,
@@ -52,25 +53,27 @@ impl Handler<GetOffsetCount> for EventProcessorActor {
     }
 }
 
-// #[automock]
-#[async_trait]
-pub trait OffsetStoreRepository {
-    type Item;
-    type Error;
-    async fn update_offset(&self, new_offset: u64)-> Result<(), Self::Error>;
-    async fn get_offset(&self) -> Result<Option<Self::Item>, Self::Error>;
-}
 
 pub struct EventProcessorActor {
-    offset_store: Arc<dyn OffsetStoreRepository<Error=anyhow::Error, Item=u64>>,
+    offset_store: Arc<dyn ProjectionOffsetStoreRepository>,
     offset_count: u64,
     offset_threshold: u64,
+    projection_name: String,
+    projection_key: String,
 }
 
 impl EventProcessorActor {
-    pub async fn new(offset_store: Arc<dyn OffsetStoreRepository<Error=anyhow::Error, Item=u64>>, offset_threshold: u64) -> Self {
-        let offset_count = match offset_store.get_offset().await {
-            Ok(Some(count)) if count > 0 => count,
+    pub async fn new(offset_store: Arc<dyn ProjectionOffsetStoreRepository>, offset_threshold: u64,
+                     projection_name: &str,projection_key: &str) -> Self {
+        let offset_count = match offset_store.read_record(projection_name,projection_key).await {
+            Ok(Some(ProjectionOffsetStore { current_offset, .. })) => {
+                let parsed_offset = current_offset.parse::<u64>().unwrap_or(0);
+                if parsed_offset > 0 {
+                    parsed_offset
+                } else {
+                    0
+                }
+            },
             Ok(_) => {
                 warn!("Offset count is zero or not found, defaulting to 1");
                 1
@@ -84,6 +87,8 @@ impl EventProcessorActor {
             offset_store,
             offset_count,
             offset_threshold,
+            projection_name: projection_name.to_string(),
+            projection_key: projection_key.to_string(),
         }
     }
 }
@@ -100,10 +105,12 @@ impl Handler<ProcessEvents> for EventProcessorActor {
 
         let current_offset = self.offset_count;
         let offset_store = Arc::clone(&self.offset_store);
+        let projection_name = self.projection_name.to_string();
+        let projection_key = self.projection_key.to_string();
         if self.offset_count % self.offset_threshold == 0 {
             self.offset_count += event_count;
             Box::pin(async move {
-                offset_store.update_offset(current_offset).await.map_err(|e| {
+                offset_store.update_record(&projection_name,&projection_key,&current_offset.to_string()).await.map_err(|e| {
                     warn!("Failed to update offset: {:?}", e);
                 }).ok();
             })
@@ -111,8 +118,24 @@ impl Handler<ProcessEvents> for EventProcessorActor {
             self.offset_count += event_count;
             Box::pin(async {})
         }
-
-
     }
 }
 
+/// Begin repository
+
+#[derive(Debug, sqlx::FromRow, PartialEq, Clone, Eq)]
+pub struct ProjectionOffsetStore {
+    pub projection_name: String,
+    pub projection_key: String,
+    pub current_offset: String,
+    pub manifest:String,
+    pub mergeable: bool,
+    pub last_updated: i64,
+}
+#[async_trait]
+pub trait ProjectionOffsetStoreRepository{
+    async fn insert_record(&self, record: ProjectionOffsetStore ) -> Result<(), anyhow::Error>;
+    async fn read_record(&self, projection_name: &str, projection_key: &str) -> Result<Option<ProjectionOffsetStore>, anyhow::Error>;
+    async fn update_record(&self, projection_name: &str, projection_key: &str,current_offset: &str) -> Result<(), anyhow::Error>;
+}
+// impl Interface for dyn ProjectionOffsetStoreRepository {}
