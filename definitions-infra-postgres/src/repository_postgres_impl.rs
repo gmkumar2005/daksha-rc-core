@@ -53,9 +53,11 @@ impl ProjectionOffsetStoreRepository for PostgresProjectionOffsetStoreRepository
     async fn update_record(&self, projection_name: &str, projection_key: &str, current_offset: &str) -> anyhow::Result<(), Error> {
         sqlx::query!(
             r#"
-            UPDATE pekko_projection_offset_store
-            SET current_offset = $3
-            WHERE projection_name = $1 AND projection_key = $2
+            INSERT INTO pekko_projection_offset_store (projection_name, projection_key, current_offset, manifest, mergeable, last_updated)
+            VALUES ($1, $2, $3, '', false, EXTRACT(EPOCH FROM NOW())::BIGINT)
+            ON CONFLICT(projection_name, projection_key) DO UPDATE
+            SET current_offset = $3, last_updated = EXTRACT(EPOCH FROM NOW())::BIGINT
+            WHERE pekko_projection_offset_store.projection_name = $1 AND pekko_projection_offset_store.projection_key = $2
             "#,
             projection_name,
             projection_key,

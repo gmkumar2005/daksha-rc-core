@@ -13,7 +13,11 @@ mod read_side_dispatch {
     use mockall::mock;
     use std::collections::HashMap;
     use std::sync::Arc;
+    use sqlite_es::default_sqlite_pool;
     use tokio::task::LocalSet;
+    use definitions_infra_sqlite::repository_sqlite_impl::SqliteProjectionOffsetStoreRepository;
+    use definitions_manager_lib::infrastructure::repository_impl;
+    use crate::DB_URL;
 
     #[tokio::test]
     async fn dispatch_using_projection_offset_store() {
@@ -82,5 +86,66 @@ mod read_side_dispatch {
             assert_that!(offset_count, is(equal_to(3)));
         }).await;
     }
+
+
+
+    #[tokio::test]
+    async fn dispatch_using_sqlite_offset_store() {
+        let offset_store_record_1 = ProjectionOffsetStore {
+            projection_name: "test_projection".to_string(),
+            projection_key: "test_key".to_string(),
+            current_offset: "1".to_string(),
+            manifest: "".to_string(),
+            mergeable: false,
+            last_updated: 0,
+        };
+        // Create a LocalSet
+        let local = LocalSet::new();
+
+        local.run_until(async {
+            let expected_offset_record = offset_store_record_1.clone();
+            let db_url = DB_URL.get().expect("Database URL not initialized").value();
+            println!("DB URL: {}", db_url);
+            let pool =
+                default_sqlite_pool(
+                    db_url)
+                    .await;
+            let offset_repo = SqliteProjectionOffsetStoreRepository::new(pool);
+            let offset_store = Arc::new(offset_repo);
+            let event_processor = EventProcessorActor::new(offset_store, 2, "SchemaDef", "1").await.start();
+            let event_processor_clone = event_processor.clone();
+            let processor = SimpleReadSideProcessor { event_processor };
+            let offset_count = event_processor_clone.send(GetOffsetCount).await.unwrap();
+            // offset_count should be always initiated to 1
+            assert_that!(offset_count, is(equal_to(1)));
+            // Create a mock event
+            let event_1: EventEnvelope<SchemaDef> = EventEnvelope {
+                aggregate_id: "test_aggregate_1".to_string(),
+                sequence: 1,
+                payload: SchemaDefEvent::DefCreated {
+                    os_id: "".to_string(),
+                    schema: "".to_string(),
+                },
+                metadata: HashMap::new(),
+            };
+            let event_2: EventEnvelope<SchemaDef> = EventEnvelope {
+                aggregate_id: "test_aggregate_2".to_string(),
+                sequence: 1,
+                payload: SchemaDefEvent::DefCreated {
+                    os_id: "".to_string(),
+                    schema: "".to_string(),
+                },
+                metadata: HashMap::new(),
+            };
+            processor.dispatch("test_aggregate_1", &[event_1]).await;
+            let offset_count = event_processor_clone.send(GetOffsetCount).await.unwrap();
+            assert_that!(offset_count, is(equal_to(2)));
+
+            processor.dispatch("test_aggregate_2", &[event_2]).await;
+            let offset_count = event_processor_clone.send(GetOffsetCount).await.unwrap();
+            assert_that!(offset_count, is(equal_to(3)));
+        }).await;
+    }
+
 }
 

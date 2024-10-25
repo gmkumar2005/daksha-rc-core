@@ -5,10 +5,10 @@ rust-version = "1.80.1"
 version = "0.1.0-SNAPSHOT"
 license = "MIT"
 [dependencies]
-anyhow = "1.0.86"
-async-trait = "0.1.82"
-chrono = { version = "0.4.38", features = ["serde"] }
+anyhow = { workspace = true }
+async-trait ={ workspace = true }
+chrono = { workspace = true }
 definitions-manager-lib = { path = "../definitions-manager-lib" }
-serde = { version = "1.0.209", features = ["derive"] }
-sqlx = { version = "0.8.2", features = ["runtime-tokio", "chrono","json","sqlite","runtime-tokio-native-tls","migrate"] }
-tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread", "time"] }
+serde = { workspace = true }
+sqlx = { workspace = true }
+tokio =  { workspace = true }

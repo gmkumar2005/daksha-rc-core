@@ -1,5 +1,5 @@
 [package]
-name = "definitions-manager-json"
+name = "projections-lib"
 edition = "2021"
 rust-version = "1.80.1"
 version = "0.1.0-SNAPSHOT"
@@ -7,3 +7,6 @@ license = "MIT"
 [dependencies]
 chrono =  { workspace = true }
 serde =  { workspace = true }
+serde_json =  { workspace = true }
+toml =  { workspace = true }
+
