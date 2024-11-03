@@ -1,6 +1,10 @@
 use crate::offset_store::LastOffset;
 use crate::{Offset, PersistenceId};
 use actix::prelude::*;
+use futures_util::stream;
+use std::pin::Pin;
+
+
 pub struct InMemOffsetStore {
     last_offsets: Vec<LastOffset>,
 }
@@ -39,6 +43,8 @@ pub struct SaveOffset {
 impl Message for SaveOffset {
     type Result = ();
 }
+
+
 impl Handler<GetLastOffset> for InMemOffsetStore {
     type Result = MessageResult<GetLastOffset>;
 
@@ -67,11 +73,75 @@ impl Handler<SaveOffset> for InMemOffsetStore {
         MessageResult(())
     }
 }
+
+/// start of my Actor
+// Define a message type
+#[derive(Message)]
+#[rtype(result = "()")]
+struct PingMessage(String);
+// Define the actor
+struct PingActor {
+    local_ping_stream: Option<Pin<Box<dyn Stream<Item=PingMessage>>>>,
+    // local_ping_stream: Option<Box<dyn Stream<Item = PingMessage> + Unpin>>,
+
+}
+
+
+impl PingActor {
+    fn new(stream: Pin<Box<dyn Stream<Item=PingMessage>>>) -> Self {
+        Self {
+            local_ping_stream: Some(stream),
+        }
+    }
+}
+impl Actor for PingActor {
+    type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        if let Some(stream) = self.local_ping_stream.take() {
+            // Self::add_stream(stream, ctx);
+            ctx.add_stream(stream);
+            println!("Stream local_ping_stream added");
+        }
+    }
+}
+
+// Implement StreamHandler for processing the ping message stream
+impl StreamHandler<PingMessage> for PingActor {
+    fn handle(&mut self, msg: PingMessage, _ctx: &mut Self::Context) {
+        println!("Received: {}", msg.0);
+    }
+    fn finished(&mut self, ctx: &mut Self::Context) {
+        println!("Stream processing finished");
+        System::current().stop();
+    }
+}
+
+
+#[derive(Message)]
+#[rtype(result = "()")]
+struct AddStreamMessage;
+
+impl Handler<AddStreamMessage> for PingActor {
+    type Result = ();
+
+    fn handle(&mut self, _: AddStreamMessage, ctx: &mut Self::Context) {
+        let ping_stream = stream::iter(vec![
+            PingMessage("Ping 1".into()),
+            PingMessage("Ping 2".into()),
+            PingMessage("Ping 3".into()),
+        ]);
+        Self::add_stream(ping_stream, ctx);
+    }
+}
+
+/// end of my Actor
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{EntityId, EntityType, Offset, PersistenceId};
     use actix_rt;
+    use futures_util::{stream, SinkExt};
+    use futures_util::stream::once;
 
     #[actix_rt::test]
     async fn test_basic_ops() {
@@ -97,5 +167,26 @@ mod tests {
         let last_offset = volatile_store.send(GetLastOffset).await.unwrap();
         let expected_last_offset = Some((vec![persistence_id], Offset::Sequence(10)));
         assert_eq!(last_offset, expected_last_offset);
+    }
+
+    #[actix_rt::test]
+    async fn test_ping_stream_handler() {
+        let ping_msg_stream =
+            once(async { PingMessage("Ping Single 1".into()) });
+
+
+        // Create a stream of ping messages
+        let ping_stream = stream::iter(vec![
+            PingMessage("Ping 1".into()),
+            PingMessage("Ping 2".into()),
+            PingMessage("Ping 3".into()),
+        ]);
+        let mut addr_1 = PingActor::new(Box::pin(ping_msg_stream));
+        addr_1.start();
+
+
+        // Allow some time for the actor to process the stream
+        actix_rt::time::sleep(std::time::Duration::from_secs(1)).await;
+        System::current().stop();
     }
 }
