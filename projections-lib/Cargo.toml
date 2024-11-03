@@ -5,8 +5,25 @@ rust-version = "1.80.1"
 version = "0.1.0-SNAPSHOT"
 license = "MIT"
 [dependencies]
-chrono =  { workspace = true }
-serde =  { workspace = true }
-serde_json =  { workspace = true }
-toml =  { workspace = true }
-
+actix = { workspace = true }
+actix-rt = { workspace = true }
+async-stream = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+env_logger.workspace = true
+futures = { workspace = true }
+log = { workspace = true }
+lru = { workspace = true }
+mqtt-protocol = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+smol_str = { workspace = true }
+streambed = { workspace = true }
+streambed-confidant = { workspace = true }
+streambed-logged = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+toml = { workspace = true }
+[dev-dependencies]
+test-log = { workspace = true }
