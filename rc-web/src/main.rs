@@ -10,7 +10,7 @@ use crate::app::{application_state_factory_pg, run_migrations};
 use actix_web::{App, HttpServer};
 use anyhow::Result;
 use config::AppConfig;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use handlers::schema_def_handlers::{create_def, hello};
 use log::error;
 use utoipa::OpenApi;

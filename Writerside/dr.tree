@@ -14,7 +14,9 @@
         <toc-element topic="High-Level-Architecture.md"/>
         <toc-element topic="High-Level-Design.md"/>
         <toc-element topic="Domain-Driven-Design.md">
+            <toc-element topic="SchemaDef-Aggregate-Design.md"/>
         </toc-element>
     </toc-element>
     <toc-element topic="Minimum-Viable-Product-MVP-Document.md"/>
+    <toc-element topic="Glossary.md"/>
 </instance-profile>

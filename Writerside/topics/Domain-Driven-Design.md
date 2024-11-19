@@ -131,3 +131,113 @@ graph TD
     E --> I[Search Engine]
 
 ```
+
+
+# Aggregate Design Canvas: Bank Account
+
+## 1. Aggregate Root: `BankAccount`
+The aggregate root is responsible for maintaining the integrity of the bank account and coordinating its associated commands and events.
+
+---
+
+## 2. State (Attributes)
+These are the internal properties that represent the state of the bank account aggregate.
+
+- **`accountId`: String**  
+  The unique identifier of the bank account.
+- **`balance`: Decimal**  
+  The current balance of the bank account.
+- **`status`: AccountStatus**  
+  The current status of the account (e.g., Open, Closed, Overdrawn).
+
+> **Note:** The state holds the current data of the account that is changed through commands and events.
+
+---
+
+## 3. Commands
+Commands are the actions or operations that can be performed on the aggregate. They usually modify the state or trigger domain events.
+
+- **OpenAccount(accountId, initialBalance)**  
+  Opens a new bank account with the specified initial balance.
+
+- **DepositMoney(accountId, amount)**  
+  Deposits the given amount into the bank account.
+
+- **WithdrawMoney(accountId, amount)**  
+  Withdraws the specified amount from the bank account if the conditions allow.
+
+- **CloseAccount(accountId)**  
+  Closes the bank account, preventing further transactions.
+
+> **Note:** Commands describe the intent to change the state but do not actually make the change directly.
+
+---
+
+## 4. Events
+Events represent what has happened as a result of a command being processed. They are immutable and indicate changes in the aggregate's state.
+
+- **AccountOpened(accountId, initialBalance)**  
+  An event that indicates the account has been successfully opened.
+
+- **MoneyDeposited(accountId, amount)**  
+  An event that confirms money has been deposited into the account.
+
+- **MoneyWithdrawn(accountId, amount)**  
+  An event confirming that a withdrawal has occurred.
+
+- **AccountClosed(accountId)**  
+  An event indicating the account has been closed.
+
+> **Note:** Events record state transitions and are used to rebuild the state of an aggregate.
+
+---
+
+## 5. Invariants (Business Rules)
+Invariants are business rules that must always hold true for the aggregate to maintain a consistent state.
+
+- **Balance cannot be negative**  
+  The account balance cannot go below zero, except in overdraft scenarios (if applicable).
+
+- **Account must be open to perform transactions**  
+  All transactions (deposits, withdrawals) can only occur if the account status is 'Open'.
+
+> **Note:** These business rules ensure the system adheres to its domain requirements and prevents invalid state transitions.
+
+---
+
+## 6. External Systems & Dependencies
+The aggregate may interact with external systems or require data from other sources to validate certain commands.
+
+- **Fraud Detection System**  
+  Before opening an account, validation may occur with a fraud detection service.
+
+- **Transaction Ledger**  
+  The aggregate might interact with a ledger service to record all transaction activities.
+
+---
+
+## 7. Example Scenarios
+
+### Opening a Bank Account
+1. **Command**: `OpenAccount(accountId, initialBalance)`
+2. **Event**: `AccountOpened(accountId, initialBalance)`
+3. **New State**:
+    - accountId: "12345"
+    - balance: 100.00
+    - status: Open
+
+### Withdrawing Money
+1. **Command**: `WithdrawMoney(accountId, 50)`
+2. **Event**: `MoneyWithdrawn(accountId, 50)`
+3. **New State**:
+    - balance: 50.00
+    - status: Open
+
+---
+
+## 8. Notes
+- The BankAccount aggregate is responsible for enforcing business rules related to transactions and account status.
+- All state changes occur in response to events, which are raised by processing commands.
+- The aggregate is designed to prevent invalid operations, such as withdrawing more than the available balance or performing actions on a closed account.
+
+

@@ -17,7 +17,7 @@ ctor ={ workspace = true }
 definitions-infra-postgres = { path = "../definitions-infra-postgres" }
 definitions-infra-sqlite = { path = "../definitions-infra-sqlite" }
 definitions-manager-lib = { path = "../definitions-manager-lib" }
-dotenv = { workspace = true }
+dotenvy = { workspace = true }
 env_logger =  { workspace = true }
 features = { workspace = true }
 futures =  { workspace = true }
