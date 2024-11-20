@@ -7,7 +7,8 @@ members = [
     "rc-web",
     "definitions-infra-postgres",
     "definitions-infra-sqlite",
-    "projections-lib"
+    "projections-lib",
+    "definitions-core"
 ]
 resolver = "2"
 
@@ -31,6 +32,7 @@ config = "0.14.1"
 cqrs-es = "0.4.12"
 ctor = "0.2.8"
 demonstrate = { version = "0.4.5"}
+disintegrate = { version = "0.8.0", features = ["macros", "serde-json"] }
 dotenvy = "0.15.7"
 env_logger = "0.11.5"
 features = "0.10.0"

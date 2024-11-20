@@ -946,6 +946,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "definitions-core"
+version = "0.1.0-SNAPSHOT"
+dependencies = [
+ "actix",
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "cqrs-es",
+ "demonstrate",
+ "disintegrate",
+ "hamcrest2",
+ "jsonschema",
+ "log",
+ "mockall 0.13.0",
+ "once_cell",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror",
+ "tokio",
+ "url",
+ "uuid",
+ "validator",
+]
+
+[[package]]
 name = "definitions-infra-postgres"
 version = "0.1.0-SNAPSHOT"
 dependencies = [
@@ -991,7 +1019,7 @@ dependencies = [
  "hamcrest2",
  "jsonschema",
  "log",
- "mockall",
+ "mockall 0.13.0",
  "once_cell",
  "regex",
  "reqwest",
@@ -1076,6 +1104,49 @@ dependencies = [
  "const-oid",
  "crypto-common",
  "subtle",
+]
+
+[[package]]
+name = "disintegrate"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61ec48eccceb236b928aeeaf28657dbd7139a4661bf42bc79d90a8197eaaee96"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "disintegrate-macros",
+ "disintegrate-serde",
+ "futures",
+ "lazy_static",
+ "mockall 0.12.1",
+ "paste",
+ "regex",
+ "serde",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
+name = "disintegrate-macros"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dd022a1acce867108312c7cfdd019609366d4e0ca12f3aae8db3cee644b4012"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.85",
+]
+
+[[package]]
+name = "disintegrate-serde"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12b2f19616b311fe1dc2427cb0461173940ba4ffd809bdf9cbea715d51d6275f"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -2190,6 +2261,21 @@ dependencies = [
 
 [[package]]
 name = "mockall"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43766c2b5203b10de348ffe19f7e54564b64f3d6018ff7648d1e2d6d3a0f0a48"
+dependencies = [
+ "cfg-if",
+ "downcast",
+ "fragile",
+ "lazy_static",
+ "mockall_derive 0.12.1",
+ "predicates",
+ "predicates-tree",
+]
+
+[[package]]
+name = "mockall"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4c28b3fb6d753d28c20e826cd46ee611fda1cf3cde03a443a974043247c065a"
@@ -2197,9 +2283,21 @@ dependencies = [
  "cfg-if",
  "downcast",
  "fragile",
- "mockall_derive",
+ "mockall_derive 0.13.0",
  "predicates",
  "predicates-tree",
+]
+
+[[package]]
+name = "mockall_derive"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af7cbce79ec385a1d4f54baa90a76401eb15d9cab93685f62e7e9f942aa00ae2"
+dependencies = [
+ "cfg-if",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.85",
 ]
 
 [[package]]
@@ -2825,7 +2923,7 @@ dependencies = [
  "futures",
  "hamcrest2",
  "log",
- "mockall",
+ "mockall 0.13.0",
  "postgres-es",
  "serde",
  "serde_json",
@@ -4288,6 +4386,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8c5f0a0af699448548ad1a2fbf920fb4bee257eae39953ba95cb84891a0446a"
 dependencies = [
  "getrandom",
+ "serde",
 ]
 
 [[package]]
