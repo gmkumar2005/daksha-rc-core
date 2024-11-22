@@ -6,3 +6,4 @@ pub mod schema_def_services;
 pub mod schema_def_queries;
 pub mod read_side_processor;
 mod banking_domain;
+mod definitions_domain;
