@@ -1,12 +1,7 @@
 [workspace]
 members = [
-    "definitions-manager-lib",
-    "definitions-manager-json",
-    "definitions-manager-toml",
     "definitions-cli",
     "rc-web",
-    "definitions-infra-postgres",
-    "definitions-infra-sqlite",
     "projections-lib",
     "definitions-core"
 ]

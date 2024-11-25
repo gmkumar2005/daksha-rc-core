@@ -1,0 +1,64 @@
+@startuml
+class Customer << aggregate >> {
+String name
+--
+@OneToMany addresses
+}
+
+    Customer -down--o Address
+    class Address  {
+String street
+String city
+String country
+--
+@ManyToOne customer
+}
+
+
+
+class Address << aggregate >> {
+String street
+String city
+String country
+--
+@ManyToOne customer
+}
+
+    Address -down--o Customer
+    class Customer  {
+String name
+--
+@OneToMany addresses
+}
+
+
+
+
+
+CustomerService -up-> Customer
+class Customer << aggregate >> {
+String name
+--
+@OneToMany addresses
+}
+
+
+
+class CustomerService  << service >> {
+    createCustomer(Customer): Customer withEvents CustomerUpdated
+    updateCustomer(id, Customer): Customer? withEvents CustomerUpdated
+    getCustomer(id): Customer? withEvents
+    listCustomers(): Customer[] withEvents
+    deleteCustomer(id):  withEvents CustomerUpdated
+}
+
+
+CustomerService -down-> events
+namespace events #DDDDDD {
+class CustomerUpdated << event >> {
+
+}
+}
+
+
+@enduml

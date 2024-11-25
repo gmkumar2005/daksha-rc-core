@@ -14,9 +14,6 @@ chrono =  { workspace = true }
 config = { workspace = true }
 cqrs-es ={ workspace = true }
 ctor ={ workspace = true }
-definitions-infra-postgres = { path = "../definitions-infra-postgres" }
-definitions-infra-sqlite = { path = "../definitions-infra-sqlite" }
-definitions-manager-lib = { path = "../definitions-manager-lib" }
 dotenvy = { workspace = true }
 env_logger =  { workspace = true }
 features = { workspace = true }

@@ -1,71 +1,28 @@
-// The main entry point of the application. This file starts the Actix-Web server and configures the routes, middleware, and app state.
-mod app;
-mod command_extractor;
-mod db;
-mod config;
-mod handlers;
-mod models;
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
-use crate::app::{application_state_factory_pg, run_migrations};
-use actix_web::{App, HttpServer};
-use anyhow::Result;
-use config::AppConfig;
-use dotenvy::dotenv;
-use handlers::schema_def_handlers::{create_def, hello};
-use log::error;
-use utoipa::OpenApi;
-use utoipa_rapidoc::RapiDoc;
-use utoipa_scalar::{Scalar, Servable};
-use utoipa_swagger_ui::SwaggerUi;
+#[get("/")]
+async fn hello() -> impl Responder {
+    HttpResponse::Ok().body("Hello world!")
+}
 
+#[post("/echo")]
+async fn echo(req_body: String) -> impl Responder {
+    HttpResponse::Ok().body(req_body)
+}
 
-#[derive(OpenApi)]
-#[openapi(
-    info(description = "Daksha-RC-core API"),
-    paths(
-        handlers::schema_def_handlers::create_def,
-    ),
-    components(schemas(handlers::schema_def_handlers::CreateDefRequest))
-)]
-struct ApiDoc;
+async fn manual_hello() -> impl Responder {
+    HttpResponse::Ok().body("Hey there!")
+}
 
 #[actix_web::main]
-async fn main() -> Result<()> {
-    std::env::set_var("RUST_LOG", "debug");
-    dotenv().ok();
-    let config = AppConfig::from_env().expect("Failed to load configuration");
-    env_logger::init();
-    let openapi = ApiDoc::openapi();
-    let db_url = format!(
-        "postgres://{}:{}@{}:{}/{}",
-        config.database.user,
-        config.database.password,
-        config.database.host,
-        config.database.port,
-        config.database.dbname
-    );
-    println!("Database URL: {}", &db_url);
-    let db_url_clone = db_url.clone();
-    tokio::task::spawn_blocking(move || {
-        run_migrations(&db_url_clone)
-            .map_err(|e| error!("Failed to run migrations: {:?}", e))
-    });
-
-    let app_state = application_state_factory_pg(&db_url).await;
-    HttpServer::new(move || {
+async fn main() -> std::io::Result<()> {
+    HttpServer::new(|| {
         App::new()
-            .app_data(app_state.clone())
             .service(hello)
-            .service(create_def)
-            .service(
-                SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", openapi.clone()),
-            )
-            .service(Scalar::with_url("/scalar", openapi.clone()))
-            .service(RapiDoc::with_openapi("/api-docs/openapi2.json", openapi.clone()).path("/rapidoc"))
-            .service(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc"))
+            .service(echo)
+            .route("/hey", web::get().to(manual_hello))
     })
         .bind(("127.0.0.1", 8080))?
         .run()
-        .await?;
-    Ok(())
+        .await
 }
