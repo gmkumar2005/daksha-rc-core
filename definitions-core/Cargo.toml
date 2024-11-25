@@ -12,7 +12,7 @@ chrono =  { workspace = true }
 cqrs-es = { workspace = true }
 demonstrate ={ workspace = true }
 disintegrate = { workspace = true }
-jsonschema = { workspace = true }
+jsonschema = "0.26.1"
 log = { workspace = true }
 mockall ={ workspace = true }
 once_cell = { workspace = true }

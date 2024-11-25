@@ -2,12 +2,14 @@ use anyhow::Error;
 use chrono::{DateTime, Utc};
 use disintegrate::{Decision, Event, StateMutate, StateQuery};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use thiserror::Error;
 
 pub type DefId = i64;
 // Start of domain events
 #[derive(Debug, Clone, PartialEq, Eq, Event, Serialize, Deserialize)]
-#[stream(DefStateEvent, [DefLoaded, DefCreated, DefUpdated, DefDeleted, DefValidated, DefActivated, DefDeactivated]
+#[stream(DefStateEvent, [DefLoaded, DefCreated, DefUpdated, DefDeleted, DefValidated, DefActivated,
+DefDeactivated]
 )]
 // #[stream(DefChangeEvents, [PropertiesAdded, PropertiesRemoved, PropertiesReplaced, VisibilityModified, AttestationPoliciesAdded, AttestationPoliciesReplaced, OwnerShipAttributesAdded, OwnerShipAttributesReplaced])]
 pub enum DomainEvent {
@@ -78,8 +80,8 @@ pub enum DomainEvent {
 // start of errors
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum DefError {
-    #[error("Invalid Json")]
-    InvalidJson,
+    #[error("Invalid Json: {0}")]
+    InvalidJson(String),
     #[error("Invalid Schema: {0}")]
     InvalidSchema(String),
     #[error("Invalid Definition")]
@@ -205,12 +207,12 @@ impl Decision for LoadDefinition {
 }
 
 pub struct CreateDefinition {
-    def_id: DefId,
-    def_title: String,
-    definitions: Vec<String>,
-    created_at: DateTime<Utc>,
-    created_by: String,
-    json_schema_string: String,
+    pub def_id: DefId,
+    pub def_title: String,
+    pub definitions: Vec<String>,
+    pub created_at: DateTime<Utc>,
+    pub created_by: String,
+    pub json_schema_string: String,
 }
 impl Decision for CreateDefinition {
     type Event = DomainEvent;
@@ -236,12 +238,12 @@ impl Decision for CreateDefinition {
 }
 
 pub struct UpdateDefinition {
-    def_id: DefId,
-    def_title: String,
-    definitions: Vec<String>,
-    created_at: DateTime<Utc>,
-    updated_by: String,
-    json_schema_string: String,
+    pub def_id: DefId,
+    pub def_title: String,
+    pub definitions: Vec<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_by: String,
+    pub json_schema_string: String,
 }
 
 impl Decision for UpdateDefinition {
@@ -270,9 +272,9 @@ impl Decision for UpdateDefinition {
 }
 
 pub struct ValidateDefinition {
-    def_id: DefId,
-    validated_at: DateTime<Utc>,
-    validated_by: String,
+    pub def_id: DefId,
+    pub validated_at: DateTime<Utc>,
+    pub validated_by: String,
 }
 
 // Load the definition check if the
@@ -291,11 +293,11 @@ impl Decision for ValidateDefinition {
 
         // TODO: validate the json and json schema
         match validate_schema(&state.json_schema_string) {
-            Ok(result) if result == "Success" => Ok(vec![DomainEvent::DefValidated {
+            Ok(result) if !result.is_empty() => Ok(vec![DomainEvent::DefValidated {
                 def_id: self.def_id,
                 validated_at: self.validated_at,
                 validated_by: self.validated_by.clone(),
-                validation_result: result,
+                validation_result: "Success".to_string(),
             }]),
             Ok(result) => Ok(vec![DomainEvent::DefValidatedFailed {
                 def_id: self.def_id,
@@ -394,98 +396,17 @@ impl Decision for DeleteDefinition {
 
 fn validate_schema(p0: &String) -> Result<String, Error> {
     if !p0.is_empty() {
-        Ok("Success".to_string())
+        let schema_value: Value = serde_json::from_str(&p0)
+            .map_err(|e| DefError::InvalidJson(e.to_string()))?;
+
+        let title = schema_value["title"].as_str().unwrap_or("").to_string();
+        if title.is_empty() {
+            return Err(DefError::InvalidSchema("Title is empty".to_string()).into());
+        }
+
+        Ok(title)
     } else {
         Err(DefError::InvalidSchema("Schema is empty".to_string()).into())
     }
 }
 
-// start test cases
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_create_definition() {
-        let date_str = "2024-11-22T16:46:51.757980Z";
-        let created_at: DateTime<Utc> = date_str.parse().expect("Failed to parse date");
-
-        let create_def_cmd = CreateDefinition {
-            def_id: 1,
-            def_title: "test_title".to_string(),
-            definitions: vec!["test_def".to_string()],
-            created_at: created_at.clone(),
-            created_by: "test_created_by".to_string(),
-            json_schema_string: "{}".to_string(),
-        };
-
-        disintegrate::TestHarness::given([])
-            .when(create_def_cmd)
-            .then([DomainEvent::DefCreated {
-                def_id: 1,
-                title: "test_title".to_string(),
-                definitions: vec!["test_def".to_string()],
-                created_at: created_at.clone(),
-                created_by: "test_created_by".to_string(),
-                json_schema_string: "{}".to_string(),
-            }]);
-    }
-
-    #[test]
-    fn test_validate_definition() {
-        let date_str = "2024-11-22T16:46:51.757980Z";
-        let validated_at: DateTime<Utc> = date_str.parse().expect("Failed to parse date");
-
-        let validate_def_cmd = ValidateDefinition {
-            def_id: 1,
-            validated_at: validated_at.clone(),
-            validated_by: "test_validated_by".to_string(),
-        };
-
-        disintegrate::TestHarness::given([DomainEvent::DefCreated {
-            def_id: 1,
-            title: "test_title".to_string(),
-            definitions: vec!["test_def".to_string()],
-            created_at: validated_at.clone(),
-            created_by: "test_created_by".to_string(),
-            json_schema_string: "{}".to_string(),
-        }])
-            .when(validate_def_cmd)
-            .then([DomainEvent::DefValidated {
-                def_id: 1,
-                validated_at: validated_at.clone(),
-                validated_by: "test_validated_by".to_string(),
-                validation_result: "Success".to_string(),
-            }]);
-    }
-
-    #[test]
-    fn test_validate_definition_empty_schema() {
-        let date_str = "2024-11-22T16:46:51.757980Z";
-        let validated_at: DateTime<Utc> = date_str.parse().expect("Failed to parse date");
-
-        let validate_def_cmd = ValidateDefinition {
-            def_id: 1,
-            validated_at: validated_at.clone(),
-            validated_by: "test_validated_by".to_string(),
-        };
-
-        disintegrate::TestHarness::given([DomainEvent::DefCreated {
-            def_id: 1,
-            title: "test_title".to_string(),
-            definitions: vec!["test_def".to_string()],
-            created_at: validated_at.clone(),
-            created_by: "test_created_by".to_string(),
-            json_schema_string: "".to_string(),
-        }])
-            .when(validate_def_cmd)
-            .then([DomainEvent::DefValidatedFailed {
-                def_id: 1,
-                validated_at: validated_at.clone(),
-                validated_by: "test_validated_by".to_string(),
-                validation_result: "failure".to_string(),
-                validation_errors: vec!["Invalid Schema: Schema is empty".to_string()],
-            }]);
-    }
-
-}
