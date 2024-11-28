@@ -57,17 +57,16 @@ description = "database: prepare the queries for the offline mode"
 category = "Database"
 install_crate = "sqlx-cli"
 install_crate_args = ["--no-default-features", "--features", "native-tls,postgres"]
-command = "cargo"
-args = ["sqlx", "prepare", "--workspace", "--", "--tests"]
+command = "dotenvx"
+args = ["run","--","cargo", "sqlx", "prepare", "--workspace", "--", "--tests"]
 
 [tasks.db-migrate]
 description = "database: run the database migrations"
 category = "Database"
 install_crate = "sqlx-cli"
-env = { "DATABASE_URL" = "postgres://daksha_rc:daksha_rc@localhost:5432/daksha_rc"}
 install_crate_args = ["--no-default-features", "--features", "native-tls,postgres"]
-command = "sqlx"
-args = ["migrate", "run"]
+command = "dotenvx"
+args = ["run", "--","sqlx","migrate", "run"]
 
 [tasks.db-update-offline]
 description = "database: update the file for the query offline mode"
@@ -80,9 +79,8 @@ dependencies = [
 ]
 
 [tasks.docker-postgres-run]
-command = "docker-compose"
-env = {POSTGRES_PASSWORD="daksha_rc", POSTGRES_DB="daksha_rc", POSTGRES_USER="daksha_rc"}
-args = ["-f", "rc-web/docker-compose.yml", "up", "-d"]
+command = "dotenvx"
+args = ["run", "--", "docker-compose","-f", "rc-web/docker-compose.yml", "up", "-d"]
 
 [tasks.docker-postgres-stop]
 command = "docker-compose"

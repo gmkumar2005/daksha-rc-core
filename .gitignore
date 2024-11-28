@@ -17,5 +17,11 @@ target/
 *.pdb
 **/*.pdb
 **/*.profraw
-**/.env
 
+
+# Allow .env at the root folder
+!/.env
+
+# Ignore any other .env files
+**/.env
+**/.env.keys
