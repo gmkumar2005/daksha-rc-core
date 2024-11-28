@@ -2783,7 +2783,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "smol_str 0.3.2",
+ "smol_str",
  "streambed",
  "streambed-confidant",
  "streambed-logged",
@@ -3385,15 +3385,6 @@ dependencies = [
 
 [[package]]
 name = "smol_str"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd538fb6910ac1099850255cf94a94df6551fbdd602454387d0adb2d1ca6dead"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "smol_str"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9676b89cd56310a87b93dec47b11af744f34d5fc9f367b829474eec0a891350d"
@@ -3672,9 +3663,9 @@ checksum = "e51f1e89f093f99e7432c491c382b88a6860a5adbe6bf02574bf0a08efff1978"
 
 [[package]]
 name = "streambed"
-version = "0.11.1"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f8d5ccd17511100cef371ceb0134a0d56641ce2069b34eb69042311f75b5d30"
+checksum = "aba5b15463447437ff8427a8acfe151a77da76cfec4d89216ed5065cbcdba0f6"
 dependencies = [
  "aes",
  "async-trait",
@@ -3687,16 +3678,16 @@ dependencies = [
  "serde",
  "serde_with",
  "sha2",
- "smol_str 0.2.2",
+ "smol_str",
  "tokio",
  "tokio-stream",
 ]
 
 [[package]]
 name = "streambed-confidant"
-version = "0.11.1"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef014b83d4c8a78b5503c1dc249e0fcdc0b718af10d62195089a919a7a551851"
+checksum = "6cfc96186b06320d7aaf2d2f96383e679066d71690b0fefe47388eda00f50640"
 dependencies = [
  "async-trait",
  "base64 0.20.0",
@@ -3714,9 +3705,9 @@ dependencies = [
 
 [[package]]
 name = "streambed-logged"
-version = "0.11.1"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39caabf8a411192ae2c8fddc40962baf0289288505c750c6f2e34cad49ec14e5"
+checksum = "e7a40375899afee217d814405b82463ed2f3e0041c885f6b4bfa5a7d27ed41ba"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -3724,12 +3715,11 @@ dependencies = [
  "chrono",
  "clap",
  "crc",
- "humantime",
  "log",
  "postcard",
  "serde",
  "serde_with",
- "smol_str 0.2.2",
+ "smol_str",
  "streambed",
  "tokio",
  "tokio-stream",

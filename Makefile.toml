@@ -1,0 +1,89 @@
+# Disabling workspace support
+[config]
+default_to_workspace = false
+
+[tasks.db-dev]
+description = "database: run the local database for development"
+category = "Database"
+dependencies = [
+    "docker-postgres-run",
+    "db-migrate",
+    "db-prepare"
+]
+
+[tasks.clean]
+description = "clean: remove the target directory"
+category = "Build"
+command = "cargo"
+args = ["clean"]
+
+[tasks.build]
+command = "cargo"
+env = { "SQLX_OFFLINE" = "true" }
+args = ["build"]
+dependencies = ["clean"]
+
+[tasks.check]
+description = "build: analyze the workspace and report errors, but don't build object files"
+category = "Build"
+env = { "SQLX_OFFLINE" = "true" }
+command = "cargo"
+args = ["check"]
+
+[tasks.test]
+description = "test: run the tests"
+category = "Check"
+env = { "SQLX_OFFLINE" = "true", "TEST_LOG" = "true", RUSTFLAGS = "-Cinstrument-coverage" }
+command = "cargo"
+args = ["test", "--no-fail-fast", "--", "--test-threads", "2"]
+
+[tasks.code-coverage]
+description = "llvm-cov: generate HTML coverage report"
+category = "Check"
+command = "cargo"
+install_crate = { rustup_component_name = "llvm-tools-preview", binary = "llvm-profdata", test_arg = "--help" }
+env = { "SQLX_OFFLINE" = "true", "TEST_LOG" = "true", RUSTFLAGS = "-Cinstrument-coverage" }
+args = ["llvm-cov", "--html"]
+
+[tasks.tarpaulin]
+description = "tarpaulin: compute the code coverage"
+category = "Check"
+install_crate = "cargo-tarpaulin"
+command = "cargo"
+args = ["tarpaulin", "--out", "html", "--", "--test-threads", "2"]
+
+[tasks.db-prepare]
+description = "database: prepare the queries for the offline mode"
+category = "Database"
+install_crate = "sqlx-cli"
+install_crate_args = ["--no-default-features", "--features", "native-tls,postgres"]
+command = "cargo"
+args = ["sqlx", "prepare", "--workspace", "--", "--tests"]
+
+[tasks.db-migrate]
+description = "database: run the database migrations"
+category = "Database"
+install_crate = "sqlx-cli"
+env = { "DATABASE_URL" = "postgres://daksha_rc:daksha_rc@localhost:5432/daksha_rc"}
+install_crate_args = ["--no-default-features", "--features", "native-tls,postgres"]
+command = "sqlx"
+args = ["migrate", "run"]
+
+[tasks.db-update-offline]
+description = "database: update the file for the query offline mode"
+category = "Database"
+dependencies = [
+    "docker-postgres-run",
+    "db-migrate",
+    "db-prepare",
+    "docker-postgres-stop"
+]
+
+[tasks.docker-postgres-run]
+command = "docker-compose"
+env = {POSTGRES_PASSWORD="daksha_rc", POSTGRES_DB="daksha_rc", POSTGRES_USER="daksha_rc"}
+args = ["-f", "rc-web/docker-compose.yml", "up", "-d"]
+
+[tasks.docker-postgres-stop]
+command = "docker-compose"
+args = ["-f", "rc-web/docker-compose.yml", "down"]
