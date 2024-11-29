@@ -52,6 +52,7 @@ category = "Check"
 install_crate = "cargo-tarpaulin"
 command = "cargo"
 args = ["tarpaulin", "--out", "html", "--", "--test-threads", "2"]
+disabled = true
 
 [tasks.db-prepare]
 description = "database: prepare the queries for the offline mode"
@@ -85,10 +86,12 @@ dependencies = [
 [tasks.docker-postgres-run]
 command = "dotenvx"
 args = ["run", "--", "docker-compose","-f", "rc-web/docker-compose.yml", "up", "-d"]
+category = "Database"
 dependencies = ["install-dotenvx"]
 
 [tasks.docker-postgres-stop]
 command = "docker-compose"
+category = "Database"
 args = ["-f", "rc-web/docker-compose.yml", "down"]
 
 [tasks.install-dotenvx]
