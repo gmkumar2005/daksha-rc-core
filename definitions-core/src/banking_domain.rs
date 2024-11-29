@@ -398,8 +398,8 @@ mod test {
             DomainEvent::AccountOpened { account_id: 1 },
             DomainEvent::AccountClosed { account_id: 1 },
         ])
-            .when(CloseAccount::new(1))
-            .then_err(Error::AccountClosed);
+        .when(CloseAccount::new(1))
+        .then_err(Error::AccountClosed);
     }
 
     #[test]
@@ -425,8 +425,8 @@ mod test {
             DomainEvent::AccountOpened { account_id: 1 },
             DomainEvent::AccountClosed { account_id: 1 },
         ])
-            .when(DepositAmount::new(1, 20))
-            .then_err(Error::AccountClosed);
+        .when(DepositAmount::new(1, 20))
+        .then_err(Error::AccountClosed);
     }
 
     #[test]
@@ -438,11 +438,11 @@ mod test {
                 amount: 10,
             },
         ])
-            .when(WithdrawAmount::new(1, 10))
-            .then([DomainEvent::AmountWithdrawn {
-                account_id: 1,
-                amount: 10,
-            }]);
+        .when(WithdrawAmount::new(1, 10))
+        .then([DomainEvent::AmountWithdrawn {
+            account_id: 1,
+            amount: 10,
+        }]);
     }
 
     #[test]
@@ -458,8 +458,8 @@ mod test {
             DomainEvent::AccountOpened { account_id: 1 },
             DomainEvent::AccountClosed { account_id: 1 },
         ])
-            .when(WithdrawAmount::new(1, 5))
-            .then_err(Error::AccountClosed);
+        .when(WithdrawAmount::new(1, 5))
+        .then_err(Error::AccountClosed);
     }
 
     #[test]
@@ -475,8 +475,8 @@ mod test {
                 amount: 26,
             },
         ])
-            .when(WithdrawAmount::new(1, 5))
-            .then_err(Error::InsufficientBalance);
+        .when(WithdrawAmount::new(1, 5))
+        .then_err(Error::InsufficientBalance);
     }
 
     #[test]
@@ -489,19 +489,19 @@ mod test {
             },
             DomainEvent::AccountOpened { account_id: 2 },
         ])
-            .when(SendMoney::new(1, 2, 7))
-            .then(vec![
-                DomainEvent::TransferSent {
-                    account_id: 1,
-                    to: 2,
-                    amount: 7,
-                },
-                DomainEvent::TransferReceived {
-                    account_id: 2,
-                    from: 1,
-                    amount: 7,
-                },
-            ])
+        .when(SendMoney::new(1, 2, 7))
+        .then(vec![
+            DomainEvent::TransferSent {
+                account_id: 1,
+                to: 2,
+                amount: 7,
+            },
+            DomainEvent::TransferReceived {
+                account_id: 2,
+                from: 1,
+                amount: 7,
+            },
+        ])
     }
 
     #[test]
@@ -520,8 +520,8 @@ mod test {
                 amount: 5,
             },
         ])
-            .when(SendMoney::new(1, 2, 7))
-            .then_err(Error::AccountNotFound);
+        .when(SendMoney::new(1, 2, 7))
+        .then_err(Error::AccountNotFound);
     }
 
     #[test]
@@ -534,7 +534,7 @@ mod test {
             },
             DomainEvent::AccountOpened { account_id: 2 },
         ])
-            .when(SendMoney::new(1, 2, 8))
-            .then_err(Error::InsufficientBalance);
+        .when(SendMoney::new(1, 2, 8))
+        .then_err(Error::InsufficientBalance);
     }
 }

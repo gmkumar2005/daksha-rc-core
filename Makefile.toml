@@ -6,6 +6,7 @@ default_to_workspace = false
 description = "database: run the local database for development"
 category = "Database"
 dependencies = [
+    "install-dotenvx",
     "docker-postgres-run",
     "db-migrate",
     "db-prepare"
@@ -59,6 +60,7 @@ install_crate = "sqlx-cli"
 install_crate_args = ["--no-default-features", "--features", "native-tls,postgres"]
 command = "dotenvx"
 args = ["run","--","cargo", "sqlx", "prepare", "--workspace", "--", "--tests"]
+dependencies = ["install-dotenvx"]
 
 [tasks.db-migrate]
 description = "database: run the database migrations"
@@ -67,11 +69,13 @@ install_crate = "sqlx-cli"
 install_crate_args = ["--no-default-features", "--features", "native-tls,postgres"]
 command = "dotenvx"
 args = ["run", "--","sqlx","migrate", "run"]
+dependencies = ["install-dotenvx"]
 
 [tasks.db-update-offline]
 description = "database: update the file for the query offline mode"
 category = "Database"
 dependencies = [
+    "install-dotenvx",
     "docker-postgres-run",
     "db-migrate",
     "db-prepare",
@@ -81,7 +85,13 @@ dependencies = [
 [tasks.docker-postgres-run]
 command = "dotenvx"
 args = ["run", "--", "docker-compose","-f", "rc-web/docker-compose.yml", "up", "-d"]
+dependencies = ["install-dotenvx"]
 
 [tasks.docker-postgres-stop]
 command = "docker-compose"
 args = ["-f", "rc-web/docker-compose.yml", "down"]
+
+[tasks.install-dotenvx]
+description = "Install dotenvx"
+category = "Setup"
+install_crate = "dotenvx"

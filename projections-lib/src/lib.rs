@@ -1,13 +1,18 @@
-use serde::{Deserialize, Serialize};
-use std::{fmt, fmt::{Display, Write}, hash::{BuildHasher, Hash, Hasher}, str::FromStr};
-use std::ops::Range;
 use chrono::{DateTime, Utc};
 use jdk::StringHasher;
+use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
+use std::ops::Range;
+use std::{
+    fmt,
+    fmt::{Display, Write},
+    hash::{BuildHasher, Hash, Hasher},
+    str::FromStr,
+};
 
+pub mod in_mem_offset_store;
 pub mod jdk;
 pub mod offset_store;
-pub mod in_mem_offset_store;
 
 /// Uniquely identifies the type of an Entity.
 pub type EntityType = SmolStr;
@@ -222,7 +227,7 @@ mod tests {
                 EntityType::from("some-entity-type"),
                 EntityId::from("some-entity-id")
             )
-                .slice(),
+            .slice(),
             451
         );
     }

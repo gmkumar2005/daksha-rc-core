@@ -3,8 +3,7 @@ use crate::{Offset, PersistenceId};
 pub type LastOffset = (Vec<PersistenceId>, Offset);
 
 pub enum Command {
-    GetLastOffset {
-    },
+    GetLastOffset {},
     GetOffset {
         persistence_id: PersistenceId,
     },

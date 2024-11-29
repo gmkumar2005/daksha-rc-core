@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_event_sequence_committed;

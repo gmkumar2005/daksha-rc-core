@@ -4,7 +4,6 @@ use actix::prelude::*;
 use futures_util::stream;
 use std::pin::Pin;
 
-
 pub struct InMemOffsetStore {
     last_offsets: Vec<LastOffset>,
 }
@@ -44,7 +43,6 @@ impl Message for SaveOffset {
     type Result = ();
 }
 
-
 impl Handler<GetLastOffset> for InMemOffsetStore {
     type Result = MessageResult<GetLastOffset>;
 
@@ -58,7 +56,9 @@ impl Handler<GetOffset> for InMemOffsetStore {
     type Result = MessageResult<GetOffset>;
 
     fn handle(&mut self, msg: GetOffset, _: &mut Self::Context) -> Self::Result {
-        let offset = self.last_offsets.iter()
+        let offset = self
+            .last_offsets
+            .iter()
             .find(|(ids, _)| ids.contains(&msg.persistence_id))
             .map(|(_, offset)| offset.clone());
         MessageResult(offset)
@@ -69,7 +69,8 @@ impl Handler<SaveOffset> for InMemOffsetStore {
     type Result = MessageResult<SaveOffset>;
 
     fn handle(&mut self, msg: SaveOffset, _: &mut Self::Context) -> Self::Result {
-        self.last_offsets.push((vec![msg.persistence_id], msg.offset));
+        self.last_offsets
+            .push((vec![msg.persistence_id], msg.offset));
         MessageResult(())
     }
 }
@@ -81,14 +82,12 @@ impl Handler<SaveOffset> for InMemOffsetStore {
 struct PingMessage(String);
 // Define the actor
 struct PingActor {
-    local_ping_stream: Option<Pin<Box<dyn Stream<Item=PingMessage>>>>,
+    local_ping_stream: Option<Pin<Box<dyn Stream<Item = PingMessage>>>>,
     // local_ping_stream: Option<Box<dyn Stream<Item = PingMessage> + Unpin>>,
-
 }
 
-
 impl PingActor {
-    fn new(stream: Pin<Box<dyn Stream<Item=PingMessage>>>) -> Self {
+    fn new(stream: Pin<Box<dyn Stream<Item = PingMessage>>>) -> Self {
         Self {
             local_ping_stream: Some(stream),
         }
@@ -116,7 +115,6 @@ impl StreamHandler<PingMessage> for PingActor {
     }
 }
 
-
 #[derive(Message)]
 #[rtype(result = "()")]
 struct AddStreamMessage;
@@ -140,8 +138,8 @@ mod tests {
     use super::*;
     use crate::{EntityId, EntityType, Offset, PersistenceId};
     use actix_rt;
-    use futures_util::{stream, SinkExt};
     use futures_util::stream::once;
+    use futures_util::{stream, SinkExt};
 
     #[actix_rt::test]
     async fn test_basic_ops() {
@@ -152,18 +150,38 @@ mod tests {
 
         let persistence_id =
             PersistenceId::new(EntityType::from("entity-type"), EntityId::from("entity-id"));
-        let offset = volatile_store.send(GetOffset { persistence_id: persistence_id.clone() }).await.unwrap();
+        let offset = volatile_store
+            .send(GetOffset {
+                persistence_id: persistence_id.clone(),
+            })
+            .await
+            .unwrap();
         assert_eq!(offset, None);
 
         let offset = Offset::Sequence(10);
-        volatile_store.send(SaveOffset { persistence_id: persistence_id.clone(), offset }).await.unwrap();
-        let offset = volatile_store.send(GetOffset { persistence_id }).await.unwrap();
+        volatile_store
+            .send(SaveOffset {
+                persistence_id: persistence_id.clone(),
+                offset,
+            })
+            .await
+            .unwrap();
+        let offset = volatile_store
+            .send(GetOffset { persistence_id })
+            .await
+            .unwrap();
         assert_eq!(offset, Some(Offset::Sequence(10)));
 
         let persistence_id =
             PersistenceId::new(EntityType::from("entity-type"), EntityId::from("entity-id"));
         let offset = Offset::Sequence(10);
-        volatile_store.send(SaveOffset { persistence_id: persistence_id.clone(), offset }).await.unwrap();
+        volatile_store
+            .send(SaveOffset {
+                persistence_id: persistence_id.clone(),
+                offset,
+            })
+            .await
+            .unwrap();
         let last_offset = volatile_store.send(GetLastOffset).await.unwrap();
         let expected_last_offset = Some((vec![persistence_id], Offset::Sequence(10)));
         assert_eq!(last_offset, expected_last_offset);
@@ -171,9 +189,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_ping_stream_handler() {
-        let ping_msg_stream =
-            once(async { PingMessage("Ping Single 1".into()) });
-
+        let ping_msg_stream = once(async { PingMessage("Ping Single 1".into()) });
 
         // Create a stream of ping messages
         let ping_stream = stream::iter(vec![
@@ -183,7 +199,6 @@ mod tests {
         ]);
         let mut addr_1 = PingActor::new(Box::pin(ping_msg_stream));
         addr_1.start();
-
 
         // Allow some time for the actor to process the stream
         actix_rt::time::sleep(std::time::Duration::from_secs(1)).await;

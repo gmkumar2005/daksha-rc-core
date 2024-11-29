@@ -74,7 +74,6 @@ pub enum DomainEvent {
         deactivated_at: DateTime<Utc>,
         deactivated_by: String,
     },
-
 }
 
 // start of errors
@@ -139,7 +138,14 @@ impl DefState {
 impl StateMutate for DefState {
     fn mutate(&mut self, event: Self::Event) {
         match event {
-            DomainEvent::DefCreated { def_id, title, definitions, created_at, created_by, json_schema_string } => {
+            DomainEvent::DefCreated {
+                def_id,
+                title,
+                definitions,
+                created_at,
+                created_by,
+                json_schema_string,
+            } => {
                 self.record_status = RecordStatus::Draft;
                 self.def_id = def_id;
                 self.title = title;
@@ -255,9 +261,10 @@ impl Decision for UpdateDefinition {
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
-
         // updates are allowed only for draft definitions and inactive definitions
-        if state.record_status != RecordStatus::Draft && state.record_status != RecordStatus::Deactivated {
+        if state.record_status != RecordStatus::Draft
+            && state.record_status != RecordStatus::Deactivated
+        {
             return Err(DefError::DefinitionNotValid);
         }
         Ok(vec![DomainEvent::DefUpdated {
@@ -396,8 +403,8 @@ impl Decision for DeleteDefinition {
 
 fn validate_schema(p0: &String) -> Result<String, Error> {
     if !p0.is_empty() {
-        let schema_value: Value = serde_json::from_str(&p0)
-            .map_err(|e| DefError::InvalidJson(e.to_string()))?;
+        let schema_value: Value =
+            serde_json::from_str(&p0).map_err(|e| DefError::InvalidJson(e.to_string()))?;
 
         let title = schema_value["title"].as_str().unwrap_or("").to_string();
         if title.is_empty() {
@@ -409,4 +416,3 @@ fn validate_schema(p0: &String) -> Result<String, Error> {
         Err(DefError::InvalidSchema("Schema is empty".to_string()).into())
     }
 }
-
