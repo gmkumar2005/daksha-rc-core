@@ -6,24 +6,17 @@ version = "0.1.0-SNAPSHOT"
 license = "MIT"
 [dependencies]
 actix = { workspace = true }
-actix-rt ={ workspace = true }
 actix-web = { workspace = true }
 anyhow =  { workspace = true }
 async-trait = { workspace = true }
 chrono =  { workspace = true }
 config = { workspace = true }
-cqrs-es ={ workspace = true }
 ctor ={ workspace = true }
-dotenvy = { workspace = true }
 env_logger =  { workspace = true }
-features = { workspace = true }
-futures =  { workspace = true }
 log =  { workspace = true }
-postgres-es = { workspace = true }
 serde =  { workspace = true }
 serde_json = { workspace = true }
-sqlite-es = { workspace = true }
-sqlx =  { workspace = true }
+sqlx = { workspace = true }
 thiserror =  { workspace = true }
 tokio =  { workspace = true }
 utoipa =  { workspace = true }
@@ -33,6 +26,9 @@ utoipa-scalar =  { workspace = true }
 utoipa-swagger-ui =  { workspace = true }
 uuid =  { workspace = true }
 validator =  { workspace = true }
+disintegrate-postgres = { workspace = true }
+disintegrate = { workspace = true }
+definitions-core = {path = "../definitions-core"}
 [dev-dependencies]
 hamcrest2 = { workspace = true }
 mockall = { workspace = true }

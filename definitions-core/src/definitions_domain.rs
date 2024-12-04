@@ -5,13 +5,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 
-pub type DefId = i64;
+// #[stream(DefChangeEvents, [PropertiesAdded, PropertiesRemoved, PropertiesReplaced, VisibilityModified, AttestationPoliciesAdded, AttestationPoliciesReplaced, OwnerShipAttributesAdded, OwnerShipAttributesReplaced])]
+
+pub type DefId = String;
 // Start of domain events
 #[derive(Debug, Clone, PartialEq, Eq, Event, Serialize, Deserialize)]
 #[stream(DefStateEvent, [DefLoaded, DefCreated, DefUpdated, DefDeleted, DefValidated, DefActivated,
 DefDeactivated]
 )]
-// #[stream(DefChangeEvents, [PropertiesAdded, PropertiesRemoved, PropertiesReplaced, VisibilityModified, AttestationPoliciesAdded, AttestationPoliciesReplaced, OwnerShipAttributesAdded, OwnerShipAttributesReplaced])]
 pub enum DomainEvent {
     DefLoaded {
         #[id]
@@ -85,8 +86,8 @@ pub enum DefError {
     InvalidSchema(String),
     #[error("Invalid Definition")]
     InvalidDefinition,
-    #[error("Definition Already Exists")]
-    DefinitionAlreadyExists,
+    #[error("Definition Already Exists: {0}")]
+    DefinitionAlreadyExists(String),
     #[error("Definition Not Found")]
     DefinitionNotFound,
     #[error("Definition Not Valid")]
@@ -133,6 +134,8 @@ impl DefState {
             definitions: vec![],
         }
     }
+
+
 }
 
 impl StateMutate for DefState {
@@ -193,15 +196,15 @@ impl Decision for LoadDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.def_id.clone())
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if state.record_status != RecordStatus::None {
-            return Err(DefError::DefinitionAlreadyExists);
+            return Err(DefError::DefinitionAlreadyExists(self.def_id.clone()));
         }
         Ok(vec![DomainEvent::DefLoaded {
-            def_id: self.def_id,
+            def_id: self.def_id.clone(),
             title: self.def_title.clone(),
             definitions: self.definitions.clone(),
             file_name: self.file_name.clone(),
@@ -225,15 +228,15 @@ impl Decision for CreateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.def_id.clone())
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if state.record_status != RecordStatus::None {
-            return Err(DefError::DefinitionAlreadyExists);
+            return Err(DefError::DefinitionAlreadyExists(self.def_id.clone()));
         }
         Ok(vec![DomainEvent::DefCreated {
-            def_id: self.def_id,
+            def_id: self.def_id.clone(),
             title: self.def_title.clone(),
             definitions: self.definitions.clone(),
             created_at: self.created_at,
@@ -257,7 +260,7 @@ impl Decision for UpdateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.def_id.clone())
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -268,7 +271,7 @@ impl Decision for UpdateDefinition {
             return Err(DefError::DefinitionNotValid);
         }
         Ok(vec![DomainEvent::DefUpdated {
-            def_id: self.def_id,
+            def_id: self.def_id.clone(),
             title: self.def_title.clone(),
             definitions: self.definitions.clone(),
             created_at: self.created_at,
@@ -290,7 +293,7 @@ impl Decision for ValidateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.def_id.clone())
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -301,20 +304,20 @@ impl Decision for ValidateDefinition {
         // TODO: validate the json and json schema
         match validate_schema(&state.json_schema_string) {
             Ok(result) if !result.is_empty() => Ok(vec![DomainEvent::DefValidated {
-                def_id: self.def_id,
+                def_id: self.def_id.clone(),
                 validated_at: self.validated_at,
                 validated_by: self.validated_by.clone(),
                 validation_result: "Success".to_string(),
             }]),
             Ok(result) => Ok(vec![DomainEvent::DefValidatedFailed {
-                def_id: self.def_id,
+                def_id: self.def_id.clone(),
                 validated_at: self.validated_at,
                 validated_by: self.validated_by.clone(),
                 validation_result: result,
                 validation_errors: vec![],
             }]),
             Err(err) => Ok(vec![DomainEvent::DefValidatedFailed {
-                def_id: self.def_id,
+                def_id: self.def_id.clone(),
                 validated_at: self.validated_at,
                 validated_by: self.validated_by.clone(),
                 validation_result: "failure".to_string(),
@@ -334,7 +337,7 @@ impl Decision for ActivateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.def_id.clone())
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -342,7 +345,7 @@ impl Decision for ActivateDefinition {
             return Err(DefError::DefinitionNotValid);
         }
         Ok(vec![DomainEvent::DefActivated {
-            def_id: self.def_id,
+            def_id: self.def_id.clone(),
             activated_at: self.activated_at,
             activated_by: self.activated_by.clone(),
         }])
@@ -359,7 +362,7 @@ impl Decision for DeactivateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.def_id.clone())
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -367,7 +370,7 @@ impl Decision for DeactivateDefinition {
             return Err(DefError::DefinitionNotActive);
         }
         Ok(vec![DomainEvent::DefDeactivated {
-            def_id: self.def_id,
+            def_id: self.def_id.clone(),
             deactivated_at: self.deactivated_at,
             deactivated_by: self.deactivated_by.clone(),
         }])
@@ -384,7 +387,7 @@ impl Decision for DeleteDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.def_id.clone())
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -392,7 +395,7 @@ impl Decision for DeleteDefinition {
             return Err(DefError::DefinitionNotFound);
         }
         Ok(vec![DomainEvent::DefDeleted {
-            def_id: self.def_id,
+            def_id: self.def_id.clone(),
             deleted_at: self.deleted_at,
             deleted_by: self.deleted_by.clone(),
         }])

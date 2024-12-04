@@ -7,9 +7,7 @@ description = "database: run the local database for development"
 category = "Database"
 dependencies = [
     "install-dotenvx",
-    "docker-postgres-run",
-    "db-migrate",
-    "db-prepare"
+    "docker-postgres-run"
 ]
 
 [tasks.clean]
@@ -98,3 +96,4 @@ args = ["-f", "rc-web/docker-compose.yml", "down"]
 description = "Install dotenvx"
 category = "Setup"
 install_crate = "dotenvx"
+
