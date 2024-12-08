@@ -126,12 +126,7 @@ impl DefState {
     pub fn new(def_id: DefId) -> Self {
         Self {
             def_id,
-            record_status: RecordStatus::None,
-            json_schema_string: "".to_string(),
-            created_at: Utc::now(),
-            created_by: "".to_string(),
-            title: "".to_string(),
-            definitions: vec![],
+            ..Default::default()
         }
     }
 
@@ -219,7 +214,6 @@ pub struct CreateDefinition {
     pub def_id: DefId,
     pub def_title: String,
     pub definitions: Vec<String>,
-    pub created_at: DateTime<Utc>,
     pub created_by: String,
     pub json_schema_string: String,
 }
@@ -239,7 +233,7 @@ impl Decision for CreateDefinition {
             def_id: self.def_id.clone(),
             title: self.def_title.clone(),
             definitions: self.definitions.clone(),
-            created_at: self.created_at,
+            created_at: Utc::now(),
             created_by: self.created_by.clone(),
             json_schema_string: self.json_schema_string.clone(),
         }])

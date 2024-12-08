@@ -1,3 +1,5 @@
+pub mod test_harness;
+
 // #[cfg(test)]
 use chrono::{DateTime, Utc};
 use definitions_core::definitions_domain::DomainEvent::DefUpdated;
@@ -72,7 +74,6 @@ pub fn create_def_cmd_1() -> CreateDefinition {
         def_id: 1.to_string(),
         def_title: "test_title".to_string(),
         definitions: vec!["test_def".to_string()],
-        created_at: get_created_at(),
         created_by: "test_created_by".to_string(),
         json_schema_string: get_valid_json_string(),
     }
