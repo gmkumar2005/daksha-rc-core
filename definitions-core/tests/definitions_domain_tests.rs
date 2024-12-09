@@ -4,6 +4,7 @@ mod common;
 use serde_json::Value;
 #[cfg(test)]
 mod test {
+    use definitions_core::definitions_domain::DefError::TitleIsNotMutable;
     use super::*;
     use crate::common::*;
     use definitions_core::definitions_domain::DomainEvent;
@@ -56,10 +57,17 @@ mod test {
     }
 
     #[test]
+    fn test_mutate_tile_should_fail() {
+        disintegrate::TestHarness::given([get_def_created_valid_json()])
+            .when(get_update_def_cmd_mutate())
+            .then_err(TitleIsNotMutable("example_schema".to_string(), "test_title".to_string()));
+    }
+
+    #[test]
     fn test_update_with_valid_schema() {
         disintegrate::TestHarness::given([get_def_created_valid_json()])
             .when(get_update_def_cmd())
-            .then([get_expected_def_updated()]);
+            .then_err(TitleIsNotMutable("example_schema".to_string(), "test_title".to_string()));
     }
 
     #[test]

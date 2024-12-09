@@ -132,22 +132,9 @@ pub fn get_validate_def_cmd() -> ValidateDefinition {
     }
 }
 
-pub fn get_update_def_cmd() -> UpdateDefinition {
-    let schema_string_updated = r###"
-        {
-            "title": "example_schema",
-            "type": "object",
-            "properties": {
-                "example1": {
-                    "type": "string"
-                }
-            }
-        }
-        "###
-    .to_string();
+pub fn get_update_def_cmd_mutate() -> UpdateDefinition {
     UpdateDefinition {
         def_id: 1.to_string(),
-        def_title: "test_title".to_string(),
         definitions: vec!["test_def".to_string()],
         created_at: get_created_at(),
         updated_by: "test_updated_by".to_string(),
@@ -155,9 +142,16 @@ pub fn get_update_def_cmd() -> UpdateDefinition {
     }
 }
 
+pub fn get_update_def_cmd() -> UpdateDefinition {
+    UpdateDefinition {
+        def_id: 1.to_string(),
+        definitions: vec!["test_def".to_string()],
+        created_at: get_created_at(),
+        updated_by: "test_updated_by".to_string(),
+        json_schema_string: get_updated_json_string(),
+    }
+}
 pub fn get_expected_def_created_empty_json() -> DomainEvent {
-    let date_str = "2024-11-22T16:46:51.757980Z";
-    let created_at: DateTime<Utc> = date_str.parse().expect("Failed to parse date");
     DomainEvent::DefCreated {
         def_id: 1.to_string(),
         title: "test_title".to_string(),

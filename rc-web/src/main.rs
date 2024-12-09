@@ -86,7 +86,6 @@ async fn create_def(
         def_id: generated_def_id.to_string(),
         def_title: "test_title_1".to_string(),
         definitions: vec!["test_def".to_string()],
-        created_at: chrono::Utc::now(),
         created_by: "test_created_by".to_string(),
         json_schema_string: web_cmd.schema.clone(),
     };

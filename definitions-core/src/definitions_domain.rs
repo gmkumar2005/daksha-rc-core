@@ -1,4 +1,6 @@
-use anyhow::Error;
+//TODO UUID Validation
+//TODO Json Schema Validation with REF
+//TODO Json Schema Validation with Records
 use chrono::{DateTime, Utc};
 use disintegrate::{Decision, Event, StateMutate, StateQuery};
 use serde::{Deserialize, Serialize};
@@ -94,6 +96,8 @@ pub enum DefError {
     DefinitionNotValid,
     #[error("Definition Not Active")]
     DefinitionNotActive,
+    #[error("Updating title: {0} to {1} is not allowed")]
+    TitleIsNotMutable(String,String),
 }
 
 // start of mutations
@@ -129,8 +133,6 @@ impl DefState {
             ..Default::default()
         }
     }
-
-
 }
 
 impl StateMutate for DefState {
@@ -152,8 +154,17 @@ impl StateMutate for DefState {
                 self.created_by = created_by;
                 self.json_schema_string = json_schema_string;
             }
-            DomainEvent::DefUpdated { .. } => {
+            DomainEvent::DefUpdated {   def_id:_,
+                title:_,
+                definitions,
+                created_at,
+                updated_by,
+                json_schema_string } => {
                 self.record_status = RecordStatus::Draft;
+                self.definitions = definitions;
+                self.created_at = created_at;
+                self.created_by = updated_by;
+                self.json_schema_string = json_schema_string;
             }
             DomainEvent::DefValidated { .. } => {
                 self.record_status = RecordStatus::Valid;
@@ -198,9 +209,10 @@ impl Decision for LoadDefinition {
         if state.record_status != RecordStatus::None {
             return Err(DefError::DefinitionAlreadyExists(self.def_id.clone()));
         }
+        let def_title = read_title(&self.json_schema_string)?;
         Ok(vec![DomainEvent::DefLoaded {
             def_id: self.def_id.clone(),
-            title: self.def_title.clone(),
+            title: def_title,
             definitions: self.definitions.clone(),
             file_name: self.file_name.clone(),
             created_at: self.created_at,
@@ -229,9 +241,10 @@ impl Decision for CreateDefinition {
         if state.record_status != RecordStatus::None {
             return Err(DefError::DefinitionAlreadyExists(self.def_id.clone()));
         }
+        let def_title = read_title(&self.json_schema_string)?;
         Ok(vec![DomainEvent::DefCreated {
             def_id: self.def_id.clone(),
-            title: self.def_title.clone(),
+            title: def_title,
             definitions: self.definitions.clone(),
             created_at: Utc::now(),
             created_by: self.created_by.clone(),
@@ -242,7 +255,6 @@ impl Decision for CreateDefinition {
 
 pub struct UpdateDefinition {
     pub def_id: DefId,
-    pub def_title: String,
     pub definitions: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_by: String,
@@ -264,9 +276,13 @@ impl Decision for UpdateDefinition {
         {
             return Err(DefError::DefinitionNotValid);
         }
+        let def_title = read_title(&self.json_schema_string)?;
+        if(def_title != state.title) {
+            return Err(DefError::TitleIsNotMutable(def_title, state.title.clone()));
+        }
         Ok(vec![DomainEvent::DefUpdated {
             def_id: self.def_id.clone(),
-            title: self.def_title.clone(),
+            title: def_title,
             definitions: self.definitions.clone(),
             created_at: self.created_at,
             updated_by: self.updated_by.clone(),
@@ -295,8 +311,7 @@ impl Decision for ValidateDefinition {
             return Err(DefError::DefinitionNotValid);
         }
 
-        // TODO: validate the json and json schema
-        match validate_schema(&state.json_schema_string) {
+        match read_title(&state.json_schema_string) {
             Ok(result) if !result.is_empty() => Ok(vec![DomainEvent::DefValidated {
                 def_id: self.def_id.clone(),
                 validated_at: self.validated_at,
@@ -398,7 +413,7 @@ impl Decision for DeleteDefinition {
 
 // start helper functions
 
-fn validate_schema(p0: &String) -> Result<String, Error> {
+fn read_title(p0: &String) -> Result<String, DefError> {
     if !p0.is_empty() {
         let schema_value: Value =
             serde_json::from_str(&p0).map_err(|e| DefError::InvalidJson(e.to_string()))?;
@@ -407,7 +422,6 @@ fn validate_schema(p0: &String) -> Result<String, Error> {
         if title.is_empty() {
             return Err(DefError::InvalidSchema("Title is empty".to_string()).into());
         }
-
         Ok(title)
     } else {
         Err(DefError::InvalidSchema("Schema is empty".to_string()).into())
