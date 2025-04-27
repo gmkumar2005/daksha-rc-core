@@ -202,7 +202,7 @@ impl Decision for LoadDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id.clone())
+        DefState::new(self.def_id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -211,7 +211,7 @@ impl Decision for LoadDefinition {
         }
         let def_title = read_title(&self.json_schema_string)?;
         Ok(vec![DomainEvent::DefLoaded {
-            def_id: self.def_id.clone(),
+            def_id: self.def_id,
             title: def_title,
             definitions: self.definitions.clone(),
             file_name: self.file_name.clone(),
@@ -234,7 +234,7 @@ impl Decision for CreateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id.clone())
+        DefState::new(self.def_id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -243,7 +243,7 @@ impl Decision for CreateDefinition {
         }
         let def_title = read_title(&self.json_schema_string)?;
         Ok(vec![DomainEvent::DefCreated {
-            def_id: self.def_id.clone(),
+            def_id: self.def_id,
             title: def_title,
             definitions: self.definitions.clone(),
             created_at: Utc::now(),
@@ -266,7 +266,7 @@ impl Decision for UpdateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id.clone())
+        DefState::new(self.def_id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -281,7 +281,7 @@ impl Decision for UpdateDefinition {
             return Err(DefError::TitleIsNotMutable(def_title, state.title.clone()));
         }
         Ok(vec![DomainEvent::DefUpdated {
-            def_id: self.def_id.clone(),
+            def_id: self.def_id,
             title: def_title,
             definitions: self.definitions.clone(),
             created_at: self.created_at,
@@ -303,7 +303,7 @@ impl Decision for ValidateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id.clone())
+        DefState::new(self.def_id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -313,20 +313,20 @@ impl Decision for ValidateDefinition {
 
         match read_title(&state.json_schema_string) {
             Ok(result) if !result.is_empty() => Ok(vec![DomainEvent::DefValidated {
-                def_id: self.def_id.clone(),
+                def_id: self.def_id,
                 validated_at: self.validated_at,
                 validated_by: self.validated_by.clone(),
                 validation_result: "Success".to_string(),
             }]),
             Ok(result) => Ok(vec![DomainEvent::DefValidatedFailed {
-                def_id: self.def_id.clone(),
+                def_id: self.def_id,
                 validated_at: self.validated_at,
                 validated_by: self.validated_by.clone(),
                 validation_result: result,
                 validation_errors: vec![],
             }]),
             Err(err) => Ok(vec![DomainEvent::DefValidatedFailed {
-                def_id: self.def_id.clone(),
+                def_id: self.def_id,
                 validated_at: self.validated_at,
                 validated_by: self.validated_by.clone(),
                 validation_result: "failure".to_string(),
@@ -346,7 +346,7 @@ impl Decision for ActivateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id.clone())
+        DefState::new(self.def_id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -354,7 +354,7 @@ impl Decision for ActivateDefinition {
             return Err(DefError::DefinitionNotValid);
         }
         Ok(vec![DomainEvent::DefActivated {
-            def_id: self.def_id.clone(),
+            def_id: self.def_id,
             activated_at: self.activated_at,
             activated_by: self.activated_by.clone(),
         }])
@@ -371,7 +371,7 @@ impl Decision for DeactivateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id.clone())
+        DefState::new(self.def_id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -379,7 +379,7 @@ impl Decision for DeactivateDefinition {
             return Err(DefError::DefinitionNotActive);
         }
         Ok(vec![DomainEvent::DefDeactivated {
-            def_id: self.def_id.clone(),
+            def_id: self.def_id,
             deactivated_at: self.deactivated_at,
             deactivated_by: self.deactivated_by.clone(),
         }])
@@ -396,7 +396,7 @@ impl Decision for DeleteDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id.clone())
+        DefState::new(self.def_id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -404,7 +404,7 @@ impl Decision for DeleteDefinition {
             return Err(DefError::DefinitionNotFound);
         }
         Ok(vec![DomainEvent::DefDeleted {
-            def_id: self.def_id.clone(),
+            def_id: self.def_id,
             deleted_at: self.deleted_at,
             deleted_by: self.deleted_by.clone(),
         }])
@@ -413,7 +413,7 @@ impl Decision for DeleteDefinition {
 
 // start helper functions
 
-fn read_title(p0: &String) -> Result<String, DefError> {
+fn read_title(p0: &str) -> Result<String, DefError> {
     if !p0.is_empty() {
         let schema_value: Value =
             serde_json::from_str(p0).map_err(|e| DefError::InvalidJson(e.to_string()))?;
