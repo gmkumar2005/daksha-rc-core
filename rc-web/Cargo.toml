@@ -12,8 +12,13 @@ async-trait = { workspace = true }
 chrono =  { workspace = true }
 config = { workspace = true }
 ctor ={ workspace = true }
+definitions-core = {path = "../definitions-core"}
+disintegrate = { workspace = true }
+disintegrate-postgres = { workspace = true }
 env_logger =  { workspace = true }
 log =  { workspace = true }
+once_cell = { workspace = true }
+postgres = { workspace = true }
 serde =  { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
@@ -26,12 +31,10 @@ utoipa-scalar =  { workspace = true }
 utoipa-swagger-ui =  { workspace = true }
 uuid =  { workspace = true }
 validator =  { workspace = true }
-disintegrate-postgres = { workspace = true }
-disintegrate = { workspace = true }
-definitions-core = {path = "../definitions-core"}
 [dev-dependencies]
 hamcrest2 = { workspace = true }
 mockall = { workspace = true }
-
+testcontainers-modules =  { workspace = true }
+tokio-postgres ={ workspace = true }
 
 

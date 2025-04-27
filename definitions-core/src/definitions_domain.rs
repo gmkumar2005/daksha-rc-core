@@ -6,10 +6,11 @@ use disintegrate::{Decision, Event, StateMutate, StateQuery};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
-
+use unicode_normalization::UnicodeNormalization;
+use uuid::Uuid;
 // #[stream(DefChangeEvents, [PropertiesAdded, PropertiesRemoved, PropertiesReplaced, VisibilityModified, AttestationPoliciesAdded, AttestationPoliciesReplaced, OwnerShipAttributesAdded, OwnerShipAttributesReplaced])]
 
-pub type DefId = String;
+pub type DefId = Uuid;
 // Start of domain events
 #[derive(Debug, Clone, PartialEq, Eq, Event, Serialize, Deserialize)]
 #[stream(DefStateEvent, [DefLoaded, DefCreated, DefUpdated, DefDeleted, DefValidated, DefActivated,
@@ -189,7 +190,6 @@ impl StateMutate for DefState {
 // Start of commands
 pub struct LoadDefinition {
     def_id: DefId,
-    def_title: String,
     definitions: Vec<String>,
     file_name: String,
     created_at: DateTime<Utc>,
@@ -207,7 +207,7 @@ impl Decision for LoadDefinition {
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if state.record_status != RecordStatus::None {
-            return Err(DefError::DefinitionAlreadyExists(self.def_id.clone()));
+            return Err(DefError::DefinitionAlreadyExists(self.def_id.to_string()));
         }
         let def_title = read_title(&self.json_schema_string)?;
         Ok(vec![DomainEvent::DefLoaded {
@@ -239,7 +239,7 @@ impl Decision for CreateDefinition {
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if state.record_status != RecordStatus::None {
-            return Err(DefError::DefinitionAlreadyExists(self.def_id.clone()));
+            return Err(DefError::DefinitionAlreadyExists(self.def_id.to_string()));
         }
         let def_title = read_title(&self.json_schema_string)?;
         Ok(vec![DomainEvent::DefCreated {
@@ -277,7 +277,7 @@ impl Decision for UpdateDefinition {
             return Err(DefError::DefinitionNotValid);
         }
         let def_title = read_title(&self.json_schema_string)?;
-        if(def_title != state.title) {
+        if def_title != state.title {
             return Err(DefError::TitleIsNotMutable(def_title, state.title.clone()));
         }
         Ok(vec![DomainEvent::DefUpdated {
@@ -416,14 +416,70 @@ impl Decision for DeleteDefinition {
 fn read_title(p0: &String) -> Result<String, DefError> {
     if !p0.is_empty() {
         let schema_value: Value =
-            serde_json::from_str(&p0).map_err(|e| DefError::InvalidJson(e.to_string()))?;
+            serde_json::from_str(p0).map_err(|e| DefError::InvalidJson(e.to_string()))?;
 
         let title = schema_value["title"].as_str().unwrap_or("").to_string();
         if title.is_empty() {
-            return Err(DefError::InvalidSchema("Title is empty".to_string()).into());
+            return Err(DefError::InvalidSchema("Title is empty".to_string()));
         }
         Ok(title)
     } else {
-        Err(DefError::InvalidSchema("Schema is empty".to_string()).into())
+        Err(DefError::InvalidSchema("Schema is empty".to_string()))
+    }
+}
+
+
+pub fn generate_id_from_title(title: &str) -> Uuid {
+    // Step 1: Unicode normalization (NFC)
+    let normalized_title = title.trim().nfc().collect::<String>();
+
+    // Step 2: Convert to uppercase
+    let upper_title = normalized_title.to_uppercase();
+
+    // Step 3: Compute BLAKE3 hash
+    let hash_bytes = blake3::hash(upper_title.as_bytes());
+
+    // let truncated_hash = u128::from_le_bytes(hash_bytes[0..16].try_into().unwrap());
+    let truncated_hash = &hash_bytes.as_bytes()[0..16];
+
+    // let truncated_hash = i64::from_le_bytes(hash_bytes[0..8].try_into().unwrap());
+    Uuid::from_bytes(truncated_hash.try_into().expect("Invalid hash length"))
+}
+
+#[cfg(test)] // Marks this module for testing
+mod tests {
+    use super::*; // Import the function from the current module
+
+
+    #[test]
+    fn test_generate_id_from_title() {
+        // Arrange
+        let title = "   My Test Title  "; // Input with extra spaces
+        let generated_id = generate_id_from_title(title);
+        println!("Generated UUID: {}", generated_id);
+        // Assert that the generated UUID is valid
+        let generated_id_again = generate_id_from_title(title);
+        assert_eq!(generated_id, generated_id_again);
+        // Different titles should generate different UUIDs
+        let different_title = "Another Test Title";
+        let different_id = generate_id_from_title(different_title);
+        assert_ne!(generated_id, different_id);
+
+    }
+
+    #[test]
+    fn test_generate_id_with_unicode() {
+        // Arrange
+        let title = "Café du Monde";
+        let generated_id = generate_id_from_title(title);
+        println!("Generated UUID: {}", generated_id);
+        // Assert that the generated UUID is valid
+        let generated_id_again = generate_id_from_title(title);
+        assert_eq!(generated_id, generated_id_again);
+        // Different titles should generate different UUIDs
+        let different_title = "Another Test Title Café du Monde";
+        let different_id = generate_id_from_title(different_title);
+        assert_ne!(generated_id, different_id);
+
     }
 }

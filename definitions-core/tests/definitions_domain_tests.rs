@@ -7,7 +7,7 @@ mod test {
     use definitions_core::definitions_domain::DefError::TitleIsNotMutable;
     use super::*;
     use crate::common::*;
-    use definitions_core::definitions_domain::DomainEvent;
+    use definitions_core::definitions_domain::{generate_id_from_title, DomainEvent};
     use crate::common::test_harness::SimpleTestHarness;
     #[test]
     fn test_create_definition() {
@@ -18,7 +18,26 @@ mod test {
                 assert_eq!(events.len(), 1);
                 let event = &events[0];
                 if let DomainEvent::DefCreated { def_id,title,created_by,json_schema_string, .. } = event {
-                    assert_eq!(def_id, "1");
+                    assert_eq!(def_id, &generate_id_from_title("test_title"));
+                    assert_eq!(title, "test_title");
+                    assert_eq!(created_by, "test_created_by");
+                    assert_eq!(json_schema_string, &get_valid_json_string());
+                } else {
+                    assert!(matches!(event, DomainEvent::DefCreated { .. }), "Event is not of type DomainEvent::DefCreated");
+                }
+            });
+    }
+
+    #[test]
+    fn test_create_definition_with_then() {
+        let create_def_cmd = create_def_cmd_1();
+        SimpleTestHarness::given([])
+            .when(create_def_cmd)
+            .then_assert(|events| {
+                assert_eq!(events.len(), 1);
+                let event = &events[0];
+                if let DomainEvent::DefCreated { def_id,title,created_by,json_schema_string, .. } = event {
+                    assert_eq!(def_id, &generate_id_from_title("test_title"));
                     assert_eq!(title, "test_title");
                     assert_eq!(created_by, "test_created_by");
                     assert_eq!(json_schema_string, &get_valid_json_string());

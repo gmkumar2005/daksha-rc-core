@@ -1,35 +1,36 @@
-use std::env;
-use std::ops::Deref;
 use actix_web::http::header::ContentType;
 use actix_web::http::StatusCode;
 use actix_web::web::Data;
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, error};
+use actix_web::{error, get, post, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::Context;
 use definitions_core::definitions_domain::*;
-use disintegrate_postgres::{PgDecisionMaker, PgEventStore, WithPgSnapshot};
+use disintegrate::NoSnapshot;
+use disintegrate_postgres::{PgDecisionMaker, PgEventStore};
 use serde::{Deserialize, Serialize};
 use sqlx::{postgres::PgConnectOptions, PgPool};
+use std::env;
+use std::ops::Deref;
 use utoipa::ToSchema;
-use uuid::Uuid;
 use validator::Validate;
 
 
 type DecisionMaker =
-    PgDecisionMaker<DomainEvent, disintegrate::serde::json::Json<DomainEvent>, WithPgSnapshot>;
+PgDecisionMaker<DomainEvent, disintegrate::serde::json::Json<DomainEvent>, NoSnapshot>;
+
 
 #[derive(thiserror::Error, Debug)]
 #[error(transparent)]
 pub struct DError {
     #[from]
-    source: disintegrate::decision::Error<DefError>,
+    source: disintegrate::DecisionError<DefError>,
 }
 
 impl error::ResponseError for DError {
     fn status_code(&self) -> StatusCode {
         match self.source {
-            disintegrate::decision::Error::Domain(_) => StatusCode::BAD_REQUEST,
-            disintegrate::decision::Error::EventStore(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            disintegrate::decision::Error::StateStore(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            disintegrate::DecisionError::Domain(_) => StatusCode::BAD_REQUEST,
+            disintegrate::DecisionError::EventStore(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            disintegrate::DecisionError::StateStore(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -51,8 +52,8 @@ async fn echo(req_body: String) -> impl Responder {
 
 #[derive(Debug, Serialize, Deserialize, Validate, ToSchema)]
 pub struct CreateDefRequest {
-    #[validate(length(min = 3, message = "id is required and must be at least 3 characters"))]
-    pub id: String,
+    // #[validate(length(min = 3, message = "id is required and must be at least 3 characters"))]
+    // pub id: String,
     #[validate(length(
         max = 4096,
         message = "schema is required and must be at less than 4096 characters"
@@ -81,9 +82,9 @@ async fn create_def(
     web_cmd: web::Json<CreateDefRequest>,
 ) -> Result<HttpResponse, DError> {
     // let generated_def_id = "1234";
-    let generated_def_id = Uuid::now_v7();
+    let generated_def_id = generate_id_from_title("test_title_1");
     let create_def_cmd = CreateDefinition {
-        def_id: generated_def_id.to_string(),
+        def_id: generated_def_id,
         def_title: "test_title_1".to_string(),
         definitions: vec!["test_def".to_string()],
         created_by: "test_created_by".to_string(),
@@ -115,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
     let serde = disintegrate::serde::json::Json::<DomainEvent>::default();
     let event_store = PgEventStore::new(pool.clone(), serde).await?;
     let decision_maker =
-        disintegrate_postgres::decision_maker_with_snapshot(event_store, 2).await?;
+        disintegrate_postgres::decision_maker(event_store, NoSnapshot);
     Ok(HttpServer::new(move || {
         App::new()
             .app_data(Data::new(decision_maker.clone()))

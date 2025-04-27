@@ -32,7 +32,7 @@ args = ["check"]
 [tasks.test]
 description = "test: run the tests"
 category = "Check"
-env = { "SQLX_OFFLINE" = "true", "TEST_LOG" = "true", RUSTFLAGS = "-Cinstrument-coverage" }
+env = { "SQLX_OFFLINE" = "true", "TEST_LOG" = "true", RUSTFLAGS = "-Cinstrument-coverage", LLVM_PROFILE_FILE="target/%p-%m.profraw" }
 command = "cargo"
 args = ["test", "--no-fail-fast", "--", "--test-threads", "2"]
 
@@ -41,7 +41,7 @@ description = "llvm-cov: generate HTML coverage report"
 category = "Check"
 command = "cargo"
 install_crate = { rustup_component_name = "llvm-tools-preview", binary = "llvm-profdata", test_arg = "--help" }
-env = { "SQLX_OFFLINE" = "true", "TEST_LOG" = "true", RUSTFLAGS = "-Cinstrument-coverage" }
+env = { "SQLX_OFFLINE" = "true", "TEST_LOG" = "true", RUSTFLAGS = "-Cinstrument-coverage", LLVM_PROFILE_FILE="target/%p-%m.profraw"}
 args = ["llvm-cov", "--html"]
 
 [tasks.tarpaulin]
@@ -97,3 +97,10 @@ description = "Install dotenvx"
 category = "Setup"
 install_crate = "dotenvx"
 
+[tasks.run]
+description = "run: run the web application"
+category = "Run"
+command = "dotenvx"
+args = ["run", "--", "cargo", "run", "--bin", "rc-web"]
+dependencies = ["db-dev"]
+#run --package rc-web --bin rc-web

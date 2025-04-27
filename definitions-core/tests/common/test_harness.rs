@@ -1,3 +1,4 @@
+// Added then_assert
 //! Utility for testing a Decision implementation
 //! Added then_assert which allows for more complex assertions, for eg: ignore attributes which use Utc::now
 //! The test harness allows you to set up a history of events, perform the given decision,
@@ -52,8 +53,8 @@ impl<E: Event + Clone> TestHarnessStep<E, Given> {
     pub fn when<D, SP, S, ERR>(self, decision: D) -> TestHarnessStep<E, When<E, ERR>>
     where
         D: Decision<Event = E, Error = ERR, StateQuery = S>,
-        S: IntoStatePart<S, Target = SP>,
-        SP: IntoState<S> + MultiState<E>,
+        S: IntoStatePart<i64, S, Target = SP>,
+        SP: IntoState<S> + MultiState<i64, E>,
     {
         let mut state = decision.state_query().into_state_part();
         for event in self

@@ -1,5 +1,7 @@
 version: '3.8'
-
+# Environment variables has to be set before running this file
+# Recommended approach is to use dotenvx docker-compose up -d
+# Seee Makefile.toml
 services:
   postgres:
     image: postgres:17.2-bookworm
