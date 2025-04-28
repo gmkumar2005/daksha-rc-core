@@ -89,8 +89,8 @@ pub enum DefError {
     InvalidSchema(String),
     #[error("Invalid Definition")]
     InvalidDefinition,
-    #[error("Definition Already Exists: {0}")]
-    DefinitionAlreadyExists(String),
+    #[error("Definition Already Exists for : {0} with id: {1}")]
+    DefinitionAlreadyExists(String, String),
     #[error("Definition Not Found")]
     DefinitionNotFound,
     #[error("Definition Not Valid")]
@@ -209,7 +209,10 @@ impl Decision for LoadDefinition {
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if state.record_status != RecordStatus::None {
-            return Err(DefError::DefinitionAlreadyExists(self.def_id.to_string()));
+            return Err(DefError::DefinitionAlreadyExists(
+                self.file_name.clone(),
+                self.def_id.to_string(),
+            ));
         }
         let def_title = read_title(&self.json_schema_string)?;
         Ok(vec![DomainEvent::DefLoaded {
@@ -241,7 +244,10 @@ impl Decision for CreateDefinition {
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if state.record_status != RecordStatus::None {
-            return Err(DefError::DefinitionAlreadyExists(self.def_id.to_string()));
+            return Err(DefError::DefinitionAlreadyExists(
+                self.def_title.clone(),
+                self.def_id.to_string(),
+            ));
         }
         let def_title = read_title(&self.json_schema_string)?;
         Ok(vec![DomainEvent::DefCreated {
@@ -415,7 +421,7 @@ impl Decision for DeleteDefinition {
 
 // start helper functions
 
-fn read_title(p0: &str) -> Result<String, DefError> {
+pub fn read_title(p0: &str) -> Result<String, DefError> {
     if !p0.is_empty() {
         let schema_value: Value =
             serde_json::from_str(p0).map_err(|e| DefError::InvalidJson(e.to_string()))?;
@@ -449,7 +455,8 @@ pub fn generate_id_from_title(title: &str) -> Uuid {
 
 #[cfg(test)] // Marks this module for testing
 mod tests {
-    use super::*; // Import the function from the current module
+    use super::*;
+    // Import the function from the current module
 
     #[test]
     fn test_generate_id_from_title() {

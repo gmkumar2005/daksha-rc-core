@@ -1,11 +1,12 @@
 use actix_web::http::header::ContentType;
 use actix_web::http::StatusCode;
 use actix_web::web::Data;
-use actix_web::{error, get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{error, get, post, App, HttpResponse, HttpServer, Responder};
 use anyhow::Context;
 use definitions_core::definitions_domain::*;
-use disintegrate::NoSnapshot;
-use disintegrate_postgres::{PgDecisionMaker, PgEventStore};
+use disintegrate::{NoSnapshot, PersistedEvent};
+use disintegrate_postgres::{PgDecisionMaker, PgEventId, PgEventStore};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use sqlx::{postgres::PgConnectOptions, PgPool};
 use std::env;
@@ -48,61 +49,44 @@ async fn echo(req_body: String) -> impl Responder {
     HttpResponse::Ok().body(req_body)
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate, ToSchema)]
-pub struct CreateDefRequest {
-    // #[validate(length(min = 3, message = "id is required and must be at least 3 characters"))]
-    // pub id: String,
-    #[validate(length(
-        max = 4096,
-        message = "schema is required and must be at less than 4096 characters"
-    ))]
-    pub schema: String,
-}
-
-pub fn get_valid_json_string() -> String {
-    r###"
-        {
-            "title": "test_title",
-            "type": "object",
-            "properties": {
-                "example": {
-                    "type": "string"
-                }
-            }
-        }
-        "###
-    .to_string()
-}
-
 #[post("/create_def")]
 async fn create_def(
     decision_maker: Data<DecisionMaker>,
-    web_cmd: web::Json<CreateDefRequest>,
+    web_cmd: String,
 ) -> Result<HttpResponse, DError> {
-    // let generated_def_id = "1234";
-    let generated_def_id = generate_id_from_title("test_title_1");
+    let title =
+        read_title(&web_cmd).map_err(|e| DError::from(disintegrate::DecisionError::Domain(e)))?;
     let create_def_cmd = CreateDefinition {
-        def_id: generated_def_id,
-        def_title: "test_title_1".to_string(),
+        def_id: generate_id_from_title(&title),
+        def_title: title,
         definitions: vec!["test_def".to_string()],
         created_by: "test_created_by".to_string(),
-        json_schema_string: web_cmd.schema.clone(),
+        json_schema_string: web_cmd,
     };
 
-    let exec_results = decision_maker.make(create_def_cmd).await?;
-    let title = exec_results
+    let exec_results: Vec<PersistedEvent<PgEventId, DomainEvent>> =
+        decision_maker.make(create_def_cmd).await?;
+    let (created_title, created_defid) = exec_results
         .iter()
         .find_map(|ev| match ev.deref() {
-            DomainEvent::DefCreated { title, .. } => Some(title),
+            DomainEvent::DefCreated { title, def_id, .. } => Some((title, def_id)),
             _ => None,
         })
         .unwrap();
-    println!("title: {}", title);
+    debug!(
+        "Created def with id: {} and title: {}",
+        created_defid, created_title
+    );
+    let response_message = format!(
+        "SchemaDef created with id: {} for title:  {}",
+        created_defid, created_title
+    );
     Ok(HttpResponse::Created()
-        .append_header(("Location", format!("/schema_def/{}", generated_def_id)))
-        .append_header(("message", "SchemaDef created"))
+        .append_header(("Location", format!("/schema_def/{}", created_defid)))
+        .append_header(("message", response_message))
         .finish())
 }
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();

@@ -16,6 +16,11 @@ POST http://localhost:8080/create_def
 Content-Type: application/json
 
 {
-  "id": "test_id",
-  "schema": "test_schema"
+  "title": "test_title_13",
+  "type": "object",
+  "properties": {
+    "example": {
+      "type": "string"
+    }
+  }
 }

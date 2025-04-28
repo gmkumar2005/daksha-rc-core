@@ -1,5 +1,3 @@
-// use sqlx::postgres::PgPoolOptions;
-// use sqlx::{query, PgPool, Row};
 use sqlx::{query, PgPool, Row, Transaction};
 use testcontainers::ContainerAsync;
 use testcontainers_modules::postgres::Postgres;
@@ -45,22 +43,6 @@ async fn begin_transaction(pool: &PgPool) -> anyhow::Result<Transaction<sqlx::po
     // let txn = conn.begin().await?;
     Ok(pool.begin().await?)
 }
-
-// Each test uses a separate transaction
-// async fn run_in_transaction<F>(test_fn: F) -> anyhow::Result<()>
-// where
-//     F: Fn(Transaction<'_, sqlx::Postgres>) -> anyhow::Result<()> + Send + Sync,
-// {
-//     let pool = get_shared_pool().await;
-//
-//     // Begin a new transaction
-//     let mut txn = pool.begin().await?;
-//     let result = test_fn(txn).await;
-//
-//     // Rollback the transaction after the test to maintain isolation
-//     txn.rollback().await?;
-//     result
-// }
 
 #[tokio::test]
 async fn test_with_postgres() -> anyhow::Result<()> {
@@ -108,3 +90,38 @@ async fn test_with_shared_pool_2() -> anyhow::Result<()> {
     assert!(outcome);
     Ok(())
 }
+//
+// #[tokio::test]
+// async fn test_create_definition_with_postgres() -> anyhow::Result<()> {
+//     let pool = get_shared_pool().await;
+//     let serde = disintegrate::serde::json::Json::<DomainEvent>::default();
+//     let event_store = PgEventStore::new(pool.clone(), serde).await?;
+//     let decision_maker = disintegrate_postgres::decision_maker(event_store, NoSnapshot);
+//     let create_def_cmd = create_def_cmd_1();
+//     let exec_results = decision_maker.make(create_def_cmd).await?;
+//     // assert_def_created(&exec_results);
+//
+//     let (title, def_id) = exec_results
+//         .iter()
+//         .find_map(|ev| match ev.deref() {
+//             DomainEvent::DefCreated { title, def_id, .. } => Some((title, def_id)),
+//             _ => None,
+//         })
+//         .unwrap();
+//
+//     assert_eq!(title, "test_title");
+//     assert_eq!(
+//         def_id.to_string(),
+//         generate_id_from_title("test_title").to_string()
+//     );
+//
+//     // let exec_results: Vec<PersistedEvent<PgEventId, DomainEvent>>
+//     Ok(())
+// }
+//
+// pub fn then_assert(
+//     actual_result: Vec<PersistedEvent<PgEventId, DomainEvent>>,
+//     assertion: impl FnOnce(&Vec<PersistedEvent<PgEventId, DomainEvent>>),
+// ) {
+//     assertion(&actual_result);
+// }
