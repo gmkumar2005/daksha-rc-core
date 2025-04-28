@@ -3,8 +3,8 @@
 //! Added then_assert which allows for more complex assertions, for eg: ignore attributes which use Utc::now
 //! The test harness allows you to set up a history of events, perform the given decision,
 //! and make assertions about the resulting changes.
-use std::fmt::Debug;
 use disintegrate::{Decision, Event, IntoState, IntoStatePart, MultiState, PersistedEvent};
+use std::fmt::Debug;
 
 /// Test harness for testing decisions.
 pub struct SimpleTestHarness;
@@ -99,7 +99,6 @@ where
     pub fn then_assert(self, assertion: impl FnOnce(&Vec<R>)) {
         assertion(&self._step.result.unwrap());
     }
-
 
     /// Makes assertions about the expected error result.
     ///

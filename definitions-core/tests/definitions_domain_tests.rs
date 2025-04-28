@@ -4,11 +4,11 @@ mod common;
 use serde_json::Value;
 #[cfg(test)]
 mod test {
-    use definitions_core::definitions_domain::DefError::TitleIsNotMutable;
     use super::*;
-    use crate::common::*;
-    use definitions_core::definitions_domain::{generate_id_from_title, DomainEvent};
     use crate::common::test_harness::SimpleTestHarness;
+    use crate::common::*;
+    use definitions_core::definitions_domain::DefError::TitleIsNotMutable;
+    use definitions_core::definitions_domain::{generate_id_from_title, DomainEvent};
     #[test]
     fn test_create_definition() {
         let create_def_cmd = create_def_cmd_1();
@@ -17,13 +17,23 @@ mod test {
             .then_assert(|events| {
                 assert_eq!(events.len(), 1);
                 let event = &events[0];
-                if let DomainEvent::DefCreated { def_id,title,created_by,json_schema_string, .. } = event {
+                if let DomainEvent::DefCreated {
+                    def_id,
+                    title,
+                    created_by,
+                    json_schema_string,
+                    ..
+                } = event
+                {
                     assert_eq!(def_id, &generate_id_from_title("test_title"));
                     assert_eq!(title, "test_title");
                     assert_eq!(created_by, "test_created_by");
                     assert_eq!(json_schema_string, &get_valid_json_string());
                 } else {
-                    assert!(matches!(event, DomainEvent::DefCreated { .. }), "Event is not of type DomainEvent::DefCreated");
+                    assert!(
+                        matches!(event, DomainEvent::DefCreated { .. }),
+                        "Event is not of type DomainEvent::DefCreated"
+                    );
                 }
             });
     }
@@ -36,13 +46,23 @@ mod test {
             .then_assert(|events| {
                 assert_eq!(events.len(), 1);
                 let event = &events[0];
-                if let DomainEvent::DefCreated { def_id,title,created_by,json_schema_string, .. } = event {
+                if let DomainEvent::DefCreated {
+                    def_id,
+                    title,
+                    created_by,
+                    json_schema_string,
+                    ..
+                } = event
+                {
                     assert_eq!(def_id, &generate_id_from_title("test_title"));
                     assert_eq!(title, "test_title");
                     assert_eq!(created_by, "test_created_by");
                     assert_eq!(json_schema_string, &get_valid_json_string());
                 } else {
-                    assert!(matches!(event, DomainEvent::DefCreated { .. }), "Event is not of type DomainEvent::DefCreated");
+                    assert!(
+                        matches!(event, DomainEvent::DefCreated { .. }),
+                        "Event is not of type DomainEvent::DefCreated"
+                    );
                 }
             });
     }
@@ -79,14 +99,20 @@ mod test {
     fn test_mutate_tile_should_fail() {
         disintegrate::TestHarness::given([get_def_created_valid_json()])
             .when(get_update_def_cmd_mutate())
-            .then_err(TitleIsNotMutable("example_schema".to_string(), "test_title".to_string()));
+            .then_err(TitleIsNotMutable(
+                "example_schema".to_string(),
+                "test_title".to_string(),
+            ));
     }
 
     #[test]
     fn test_update_with_valid_schema() {
         disintegrate::TestHarness::given([get_def_created_valid_json()])
             .when(get_update_def_cmd())
-            .then_err(TitleIsNotMutable("example_schema".to_string(), "test_title".to_string()));
+            .then_err(TitleIsNotMutable(
+                "example_schema".to_string(),
+                "test_title".to_string(),
+            ));
     }
 
     #[test]

@@ -13,10 +13,8 @@ use std::ops::Deref;
 use utoipa::ToSchema;
 use validator::Validate;
 
-
 type DecisionMaker =
-PgDecisionMaker<DomainEvent, disintegrate::serde::json::Json<DomainEvent>, NoSnapshot>;
-
+    PgDecisionMaker<DomainEvent, disintegrate::serde::json::Json<DomainEvent>, NoSnapshot>;
 
 #[derive(thiserror::Error, Debug)]
 #[error(transparent)]
@@ -115,8 +113,7 @@ async fn main() -> anyhow::Result<()> {
         .context("Failed to connect to the database")?;
     let serde = disintegrate::serde::json::Json::<DomainEvent>::default();
     let event_store = PgEventStore::new(pool.clone(), serde).await?;
-    let decision_maker =
-        disintegrate_postgres::decision_maker(event_store, NoSnapshot);
+    let decision_maker = disintegrate_postgres::decision_maker(event_store, NoSnapshot);
     Ok(HttpServer::new(move || {
         App::new()
             .app_data(Data::new(decision_maker.clone()))

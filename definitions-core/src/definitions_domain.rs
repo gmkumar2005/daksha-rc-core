@@ -98,7 +98,7 @@ pub enum DefError {
     #[error("Definition Not Active")]
     DefinitionNotActive,
     #[error("Updating title: {0} to {1} is not allowed")]
-    TitleIsNotMutable(String,String),
+    TitleIsNotMutable(String, String),
 }
 
 // start of mutations
@@ -155,12 +155,14 @@ impl StateMutate for DefState {
                 self.created_by = created_by;
                 self.json_schema_string = json_schema_string;
             }
-            DomainEvent::DefUpdated {   def_id:_,
-                title:_,
+            DomainEvent::DefUpdated {
+                def_id: _,
+                title: _,
                 definitions,
                 created_at,
                 updated_by,
-                json_schema_string } => {
+                json_schema_string,
+            } => {
                 self.record_status = RecordStatus::Draft;
                 self.definitions = definitions;
                 self.created_at = created_at;
@@ -428,7 +430,6 @@ fn read_title(p0: &str) -> Result<String, DefError> {
     }
 }
 
-
 pub fn generate_id_from_title(title: &str) -> Uuid {
     // Step 1: Unicode normalization (NFC)
     let normalized_title = title.trim().nfc().collect::<String>();
@@ -450,7 +451,6 @@ pub fn generate_id_from_title(title: &str) -> Uuid {
 mod tests {
     use super::*; // Import the function from the current module
 
-
     #[test]
     fn test_generate_id_from_title() {
         // Arrange
@@ -464,7 +464,6 @@ mod tests {
         let different_title = "Another Test Title";
         let different_id = generate_id_from_title(different_title);
         assert_ne!(generated_id, different_id);
-
     }
 
     #[test]
@@ -480,6 +479,5 @@ mod tests {
         let different_title = "Another Test Title Café du Monde";
         let different_id = generate_id_from_title(different_title);
         assert_ne!(generated_id, different_id);
-
     }
 }

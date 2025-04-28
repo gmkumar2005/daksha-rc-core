@@ -14,6 +14,7 @@ license = "MIT"
 
 [profile.dev]
 split-debuginfo = "unpacked"
+
 [workspace.dependencies]
 actix = "0.13.5"
 actix-rt = "2.10.0"
@@ -24,16 +25,14 @@ async-trait = "0.1.88"
 blake3 = "1.8.2"
 chrono = { version = "0.4.40", features = ["serde"] }
 config = "0.15.11"
-ctor = "0.4.1"
+ctor = "0.4.2"
 disintegrate = { version = "2.0.0", features = ["macros", "serde-json"] }
-disintegrate-postgres = { version = "2.0.1"}
-dotenvy = "0.15.7"
+disintegrate-postgres = { version = "2.0.1" }
 env_logger = "0.11.8"
-features = "0.10.0"
 futures = "0.3.31"
 futures-util = "0.3.31"
 hamcrest2 = "0.3.0"
-jsonschema = "0.29.1"
+jsonschema = "0.30.0"
 log = "0.4.27"
 lru = "0.14.0"
 mockall = "0.13.1"
@@ -44,23 +43,23 @@ regex = "1.11.1"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 smol_str = { version = "0.3.2", features = ["serde"] }
-sqlx = { version = "0.8.4", features = ["runtime-tokio","chrono", "postgres" ,"json","runtime-tokio-native-tls","migrate"] }
+sqlx = { version = "0.8.5", features = ["runtime-tokio", "chrono", "postgres", "json", "runtime-tokio-native-tls", "migrate"] }
 streambed = "0.13.0"
 streambed-confidant = { version = "0.13.0" }
 streambed-logged = { version = "0.13.0" }
 test-log = "0.2.17"
-testcontainers = "0.23.3"
-testcontainers-modules =  { version =  "0.11.6", features = ["postgres"] }
+testcontainers = { version = "0.23.3" }
+testcontainers-modules = { version = "0.11.6", features = ["postgres"] }
 thiserror = "2.0.12"
 tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread", "time"] }
 tokio-postgres = "0.7.13"
-tokio-stream= "0.1.17"
+tokio-stream = "0.1.17"
 toml = "0.8.21"
 unicode-normalization = "0.1.24"
 utoipa = "5.3.1"
-utoipa-rapidoc =  { version = "6.0.0", features = ["actix-web"] }
+utoipa-rapidoc = { version = "6.0.0", features = ["actix-web"] }
 utoipa-redoc = { version = "6.0.0", features = ["actix-web"] }
 utoipa-scalar = { version = "0.3.0", features = ["actix-web"] }
-utoipa-swagger-ui = { version = "9.0.1", features = ["actix-web","vendored"] }
+utoipa-swagger-ui = { version = "9.0.1", features = ["actix-web", "vendored"] }
 uuid = { version = "1.16.0", features = ["v7"] }
 validator = { version = "0.20.0", features = ["derive"] }

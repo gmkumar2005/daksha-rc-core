@@ -3,7 +3,9 @@ pub mod test_harness;
 // #[cfg(test)]
 use chrono::{DateTime, Utc};
 use definitions_core::definitions_domain::DomainEvent::DefUpdated;
-use definitions_core::definitions_domain::{generate_id_from_title, CreateDefinition, DomainEvent, UpdateDefinition, ValidateDefinition};
+use definitions_core::definitions_domain::{
+    generate_id_from_title, CreateDefinition, DomainEvent, UpdateDefinition, ValidateDefinition,
+};
 
 pub fn get_valid_json_string() -> String {
     r###"
