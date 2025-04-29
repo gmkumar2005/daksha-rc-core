@@ -1,18 +1,19 @@
 use actix_web::http::header::ContentType;
 use actix_web::http::StatusCode;
 use actix_web::web::Data;
-use actix_web::{error, get, post, App, HttpResponse, HttpServer, Responder};
+use actix_web::{error, get, post, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::Context;
+use chrono::Utc;
 use definitions_core::definitions_domain::*;
 use disintegrate::{NoSnapshot, PersistedEvent};
 use disintegrate_postgres::{PgDecisionMaker, PgEventId, PgEventStore};
 use log::debug;
-use serde::{Deserialize, Serialize};
+use rc_web::models::ValidateDefRequest;
 use sqlx::{postgres::PgConnectOptions, PgPool};
 use std::env;
 use std::ops::Deref;
-use utoipa::ToSchema;
-use validator::Validate;
+use std::str::FromStr;
+use uuid::Uuid;
 
 type DecisionMaker =
     PgDecisionMaker<DomainEvent, disintegrate::serde::json::Json<DomainEvent>, NoSnapshot>;
@@ -47,6 +48,88 @@ async fn hello() -> impl Responder {
 #[post("/echo")]
 async fn echo(req_body: String) -> impl Responder {
     HttpResponse::Ok().body(req_body)
+}
+
+#[post("/activate_def")]
+async fn activate_def(
+    decision_maker: Data<DecisionMaker>,
+    web_cmd: web::Json<ValidateDefRequest>,
+) -> Result<HttpResponse, DError> {
+    let validate_def_cmd = ActivateDefinition {
+        def_id: Uuid::from_str(web_cmd.def_id.as_str()).unwrap(),
+        activated_at: Utc::now(),
+        activated_by: "test_activated_by".to_string(),
+    };
+
+    let exec_results: Vec<PersistedEvent<PgEventId, DomainEvent>> =
+        decision_maker.make(validate_def_cmd).await?;
+    let validated_defid = exec_results
+        .iter()
+        .find_map(|ev| match ev.deref() {
+            DomainEvent::DefActivated { def_id, .. } => Some(def_id),
+            _ => None,
+        })
+        .unwrap();
+    debug!(
+        "Activation successful for Definition with ID: {}",
+        validated_defid
+    );
+
+    let response_message = format!(
+        "Activation successful for Definition with ID: {}",
+        validated_defid
+    );
+
+    Ok(HttpResponse::Ok()
+        .append_header(("Location", format!("/schema_def/{}", validated_defid)))
+        .append_header(("message", response_message))
+        .finish())
+}
+
+#[post("/validate_def")]
+async fn validate_def(
+    decision_maker: Data<DecisionMaker>,
+    web_cmd: web::Json<ValidateDefRequest>,
+) -> Result<HttpResponse, DError> {
+    let validate_def_cmd = ValidateDefinition {
+        def_id: Uuid::from_str(web_cmd.def_id.as_str()).unwrap(),
+        validated_at: Utc::now(),
+        validated_by: "test_validated_by".to_string(),
+    };
+
+    let exec_results: Vec<PersistedEvent<PgEventId, DomainEvent>> =
+        decision_maker.make(validate_def_cmd).await?;
+    let (validation_result, validated_defid) = exec_results
+        .iter()
+        .find_map(|ev| match ev.deref() {
+            DomainEvent::DefValidated {
+                validation_result,
+                def_id,
+                ..
+            } => Some((validation_result, def_id)),
+            _ => None,
+        })
+        .unwrap();
+    debug!(
+        "Validation result of def Definition ID: {} is: {}",
+        validated_defid, validation_result
+    );
+
+    let response_message = format!(
+        "Validation result for Definition with ID {}: is {}.",
+        validated_defid, validation_result
+    );
+
+    if validation_result != "Success" {
+        return Err(DError::from(disintegrate::DecisionError::Domain(
+            DefError::DefinitionNotValid,
+        )));
+    }
+
+    Ok(HttpResponse::Ok()
+        .append_header(("Location", format!("/schema_def/{}", validated_defid)))
+        .append_header(("message", response_message))
+        .finish())
 }
 
 #[post("/create_def")]
@@ -104,6 +187,8 @@ async fn main() -> anyhow::Result<()> {
             .service(echo)
             .service(create_def)
             .service(hello)
+            .service(validate_def)
+            .service(activate_def)
     })
     .bind(("127.0.0.1", 8080))?
     .run()

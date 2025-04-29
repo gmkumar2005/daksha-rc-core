@@ -7,16 +7,18 @@ license = "MIT"
 [dependencies]
 anyhow = { workspace = true }
 blake3 = { workspace = true }
-chrono =  { workspace = true }
+chrono = { workspace = true }
 disintegrate = { workspace = true }
 jsonschema = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-thiserror =  { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+thiserror = { workspace = true }
 unicode-normalization = { workspace = true }
 uuid = { workspace = true }
 [dev-dependencies]
-mockall ={ workspace = true }
+mockall = { workspace = true }
 [package.metadata.sqlx]
 query = true

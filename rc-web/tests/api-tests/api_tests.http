@@ -16,7 +16,7 @@ POST http://localhost:8080/create_def
 Content-Type: application/json
 
 {
-  "title": "test_title_13",
+  "title": "test_title_3",
   "type": "object",
   "properties": {
     "example": {
@@ -24,3 +24,21 @@ Content-Type: application/json
     }
   }
 }
+
+### Test validation
+POST http://localhost:8080/validate_def
+Content-Type: application/json
+
+{
+  "def_id": "4b736e56-8c99-c1c0-bd55-16175ec63f76"
+}
+
+
+### Test Activation
+POST http://localhost:8080/activate_def
+Content-Type: application/json
+
+{
+  "def_id": "4b736e56-8c99-c1c0-bd55-16175ec63f76"
+}
+

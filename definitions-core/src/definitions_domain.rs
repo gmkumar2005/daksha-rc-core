@@ -1,10 +1,10 @@
-//TODO UUID Validation
 //TODO Json Schema Validation with REF
 //TODO Json Schema Validation with Records
 use chrono::{DateTime, Utc};
 use disintegrate::{Decision, Event, StateMutate, StateQuery};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use strum_macros::Display;
 use thiserror::Error;
 use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
@@ -99,11 +99,13 @@ pub enum DefError {
     DefinitionNotActive,
     #[error("Updating title: {0} to {1} is not allowed")]
     TitleIsNotMutable(String, String),
+    #[error("Definition is not in `{0}` state. It is in `{1}` state")]
+    DefinitionNotInProperState(RecordStatus, RecordStatus),
 }
 
 // start of mutations
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Display)]
 pub enum RecordStatus {
     #[default]
     None,
@@ -114,6 +116,7 @@ pub enum RecordStatus {
     Invalid,
     MarkedForDeletion,
 }
+
 #[derive(Default, StateQuery, Clone, Debug, Serialize, Deserialize)]
 #[state_query(DomainEvent)]
 pub struct DefState {
@@ -250,6 +253,13 @@ impl Decision for CreateDefinition {
             ));
         }
         let def_title = read_title(&self.json_schema_string)?;
+        if generate_id_from_title(&def_title) != self.def_id {
+            return Err(DefError::InvalidSchema(format!(
+                "Title: {} does not match id: {}",
+                def_title,
+                self.def_id.to_string()
+            )));
+        }
         Ok(vec![DomainEvent::DefCreated {
             def_id: self.def_id,
             title: def_title,
@@ -316,7 +326,10 @@ impl Decision for ValidateDefinition {
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if state.record_status != RecordStatus::Draft {
-            return Err(DefError::DefinitionNotValid);
+            return Err(DefError::DefinitionNotInProperState(
+                RecordStatus::Draft,
+                state.record_status.clone(),
+            ));
         }
 
         match read_title(&state.json_schema_string) {
@@ -345,9 +358,9 @@ impl Decision for ValidateDefinition {
 }
 
 pub struct ActivateDefinition {
-    def_id: DefId,
-    activated_at: DateTime<Utc>,
-    activated_by: String,
+    pub def_id: DefId,
+    pub activated_at: DateTime<Utc>,
+    pub activated_by: String,
 }
 impl Decision for ActivateDefinition {
     type Event = DomainEvent;
@@ -359,7 +372,10 @@ impl Decision for ActivateDefinition {
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if state.record_status != RecordStatus::Valid {
-            return Err(DefError::DefinitionNotValid);
+            return Err(DefError::DefinitionNotInProperState(
+                RecordStatus::Valid,
+                state.record_status.clone(),
+            ));
         }
         Ok(vec![DomainEvent::DefActivated {
             def_id: self.def_id,
