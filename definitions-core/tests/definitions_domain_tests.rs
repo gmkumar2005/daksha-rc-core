@@ -18,7 +18,7 @@ mod test {
                 assert_eq!(events.len(), 1);
                 let event = &events[0];
                 if let DomainEvent::DefCreated {
-                    def_id,
+                    id: def_id,
                     title,
                     created_by,
                     json_schema_string,
@@ -47,7 +47,7 @@ mod test {
                 assert_eq!(events.len(), 1);
                 let event = &events[0];
                 if let DomainEvent::DefCreated {
-                    def_id,
+                    id: def_id,
                     title,
                     created_by,
                     json_schema_string,

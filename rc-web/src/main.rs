@@ -56,7 +56,7 @@ async fn activate_def(
     web_cmd: web::Json<ValidateDefRequest>,
 ) -> Result<HttpResponse, DError> {
     let validate_def_cmd = ActivateDefinition {
-        def_id: Uuid::from_str(web_cmd.def_id.as_str()).unwrap(),
+        id: Uuid::from_str(web_cmd.def_id.as_str()).unwrap(),
         activated_at: Utc::now(),
         activated_by: "test_activated_by".to_string(),
     };
@@ -66,7 +66,7 @@ async fn activate_def(
     let validated_defid = exec_results
         .iter()
         .find_map(|ev| match ev.deref() {
-            DomainEvent::DefActivated { def_id, .. } => Some(def_id),
+            DomainEvent::DefActivated { id: def_id, .. } => Some(def_id),
             _ => None,
         })
         .unwrap();
@@ -92,7 +92,7 @@ async fn validate_def(
     web_cmd: web::Json<ValidateDefRequest>,
 ) -> Result<HttpResponse, DError> {
     let validate_def_cmd = ValidateDefinition {
-        def_id: Uuid::from_str(web_cmd.def_id.as_str()).unwrap(),
+        id: Uuid::from_str(web_cmd.def_id.as_str()).unwrap(),
         validated_at: Utc::now(),
         validated_by: "test_validated_by".to_string(),
     };
@@ -104,7 +104,7 @@ async fn validate_def(
         .find_map(|ev| match ev.deref() {
             DomainEvent::DefValidated {
                 validation_result,
-                def_id,
+                id: def_id,
                 ..
             } => Some((validation_result, def_id)),
             _ => None,
@@ -140,8 +140,8 @@ async fn create_def(
     let title =
         read_title(&web_cmd).map_err(|e| DError::from(disintegrate::DecisionError::Domain(e)))?;
     let create_def_cmd = CreateDefinition {
-        def_id: generate_id_from_title(&title),
-        def_title: title,
+        id: generate_id_from_title(&title),
+        title: title,
         definitions: vec!["test_def".to_string()],
         created_by: "test_created_by".to_string(),
         json_schema_string: web_cmd,
@@ -152,7 +152,9 @@ async fn create_def(
     let (created_title, created_defid) = exec_results
         .iter()
         .find_map(|ev| match ev.deref() {
-            DomainEvent::DefCreated { title, def_id, .. } => Some((title, def_id)),
+            DomainEvent::DefCreated {
+                title, id: def_id, ..
+            } => Some((title, def_id)),
             _ => None,
         })
         .unwrap();

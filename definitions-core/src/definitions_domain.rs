@@ -19,7 +19,7 @@ DefDeactivated]
 pub enum DomainEvent {
     DefLoaded {
         #[id]
-        def_id: DefId,
+        id: DefId,
         title: String,
         definitions: Vec<String>,
         file_name: String,
@@ -29,7 +29,7 @@ pub enum DomainEvent {
     },
     DefCreated {
         #[id]
-        def_id: DefId,
+        id: DefId,
         title: String,
         definitions: Vec<String>,
         created_at: DateTime<Utc>,
@@ -38,7 +38,7 @@ pub enum DomainEvent {
     },
     DefUpdated {
         #[id]
-        def_id: DefId,
+        id: DefId,
         title: String,
         definitions: Vec<String>,
         created_at: DateTime<Utc>,
@@ -47,20 +47,20 @@ pub enum DomainEvent {
     },
     DefDeleted {
         #[id]
-        def_id: DefId,
+        id: DefId,
         deleted_at: DateTime<Utc>,
         deleted_by: String,
     },
     DefValidated {
         #[id]
-        def_id: DefId,
+        id: DefId,
         validated_at: DateTime<Utc>,
         validated_by: String,
         validation_result: String,
     },
     DefValidatedFailed {
         #[id]
-        def_id: DefId,
+        id: DefId,
         validated_at: DateTime<Utc>,
         validated_by: String,
         validation_result: String,
@@ -68,13 +68,13 @@ pub enum DomainEvent {
     },
     DefActivated {
         #[id]
-        def_id: DefId,
+        id: DefId,
         activated_at: DateTime<Utc>,
         activated_by: String,
     },
     DefDeactivated {
         #[id]
-        def_id: DefId,
+        id: DefId,
         deactivated_at: DateTime<Utc>,
         deactivated_by: String,
     },
@@ -121,7 +121,7 @@ pub enum RecordStatus {
 #[state_query(DomainEvent)]
 pub struct DefState {
     #[id]
-    def_id: DefId,
+    id: DefId,
     record_status: RecordStatus,
     json_schema_string: String,
     created_at: DateTime<Utc>,
@@ -131,9 +131,9 @@ pub struct DefState {
 }
 
 impl DefState {
-    pub fn new(def_id: DefId) -> Self {
+    pub fn new(id: DefId) -> Self {
         Self {
-            def_id,
+            id,
             ..Default::default()
         }
     }
@@ -143,7 +143,7 @@ impl StateMutate for DefState {
     fn mutate(&mut self, event: Self::Event) {
         match event {
             DomainEvent::DefCreated {
-                def_id,
+                id,
                 title,
                 definitions,
                 created_at,
@@ -151,7 +151,7 @@ impl StateMutate for DefState {
                 json_schema_string,
             } => {
                 self.record_status = RecordStatus::Draft;
-                self.def_id = def_id;
+                self.id = id;
                 self.title = title;
                 self.definitions = definitions;
                 self.created_at = created_at;
@@ -159,7 +159,7 @@ impl StateMutate for DefState {
                 self.json_schema_string = json_schema_string;
             }
             DomainEvent::DefUpdated {
-                def_id: _,
+                id: _,
                 title: _,
                 definitions,
                 created_at,
@@ -194,7 +194,7 @@ impl StateMutate for DefState {
 
 // Start of commands
 pub struct LoadDefinition {
-    def_id: DefId,
+    id: DefId,
     definitions: Vec<String>,
     file_name: String,
     created_at: DateTime<Utc>,
@@ -207,19 +207,19 @@ impl Decision for LoadDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if state.record_status != RecordStatus::None {
             return Err(DefError::DefinitionAlreadyExists(
                 self.file_name.clone(),
-                self.def_id.to_string(),
+                self.id.to_string(),
             ));
         }
         let def_title = read_title(&self.json_schema_string)?;
         Ok(vec![DomainEvent::DefLoaded {
-            def_id: self.def_id,
+            id: self.id,
             title: def_title,
             definitions: self.definitions.clone(),
             file_name: self.file_name.clone(),
@@ -231,8 +231,8 @@ impl Decision for LoadDefinition {
 }
 
 pub struct CreateDefinition {
-    pub def_id: DefId,
-    pub def_title: String,
+    pub id: DefId,
+    pub title: String,
     pub definitions: Vec<String>,
     pub created_by: String,
     pub json_schema_string: String,
@@ -242,26 +242,25 @@ impl Decision for CreateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if state.record_status != RecordStatus::None {
             return Err(DefError::DefinitionAlreadyExists(
-                self.def_title.clone(),
-                self.def_id.to_string(),
+                self.title.clone(),
+                self.id.to_string(),
             ));
         }
         let def_title = read_title(&self.json_schema_string)?;
-        if generate_id_from_title(&def_title) != self.def_id {
+        if generate_id_from_title(&def_title) != self.id {
             return Err(DefError::InvalidSchema(format!(
                 "Title: {} does not match id: {}",
-                def_title,
-                self.def_id.to_string()
+                def_title, self.id
             )));
         }
         Ok(vec![DomainEvent::DefCreated {
-            def_id: self.def_id,
+            id: self.id,
             title: def_title,
             definitions: self.definitions.clone(),
             created_at: Utc::now(),
@@ -272,7 +271,7 @@ impl Decision for CreateDefinition {
 }
 
 pub struct UpdateDefinition {
-    pub def_id: DefId,
+    pub id: DefId,
     pub definitions: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_by: String,
@@ -284,7 +283,7 @@ impl Decision for UpdateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -299,7 +298,7 @@ impl Decision for UpdateDefinition {
             return Err(DefError::TitleIsNotMutable(def_title, state.title.clone()));
         }
         Ok(vec![DomainEvent::DefUpdated {
-            def_id: self.def_id,
+            id: self.id,
             title: def_title,
             definitions: self.definitions.clone(),
             created_at: self.created_at,
@@ -310,7 +309,7 @@ impl Decision for UpdateDefinition {
 }
 
 pub struct ValidateDefinition {
-    pub def_id: DefId,
+    pub id: DefId,
     pub validated_at: DateTime<Utc>,
     pub validated_by: String,
 }
@@ -321,7 +320,7 @@ impl Decision for ValidateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -334,20 +333,20 @@ impl Decision for ValidateDefinition {
 
         match read_title(&state.json_schema_string) {
             Ok(result) if !result.is_empty() => Ok(vec![DomainEvent::DefValidated {
-                def_id: self.def_id,
+                id: self.id,
                 validated_at: self.validated_at,
                 validated_by: self.validated_by.clone(),
                 validation_result: "Success".to_string(),
             }]),
             Ok(result) => Ok(vec![DomainEvent::DefValidatedFailed {
-                def_id: self.def_id,
+                id: self.id,
                 validated_at: self.validated_at,
                 validated_by: self.validated_by.clone(),
                 validation_result: result,
                 validation_errors: vec![],
             }]),
             Err(err) => Ok(vec![DomainEvent::DefValidatedFailed {
-                def_id: self.def_id,
+                id: self.id,
                 validated_at: self.validated_at,
                 validated_by: self.validated_by.clone(),
                 validation_result: "failure".to_string(),
@@ -358,7 +357,7 @@ impl Decision for ValidateDefinition {
 }
 
 pub struct ActivateDefinition {
-    pub def_id: DefId,
+    pub id: DefId,
     pub activated_at: DateTime<Utc>,
     pub activated_by: String,
 }
@@ -367,7 +366,7 @@ impl Decision for ActivateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -378,7 +377,7 @@ impl Decision for ActivateDefinition {
             ));
         }
         Ok(vec![DomainEvent::DefActivated {
-            def_id: self.def_id,
+            id: self.id,
             activated_at: self.activated_at,
             activated_by: self.activated_by.clone(),
         }])
@@ -386,7 +385,7 @@ impl Decision for ActivateDefinition {
 }
 
 pub struct DeactivateDefinition {
-    def_id: DefId,
+    id: DefId,
     deactivated_at: DateTime<Utc>,
     deactivated_by: String,
 }
@@ -395,7 +394,7 @@ impl Decision for DeactivateDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -403,7 +402,7 @@ impl Decision for DeactivateDefinition {
             return Err(DefError::DefinitionNotActive);
         }
         Ok(vec![DomainEvent::DefDeactivated {
-            def_id: self.def_id,
+            id: self.id,
             deactivated_at: self.deactivated_at,
             deactivated_by: self.deactivated_by.clone(),
         }])
@@ -411,7 +410,7 @@ impl Decision for DeactivateDefinition {
 }
 
 pub struct DeleteDefinition {
-    def_id: DefId,
+    id: DefId,
     deleted_at: DateTime<Utc>,
     deleted_by: String,
 }
@@ -420,7 +419,7 @@ impl Decision for DeleteDefinition {
     type StateQuery = DefState;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.def_id)
+        DefState::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -428,7 +427,7 @@ impl Decision for DeleteDefinition {
             return Err(DefError::DefinitionNotFound);
         }
         Ok(vec![DomainEvent::DefDeleted {
-            def_id: self.def_id,
+            id: self.id,
             deleted_at: self.deleted_at,
             deleted_by: self.deleted_by.clone(),
         }])
