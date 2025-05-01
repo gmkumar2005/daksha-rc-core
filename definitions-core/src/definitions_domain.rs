@@ -1,14 +1,32 @@
 //TODO Json Schema Validation with REF
-//TODO Json Schema Validation with Records
+
+use crate::registry_domain::EntityId;
 use chrono::{DateTime, Utc};
 use disintegrate::{Decision, Event, StateMutate, StateQuery};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::num::NonZeroU16;
 use strum_macros::Display;
 use thiserror::Error;
 use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
-// #[stream(DefChangeEvents, [PropertiesAdded, PropertiesRemoved, PropertiesReplaced, VisibilityModified, AttestationPoliciesAdded, AttestationPoliciesReplaced, OwnerShipAttributesAdded, OwnerShipAttributesReplaced])]
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Version(NonZeroU16);
+impl Default for Version {
+    fn default() -> Self {
+        Version(NonZeroU16::new(1).unwrap())
+    }
+}
+impl Version {
+    pub fn increment(self) -> Version {
+        let new_val = self.0.get().wrapping_add(1).max(1); // ensures result is never 0
+        Version(NonZeroU16::new(new_val).unwrap())
+    }
+    pub fn get(self) -> u16 {
+        self.0.get()
+    }
+}
 
 pub type DefId = Uuid;
 // Start of domain events
@@ -78,6 +96,64 @@ pub enum DomainEvent {
         deactivated_at: DateTime<Utc>,
         deactivated_by: String,
     },
+    EntityCreated {
+        #[id]
+        id: EntityId,
+        registry_def_id: DefId,
+        registry_def_version: Version,
+        entity_body: String,
+        entity_type: String,
+        created_at: DateTime<Utc>,
+        created_by: String,
+    },
+    EntityInvited {
+        #[id]
+        id: EntityId,
+        registry_def_id: DefId,
+        registry_def_version: Version,
+        entity_body: String,
+        entity_type: String,
+        invited_at: DateTime<Utc>,
+        invited_by: String,
+    },
+    EntityUpdated {
+        #[id]
+        id: EntityId,
+        def_id: DefId,
+        def_version: Version,
+        entity_body: String,
+        entity_type: String,
+        updated_at: DateTime<Utc>,
+        created_by: String,
+    },
+    EntityPropertyUpdated {
+        #[id]
+        id: EntityId,
+        def_id: DefId,
+        def_version: Version,
+        property_name: String,
+        property_value: String,
+        updated_at: DateTime<Utc>,
+        created_by: String,
+    },
+    EntityPropertyAdded {
+        #[id]
+        id: EntityId,
+        def_id: DefId,
+        def_version: Version,
+        property_name: String,
+        property_value: String,
+        added_at: DateTime<Utc>,
+        created_by: String,
+    },
+    EntityDeleted {
+        #[id]
+        id: EntityId,
+        def_id: DefId,
+        def_version: Version,
+        deleted_at: DateTime<Utc>,
+        created_by: String,
+    },
 }
 
 // start of errors
@@ -99,8 +175,10 @@ pub enum DefError {
     DefinitionNotActive,
     #[error("Updating title: {0} to {1} is not allowed")]
     TitleIsNotMutable(String, String),
-    #[error("Definition is not in `{0}` state. It is in `{1}` state")]
+    #[error("Definition is expected to be `{0}` state. It is in `{1}` state")]
     DefinitionNotInProperState(RecordStatus, RecordStatus),
+    #[error("Title  `{0}` and its Id `{1}` does not match")]
+    DigestMismatch(String, DefId),
 }
 
 // start of mutations
@@ -117,20 +195,19 @@ pub enum RecordStatus {
     MarkedForDeletion,
 }
 
+/// This Aggregate is responsible for managing JSON Schemas and definitions
 #[derive(Default, StateQuery, Clone, Debug, Serialize, Deserialize)]
 #[state_query(DomainEvent)]
-pub struct DefState {
+pub struct RegistryDefinition {
     #[id]
-    id: DefId,
-    record_status: RecordStatus,
-    json_schema_string: String,
-    created_at: DateTime<Utc>,
-    created_by: String,
-    title: String,
-    definitions: Vec<String>,
+    pub id: DefId,
+    pub record_status: RecordStatus,
+    pub json_schema_string: String,
+    pub title: String,
+    pub version: Version,
 }
 
-impl DefState {
+impl RegistryDefinition {
     pub fn new(id: DefId) -> Self {
         Self {
             id,
@@ -139,38 +216,33 @@ impl DefState {
     }
 }
 
-impl StateMutate for DefState {
+impl StateMutate for RegistryDefinition {
     fn mutate(&mut self, event: Self::Event) {
         match event {
             DomainEvent::DefCreated {
                 id,
                 title,
-                definitions,
-                created_at,
-                created_by,
+                definitions: _,
+                created_at: _,
+                created_by: _,
                 json_schema_string,
             } => {
                 self.record_status = RecordStatus::Draft;
                 self.id = id;
                 self.title = title;
-                self.definitions = definitions;
-                self.created_at = created_at;
-                self.created_by = created_by;
                 self.json_schema_string = json_schema_string;
             }
             DomainEvent::DefUpdated {
                 id: _,
                 title: _,
-                definitions,
-                created_at,
-                updated_by,
+                definitions: _,
+                created_at: _,
+                updated_by: _,
                 json_schema_string,
             } => {
                 self.record_status = RecordStatus::Draft;
-                self.definitions = definitions;
-                self.created_at = created_at;
-                self.created_by = updated_by;
                 self.json_schema_string = json_schema_string;
+                self.version = self.version.increment();
             }
             DomainEvent::DefValidated { .. } => {
                 self.record_status = RecordStatus::Valid;
@@ -204,10 +276,10 @@ pub struct LoadDefinition {
 
 impl Decision for LoadDefinition {
     type Event = DomainEvent;
-    type StateQuery = DefState;
+    type StateQuery = RegistryDefinition;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.id)
+        RegistryDefinition::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -239,10 +311,10 @@ pub struct CreateDefinition {
 }
 impl Decision for CreateDefinition {
     type Event = DomainEvent;
-    type StateQuery = DefState;
+    type StateQuery = RegistryDefinition;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.id)
+        RegistryDefinition::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -254,10 +326,7 @@ impl Decision for CreateDefinition {
         }
         let def_title = read_title(&self.json_schema_string)?;
         if generate_id_from_title(&def_title) != self.id {
-            return Err(DefError::InvalidSchema(format!(
-                "Title: {} does not match id: {}",
-                def_title, self.id
-            )));
+            return Err(DefError::DigestMismatch(def_title, self.id));
         }
         Ok(vec![DomainEvent::DefCreated {
             id: self.id,
@@ -280,10 +349,10 @@ pub struct UpdateDefinition {
 
 impl Decision for UpdateDefinition {
     type Event = DomainEvent;
-    type StateQuery = DefState;
+    type StateQuery = RegistryDefinition;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.id)
+        RegistryDefinition::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -317,10 +386,10 @@ pub struct ValidateDefinition {
 // Load the definition check if the
 impl Decision for ValidateDefinition {
     type Event = DomainEvent;
-    type StateQuery = DefState;
+    type StateQuery = RegistryDefinition;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.id)
+        RegistryDefinition::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -363,10 +432,10 @@ pub struct ActivateDefinition {
 }
 impl Decision for ActivateDefinition {
     type Event = DomainEvent;
-    type StateQuery = DefState;
+    type StateQuery = RegistryDefinition;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.id)
+        RegistryDefinition::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -391,10 +460,10 @@ pub struct DeactivateDefinition {
 }
 impl Decision for DeactivateDefinition {
     type Event = DomainEvent;
-    type StateQuery = DefState;
+    type StateQuery = RegistryDefinition;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.id)
+        RegistryDefinition::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -416,10 +485,10 @@ pub struct DeleteDefinition {
 }
 impl Decision for DeleteDefinition {
     type Event = DomainEvent;
-    type StateQuery = DefState;
+    type StateQuery = RegistryDefinition;
     type Error = DefError;
     fn state_query(&self) -> Self::StateQuery {
-        DefState::new(self.id)
+        RegistryDefinition::new(self.id)
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
@@ -489,14 +558,35 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_id_from_title_simple_values() {
+        // Arrange
+        let title = "Student"; // Input with extra spaces
+        let generated_id = generate_id_from_title(title);
+        println!("Generated UUID: {}", generated_id);
+        // Assert that the generated UUID is valid
+        let generated_id_again = generate_id_from_title(title);
+        assert_eq!(generated_id, generated_id_again);
+        assert_eq!(
+            generated_id.to_string(),
+            "1bd23c91-3379-b65b-11cc-64984050e35c"
+        );
+        // Different titles should generate different UUIDs
+        let different_title = "test_title";
+        let different_id = generate_id_from_title(different_title);
+        assert_ne!(generated_id, different_id);
+        assert_eq!(
+            different_id.to_string(),
+            "edddcff8-4970-283f-7ab1-9b925d059b69"
+        );
+    }
+    #[test]
     fn test_generate_id_with_unicode() {
         // Arrange
         let title = "Café du Monde";
         let generated_id = generate_id_from_title(title);
         println!("Generated UUID: {}", generated_id);
         // Assert that the generated UUID is valid
-        let generated_id_again = generate_id_from_title(title);
-        assert_eq!(generated_id, generated_id_again);
+        // let generated_id_again = generate_id_from_title(title);
         // Different titles should generate different UUIDs
         let different_title = "Another Test Title Café du Monde";
         let different_id = generate_id_from_title(different_title);

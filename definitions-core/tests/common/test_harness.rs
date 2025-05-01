@@ -114,4 +114,9 @@ where
         let err = self._step.result.unwrap_err();
         assert_eq!(err, expected);
     }
+
+    #[track_caller]
+    pub fn then_err_assert(self, assertion: impl FnOnce(&ERR)) {
+        assertion(&self._step.result.unwrap_err());
+    }
 }

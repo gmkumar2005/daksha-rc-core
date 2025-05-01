@@ -6,6 +6,8 @@ use definitions_core::definitions_domain::DomainEvent::DefUpdated;
 use definitions_core::definitions_domain::{
     generate_id_from_title, CreateDefinition, DomainEvent, UpdateDefinition, ValidateDefinition,
 };
+use definitions_core::registry_domain::CreateEntityCmd;
+use uuid::Uuid;
 
 pub fn get_valid_json_string() -> String {
     r###"
@@ -22,6 +24,51 @@ pub fn get_valid_json_string() -> String {
     .to_string()
 }
 
+pub fn get_valid_student_schema_string() -> String {
+    r###"
+        {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Student",
+  "type": "object",
+  "properties": {
+    "Student": {
+      "type": "object",
+      "properties": {
+        "identityDetails": {
+          "type": "object",
+          "properties": {
+            "fullName": {
+              "type": "string"
+            },
+            "gender": {
+              "type": "string",
+              "enum": ["Male", "Female", "Other"]
+            }
+          },
+          "required": ["fullName", "gender"]
+        },
+        "contactDetails": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "address": {
+              "type": "string"
+            }
+          },
+          "required": ["email", "address"]
+        }
+      }
+    }
+  },
+  "required": ["Student"]
+}
+
+        "###
+    .to_string()
+}
 pub fn get_updated_json_string() -> String {
     r###"
         {
@@ -114,6 +161,33 @@ pub fn get_def_created_valid_json() -> DomainEvent {
     }
 }
 
+pub fn get_def_created_valid_student_json() -> DomainEvent {
+    DomainEvent::DefCreated {
+        id: generate_id_from_title("Student"),
+        title: "Student".to_string(),
+        definitions: vec!["test_def".to_string()],
+        created_at: get_created_at(),
+        created_by: "test_created_by".to_string(),
+        json_schema_string: get_valid_student_schema_string(),
+    }
+}
+
+pub fn get_def_validated_valid_student_json() -> DomainEvent {
+    DomainEvent::DefValidated {
+        id: generate_id_from_title("Student"),
+        validated_at: Utc::now(),
+        validated_by: "test_user".to_string(),
+        validation_result: "Success".to_string(),
+    }
+}
+
+pub fn get_def_activated_valid_student_json() -> DomainEvent {
+    DomainEvent::DefActivated {
+        id: generate_id_from_title("Student"),
+        activated_at: Utc::now(),
+        activated_by: "".to_string(),
+    }
+}
 pub fn get_def_created_empty_title() -> DomainEvent {
     DomainEvent::DefCreated {
         id: generate_id_from_title("test_title"),
@@ -219,5 +293,56 @@ pub fn get_expected_def_created_valid_json() -> DomainEvent {
         created_at: get_created_at(),
         created_by: "test_created_by".to_string(),
         json_schema_string: get_valid_json_string(),
+    }
+}
+
+pub fn get_valid_student_document() -> String {
+    r###"
+{
+  "Student": {
+    "identityDetails":{
+      "fullName":"John",
+      "gender":"Male"
+    },
+    "contactDetails":{
+      "email":"abc@abc.com",
+      "address":"line1"
+    }
+  }
+}
+"###
+    .to_string()
+}
+pub fn get_create_entity_cmd() -> CreateEntityCmd {
+    CreateEntityCmd {
+        id: Uuid::now_v7(),
+        entity_body: get_valid_student_document(),
+        entity_type: "Student".to_string(),
+        created_by: "test_user".to_string(),
+    }
+}
+
+pub fn get_create_entity_cmd_with_invalid_student() -> CreateEntityCmd {
+    let invalid_student_document = r###"
+{
+  "Student": {
+    "identityDetails":{
+      "fullName":100,
+      "gender":"Child"
+    },
+    "contactDetails":{
+      "email":"abc@abc.com",
+      "address":"line1"
+    }
+  }
+}
+"###
+    .to_string();
+
+    CreateEntityCmd {
+        id: Uuid::now_v7(),
+        entity_body: invalid_student_document,
+        entity_type: "Student".to_string(),
+        created_by: "test_user".to_string(),
     }
 }

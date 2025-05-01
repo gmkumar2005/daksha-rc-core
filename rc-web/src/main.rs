@@ -141,7 +141,7 @@ async fn create_def(
         read_title(&web_cmd).map_err(|e| DError::from(disintegrate::DecisionError::Domain(e)))?;
     let create_def_cmd = CreateDefinition {
         id: generate_id_from_title(&title),
-        title: title,
+        title,
         definitions: vec!["test_def".to_string()],
         created_by: "test_created_by".to_string(),
         json_schema_string: web_cmd,
