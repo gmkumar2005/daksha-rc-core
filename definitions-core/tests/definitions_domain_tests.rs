@@ -7,8 +7,10 @@ mod test {
     use super::*;
     use crate::common::test_harness::SimpleTestHarness;
     use crate::common::*;
-    use definitions_core::definitions_domain::DefError::TitleIsNotMutable;
-    use definitions_core::definitions_domain::{generate_id_from_title, DomainEvent};
+    use definitions_core::definitions_domain::DefError::{ModifyNotAllowed, TitleIsNotMutable};
+    use definitions_core::definitions_domain::{
+        generate_id_from_title, DefRecordStatus, DomainEvent,
+    };
     #[test]
     fn test_create_definition() {
         let create_def_cmd = create_def_cmd_1();
@@ -83,7 +85,7 @@ mod test {
 
     #[test]
     fn test_validate_with_valid_schema() {
-        disintegrate::TestHarness::given([get_def_created_valid_json()])
+        disintegrate::TestHarness::given([def_created_valid_json_draft()])
             .when(get_validate_def_cmd())
             .then([get_expected_validation_success()]);
     }
@@ -97,22 +99,55 @@ mod test {
 
     #[test]
     fn test_mutate_tile_should_fail() {
-        disintegrate::TestHarness::given([get_def_created_valid_json()])
-            .when(get_update_def_cmd_mutate())
-            .then_err(TitleIsNotMutable(
-                "example_schema".to_string(),
-                "test_title".to_string(),
-            ));
+        disintegrate::TestHarness::given([
+            def_created_valid_json_draft(),
+            def_validated_valid_json(),
+            def_activated_valid_json(),
+        ])
+        .when(get_update_def_cmd_mutate())
+        .then_err(TitleIsNotMutable(
+            "example_schema".to_string(),
+            "test_title".to_string(),
+        ));
     }
 
     #[test]
-    fn test_update_with_valid_schema() {
-        disintegrate::TestHarness::given([get_def_created_valid_json()])
-            .when(get_update_def_cmd())
-            .then_err(TitleIsNotMutable(
-                "example_schema".to_string(),
-                "test_title".to_string(),
-            ));
+    fn test_update_with_valid_schema_should_fail() {
+        SimpleTestHarness::given([def_created_valid_json_draft()])
+            .when(get_update_def_cmd_mutate())
+            .then_err(ModifyNotAllowed(DefRecordStatus::Draft));
+    }
+
+    #[test]
+    fn test_update_with_valid_schema_should_succeed() {
+        SimpleTestHarness::given([
+            def_created_valid_json_draft(),
+            def_validated_valid_json(),
+            def_activated_valid_json(),
+        ])
+        .when(get_update_title_def_cmd())
+        .then_assert(|events| {
+            assert_eq!(events.len(), 1);
+            let event = &events[0];
+            if let DomainEvent::DefUpdated {
+                id: def_id,
+                title,
+                updated_by,
+                json_schema_string,
+                ..
+            } = event
+            {
+                assert_eq!(def_id, &generate_id_from_title("test_title"));
+                assert_eq!(title, "test_title");
+                assert_eq!(updated_by, "test_updated_by");
+                assert_eq!(json_schema_string, &get_updated_json_string_test_title());
+            } else {
+                assert!(
+                    matches!(event, DomainEvent::DefUpdated { .. }),
+                    "Event is not of type DomainEvent::DefUpdated"
+                );
+            }
+        });
     }
 
     #[test]

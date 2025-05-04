@@ -4,7 +4,8 @@ pub mod test_harness;
 use chrono::{DateTime, Utc};
 use definitions_core::definitions_domain::DomainEvent::DefUpdated;
 use definitions_core::definitions_domain::{
-    generate_id_from_title, CreateDefinition, DomainEvent, UpdateDefinition, ValidateDefinition,
+    generate_id_from_title, CreateDefinitionCmd, DomainEvent, UpdateDefinitionCmd,
+    ValidateDefinitionCmd,
 };
 use definitions_core::registry_domain::CreateEntityCmd;
 use uuid::Uuid;
@@ -84,6 +85,20 @@ pub fn get_updated_json_string() -> String {
     .to_string()
 }
 
+pub fn get_updated_json_string_test_title() -> String {
+    r###"
+        {
+            "title": "test_title",
+            "type": "object",
+            "properties": {
+                "example1": {
+                    "type": "string"
+                }
+            }
+        }
+        "###
+    .to_string()
+}
 pub fn get_json_string_empty_title() -> String {
     r###"
         {
@@ -116,8 +131,8 @@ pub fn get_created_at() -> DateTime<Utc> {
     let date_str = "2024-11-22T16:46:51.757980Z";
     date_str.parse().expect("Failed to parse date")
 }
-pub fn create_def_cmd_1() -> CreateDefinition {
-    CreateDefinition {
+pub fn create_def_cmd_1() -> CreateDefinitionCmd {
+    CreateDefinitionCmd {
         id: generate_id_from_title("test_title"),
         title: "test_title".to_string(),
         definitions: vec!["test_def".to_string()],
@@ -150,7 +165,7 @@ pub fn get_def_created_invalid_json() -> DomainEvent {
         json_schema_string: get_in_valid_json_string(),
     }
 }
-pub fn get_def_created_valid_json() -> DomainEvent {
+pub fn def_created_valid_json_draft() -> DomainEvent {
     DomainEvent::DefCreated {
         id: generate_id_from_title("test_title"),
         title: "test_title".to_string(),
@@ -158,6 +173,22 @@ pub fn get_def_created_valid_json() -> DomainEvent {
         created_at: get_created_at(),
         created_by: "test_created_by".to_string(),
         json_schema_string: get_valid_json_string(),
+    }
+}
+pub fn def_validated_valid_json() -> DomainEvent {
+    DomainEvent::DefValidated {
+        id: generate_id_from_title("test_title"),
+        validated_at: get_created_at(),
+        validated_by: "test_user".to_string(),
+        validation_result: "Success".to_string(),
+    }
+}
+
+pub fn def_activated_valid_json() -> DomainEvent {
+    DomainEvent::DefActivated {
+        id: generate_id_from_title("test_title"),
+        activated_at: get_created_at(),
+        activated_by: "".to_string(),
     }
 }
 
@@ -198,16 +229,16 @@ pub fn get_def_created_empty_title() -> DomainEvent {
         json_schema_string: get_json_string_empty_title(),
     }
 }
-pub fn get_validate_def_cmd() -> ValidateDefinition {
-    ValidateDefinition {
+pub fn get_validate_def_cmd() -> ValidateDefinitionCmd {
+    ValidateDefinitionCmd {
         id: generate_id_from_title("test_title"),
         validated_at: get_created_at(),
         validated_by: "test_validated_by".to_string(),
     }
 }
 
-pub fn get_update_def_cmd_mutate() -> UpdateDefinition {
-    UpdateDefinition {
+pub fn get_update_def_cmd_mutate() -> UpdateDefinitionCmd {
+    UpdateDefinitionCmd {
         id: generate_id_from_title("test_title"),
         definitions: vec!["test_def".to_string()],
         created_at: get_created_at(),
@@ -216,13 +247,22 @@ pub fn get_update_def_cmd_mutate() -> UpdateDefinition {
     }
 }
 
-pub fn get_update_def_cmd() -> UpdateDefinition {
-    UpdateDefinition {
+pub fn get_update_title_def_cmd() -> UpdateDefinitionCmd {
+    UpdateDefinitionCmd {
         id: generate_id_from_title("test_title"),
         definitions: vec!["test_def".to_string()],
         created_at: get_created_at(),
         updated_by: "test_updated_by".to_string(),
-        json_schema_string: get_updated_json_string(),
+        json_schema_string: get_updated_json_string_test_title(),
+    }
+}
+pub fn get_update_def_cmd() -> UpdateDefinitionCmd {
+    UpdateDefinitionCmd {
+        id: generate_id_from_title("test_title"),
+        definitions: vec!["test_def".to_string()],
+        created_at: get_created_at(),
+        updated_by: "test_updated_by".to_string(),
+        json_schema_string: get_updated_json_string_test_title(),
     }
 }
 pub fn get_expected_def_created_empty_json() -> DomainEvent {

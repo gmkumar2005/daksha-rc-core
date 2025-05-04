@@ -55,7 +55,7 @@ async fn activate_def(
     decision_maker: Data<DecisionMaker>,
     web_cmd: web::Json<ValidateDefRequest>,
 ) -> Result<HttpResponse, DError> {
-    let validate_def_cmd = ActivateDefinition {
+    let validate_def_cmd = ActivateDefinitionCmd {
         id: Uuid::from_str(web_cmd.def_id.as_str()).unwrap(),
         activated_at: Utc::now(),
         activated_by: "test_activated_by".to_string(),
@@ -91,7 +91,7 @@ async fn validate_def(
     decision_maker: Data<DecisionMaker>,
     web_cmd: web::Json<ValidateDefRequest>,
 ) -> Result<HttpResponse, DError> {
-    let validate_def_cmd = ValidateDefinition {
+    let validate_def_cmd = ValidateDefinitionCmd {
         id: Uuid::from_str(web_cmd.def_id.as_str()).unwrap(),
         validated_at: Utc::now(),
         validated_by: "test_validated_by".to_string(),
@@ -139,7 +139,7 @@ async fn create_def(
 ) -> Result<HttpResponse, DError> {
     let title =
         read_title(&web_cmd).map_err(|e| DError::from(disintegrate::DecisionError::Domain(e)))?;
-    let create_def_cmd = CreateDefinition {
+    let create_def_cmd = CreateDefinitionCmd {
         id: generate_id_from_title(&title),
         title,
         definitions: vec!["test_def".to_string()],

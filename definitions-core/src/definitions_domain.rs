@@ -1,5 +1,5 @@
 //TODO Json Schema Validation with REF
-
+//TODO RollBack Command
 use crate::registry_domain::EntityId;
 use chrono::{DateTime, Utc};
 use disintegrate::{Decision, Event, StateMutate, StateQuery};
@@ -95,6 +95,7 @@ pub enum DomainEvent {
         id: DefId,
         deactivated_at: DateTime<Utc>,
         deactivated_by: String,
+        json_schema_string: String,
     },
     EntityCreated {
         #[id]
@@ -105,6 +106,7 @@ pub enum DomainEvent {
         entity_type: String,
         created_at: DateTime<Utc>,
         created_by: String,
+        version: Version,
     },
     EntityInvited {
         #[id]
@@ -115,16 +117,18 @@ pub enum DomainEvent {
         entity_type: String,
         invited_at: DateTime<Utc>,
         invited_by: String,
+        version: Version,
     },
     EntityUpdated {
         #[id]
         id: EntityId,
-        def_id: DefId,
-        def_version: Version,
+        registry_def_id: DefId,
+        registry_def_version: Version,
         entity_body: String,
         entity_type: String,
         updated_at: DateTime<Utc>,
-        created_by: String,
+        updated_by: String,
+        version: Version,
     },
     EntityPropertyUpdated {
         #[id]
@@ -149,10 +153,8 @@ pub enum DomainEvent {
     EntityDeleted {
         #[id]
         id: EntityId,
-        def_id: DefId,
-        def_version: Version,
         deleted_at: DateTime<Utc>,
-        created_by: String,
+        deleted_by: String,
     },
 }
 
@@ -163,20 +165,22 @@ pub enum DefError {
     InvalidJson(String),
     #[error("Invalid Schema: {0}")]
     InvalidSchema(String),
-    #[error("Invalid Definition")]
-    InvalidDefinition,
     #[error("Definition Already Exists for : {0} with id: {1}")]
     DefinitionAlreadyExists(String, String),
-    #[error("Definition Not Found")]
-    DefinitionNotFound,
     #[error("Definition Not Valid")]
     DefinitionNotValid,
-    #[error("Definition Not Active")]
-    DefinitionNotActive,
+    #[error("Cannot validate definition which is in `{0}")]
+    ValidateNotAllowed(DefRecordStatus),
+    #[error("Cannot deactivate definition which is in `{0}")]
+    DeactivateNotAllowed(DefRecordStatus),
+    #[error("Cannot delete definition which is in `{0}")]
+    DeleteNotAllowed(DefRecordStatus),
+    #[error("Cannot modify definition which is in `{0}")]
+    ModifyNotAllowed(DefRecordStatus),
+    #[error("Cannot activate definition which is in `{0}")]
+    ActivateNotAllowed(DefRecordStatus),
     #[error("Updating title: {0} to {1} is not allowed")]
     TitleIsNotMutable(String, String),
-    #[error("Definition is expected to be `{0}` state. It is in `{1}` state")]
-    DefinitionNotInProperState(RecordStatus, RecordStatus),
     #[error("Title  `{0}` and its Id `{1}` does not match")]
     DigestMismatch(String, DefId),
 }
@@ -184,7 +188,7 @@ pub enum DefError {
 // start of mutations
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Display)]
-pub enum RecordStatus {
+pub enum DefRecordStatus {
     #[default]
     None,
     Draft,
@@ -193,6 +197,7 @@ pub enum RecordStatus {
     Deactivated,
     Invalid,
     MarkedForDeletion,
+    Modified,
 }
 
 /// This Aggregate is responsible for managing JSON Schemas and definitions
@@ -201,7 +206,7 @@ pub enum RecordStatus {
 pub struct RegistryDefinition {
     #[id]
     pub id: DefId,
-    pub record_status: RecordStatus,
+    pub record_status: DefRecordStatus,
     pub json_schema_string: String,
     pub title: String,
     pub version: Version,
@@ -227,7 +232,7 @@ impl StateMutate for RegistryDefinition {
                 created_by: _,
                 json_schema_string,
             } => {
-                self.record_status = RecordStatus::Draft;
+                self.record_status = DefRecordStatus::Draft;
                 self.id = id;
                 self.title = title;
                 self.json_schema_string = json_schema_string;
@@ -240,24 +245,24 @@ impl StateMutate for RegistryDefinition {
                 updated_by: _,
                 json_schema_string,
             } => {
-                self.record_status = RecordStatus::Draft;
+                self.record_status = DefRecordStatus::Draft;
                 self.json_schema_string = json_schema_string;
                 self.version = self.version.increment();
             }
             DomainEvent::DefValidated { .. } => {
-                self.record_status = RecordStatus::Valid;
+                self.record_status = DefRecordStatus::Valid;
             }
             DomainEvent::DefValidatedFailed { .. } => {
-                self.record_status = RecordStatus::Invalid;
+                self.record_status = DefRecordStatus::Invalid;
             }
             DomainEvent::DefActivated { .. } => {
-                self.record_status = RecordStatus::Active;
+                self.record_status = DefRecordStatus::Active;
             }
             DomainEvent::DefDeactivated { .. } => {
-                self.record_status = RecordStatus::Deactivated;
+                self.record_status = DefRecordStatus::Deactivated;
             }
             DomainEvent::DefDeleted { .. } => {
-                self.record_status = RecordStatus::MarkedForDeletion;
+                self.record_status = DefRecordStatus::MarkedForDeletion;
             }
             _ => {}
         }
@@ -283,7 +288,7 @@ impl Decision for LoadDefinition {
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
-        if state.record_status != RecordStatus::None {
+        if state.record_status != DefRecordStatus::None {
             return Err(DefError::DefinitionAlreadyExists(
                 self.file_name.clone(),
                 self.id.to_string(),
@@ -302,14 +307,14 @@ impl Decision for LoadDefinition {
     }
 }
 
-pub struct CreateDefinition {
+pub struct CreateDefinitionCmd {
     pub id: DefId,
     pub title: String,
     pub definitions: Vec<String>,
     pub created_by: String,
     pub json_schema_string: String,
 }
-impl Decision for CreateDefinition {
+impl Decision for CreateDefinitionCmd {
     type Event = DomainEvent;
     type StateQuery = RegistryDefinition;
     type Error = DefError;
@@ -318,7 +323,7 @@ impl Decision for CreateDefinition {
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
-        if state.record_status != RecordStatus::None {
+        if !state_machine(&state.record_status, RegistryDefAction::Create) {
             return Err(DefError::DefinitionAlreadyExists(
                 self.title.clone(),
                 self.id.to_string(),
@@ -339,7 +344,7 @@ impl Decision for CreateDefinition {
     }
 }
 
-pub struct UpdateDefinition {
+pub struct UpdateDefinitionCmd {
     pub id: DefId,
     pub definitions: Vec<String>,
     pub created_at: DateTime<Utc>,
@@ -347,7 +352,7 @@ pub struct UpdateDefinition {
     pub json_schema_string: String,
 }
 
-impl Decision for UpdateDefinition {
+impl Decision for UpdateDefinitionCmd {
     type Event = DomainEvent;
     type StateQuery = RegistryDefinition;
     type Error = DefError;
@@ -356,12 +361,16 @@ impl Decision for UpdateDefinition {
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
-        // updates are allowed only for draft definitions and inactive definitions
-        if state.record_status != RecordStatus::Draft
-            && state.record_status != RecordStatus::Deactivated
-        {
-            return Err(DefError::DefinitionNotValid);
+        if !state_machine(&state.record_status, RegistryDefAction::Modify) {
+            return Err(DefError::ModifyNotAllowed(state.record_status.clone()));
         }
+        //  return Err(EntityError::ModifyNotAllowed(resource.status.clone()));
+        // updates are allowed only for draft definitions and inactive definitions
+        // if state.record_status != DefRecordStatus::Draft
+        //     && state.record_status != DefRecordStatus::Deactivated
+        // {
+        //     return Err(DefError::DefinitionNotValid);
+        // }
         let def_title = read_title(&self.json_schema_string)?;
         if def_title != state.title {
             return Err(DefError::TitleIsNotMutable(def_title, state.title.clone()));
@@ -377,14 +386,14 @@ impl Decision for UpdateDefinition {
     }
 }
 
-pub struct ValidateDefinition {
+pub struct ValidateDefinitionCmd {
     pub id: DefId,
     pub validated_at: DateTime<Utc>,
     pub validated_by: String,
 }
 
 // Load the definition check if the
-impl Decision for ValidateDefinition {
+impl Decision for ValidateDefinitionCmd {
     type Event = DomainEvent;
     type StateQuery = RegistryDefinition;
     type Error = DefError;
@@ -393,11 +402,8 @@ impl Decision for ValidateDefinition {
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
-        if state.record_status != RecordStatus::Draft {
-            return Err(DefError::DefinitionNotInProperState(
-                RecordStatus::Draft,
-                state.record_status.clone(),
-            ));
+        if !state_machine(&state.record_status, RegistryDefAction::Validate) {
+            return Err(DefError::ValidateNotAllowed(state.record_status.clone()));
         }
 
         match read_title(&state.json_schema_string) {
@@ -425,12 +431,12 @@ impl Decision for ValidateDefinition {
     }
 }
 
-pub struct ActivateDefinition {
+pub struct ActivateDefinitionCmd {
     pub id: DefId,
     pub activated_at: DateTime<Utc>,
     pub activated_by: String,
 }
-impl Decision for ActivateDefinition {
+impl Decision for ActivateDefinitionCmd {
     type Event = DomainEvent;
     type StateQuery = RegistryDefinition;
     type Error = DefError;
@@ -439,12 +445,15 @@ impl Decision for ActivateDefinition {
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
-        if state.record_status != RecordStatus::Valid {
-            return Err(DefError::DefinitionNotInProperState(
-                RecordStatus::Valid,
-                state.record_status.clone(),
-            ));
+        if !state_machine(&state.record_status, RegistryDefAction::Activate) {
+            return Err(DefError::ActivateNotAllowed(state.record_status.clone()));
         }
+        // if state.record_status != DefRecordStatus::Valid {
+        //     return Err(DefError::DefinitionNotInProperState(
+        //         DefRecordStatus::Valid,
+        //         state.record_status.clone(),
+        //     ));
+        // }
         Ok(vec![DomainEvent::DefActivated {
             id: self.id,
             activated_at: self.activated_at,
@@ -453,12 +462,12 @@ impl Decision for ActivateDefinition {
     }
 }
 
-pub struct DeactivateDefinition {
+pub struct DeactivateDefinitionCmd {
     id: DefId,
     deactivated_at: DateTime<Utc>,
     deactivated_by: String,
 }
-impl Decision for DeactivateDefinition {
+impl Decision for DeactivateDefinitionCmd {
     type Event = DomainEvent;
     type StateQuery = RegistryDefinition;
     type Error = DefError;
@@ -467,23 +476,24 @@ impl Decision for DeactivateDefinition {
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
-        if state.record_status != RecordStatus::Active {
-            return Err(DefError::DefinitionNotActive);
+        if !state_machine(&state.record_status, RegistryDefAction::Deactivate) {
+            return Err(DefError::DeactivateNotAllowed(state.record_status.clone()));
         }
         Ok(vec![DomainEvent::DefDeactivated {
             id: self.id,
             deactivated_at: self.deactivated_at,
             deactivated_by: self.deactivated_by.clone(),
+            json_schema_string: state.json_schema_string.clone(),
         }])
     }
 }
 
-pub struct DeleteDefinition {
+pub struct DeleteDefinitionCmd {
     id: DefId,
     deleted_at: DateTime<Utc>,
     deleted_by: String,
 }
-impl Decision for DeleteDefinition {
+impl Decision for DeleteDefinitionCmd {
     type Event = DomainEvent;
     type StateQuery = RegistryDefinition;
     type Error = DefError;
@@ -492,8 +502,8 @@ impl Decision for DeleteDefinition {
     }
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
-        if state.record_status == RecordStatus::MarkedForDeletion {
-            return Err(DefError::DefinitionNotFound);
+        if !state_machine(&state.record_status, RegistryDefAction::MarkForDeletion) {
+            return Err(DefError::DeleteNotAllowed(state.record_status.clone()));
         }
         Ok(vec![DomainEvent::DefDeleted {
             id: self.id,
@@ -504,6 +514,44 @@ impl Decision for DeleteDefinition {
 }
 
 // start helper functions
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryDefAction {
+    Create,
+    UpLoad,
+    Validate,
+    Activate,
+    Deactivate,
+    Modify,
+    MarkForDeletion,
+}
+
+pub fn state_machine(current_status: &DefRecordStatus, action: RegistryDefAction) -> bool {
+    match action {
+        RegistryDefAction::Modify => {
+            matches!(
+                current_status,
+                DefRecordStatus::Active | DefRecordStatus::Modified
+            )
+        }
+        RegistryDefAction::Create => matches!(current_status, DefRecordStatus::None),
+        RegistryDefAction::MarkForDeletion => {
+            matches!(current_status, DefRecordStatus::Active)
+        }
+        RegistryDefAction::Validate => {
+            matches!(current_status, DefRecordStatus::Draft)
+        }
+        RegistryDefAction::Deactivate => {
+            matches!(current_status, DefRecordStatus::Active)
+        }
+        RegistryDefAction::Activate => {
+            matches!(current_status, DefRecordStatus::Valid)
+        }
+
+        _ => false,
+        // Add more actions as needed, with appropriate logic
+    }
+}
 
 pub fn read_title(p0: &str) -> Result<String, DefError> {
     if !p0.is_empty() {

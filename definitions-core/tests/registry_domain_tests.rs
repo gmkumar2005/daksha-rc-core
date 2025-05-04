@@ -17,7 +17,9 @@ mod test {
         get_def_validated_valid_student_json,
     };
     use crate::read_student_schema;
-    use definitions_core::definitions_domain::{generate_id_from_title, DomainEvent, RecordStatus};
+    use definitions_core::definitions_domain::{
+        generate_id_from_title, DefRecordStatus, DomainEvent,
+    };
     use definitions_core::registry_domain::EntityError;
 
     #[test]
@@ -80,8 +82,8 @@ mod test {
         SimpleTestHarness::given([get_def_created_valid_student_json()])
             .when(create_entity_cmd.clone())
             .then_err(EntityError::DefinitionNotInProperState(
-                RecordStatus::Active,
-                RecordStatus::Draft,
+                DefRecordStatus::Active,
+                DefRecordStatus::Draft,
             ));
 
         SimpleTestHarness::given([
@@ -90,8 +92,8 @@ mod test {
         ])
         .when(create_entity_cmd)
         .then_err(EntityError::DefinitionNotInProperState(
-            RecordStatus::Active,
-            RecordStatus::Valid,
+            DefRecordStatus::Active,
+            DefRecordStatus::Valid,
         ));
     }
 

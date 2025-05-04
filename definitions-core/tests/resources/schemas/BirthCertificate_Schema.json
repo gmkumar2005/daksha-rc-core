@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "BirthCertificate": {
+      "$ref": "#/definitions/BirthCertificate"
+    }
+  },
+  "required": [
+    "BirthCertificate"
+  ],
+  "title": "BirthCertificate",
+  "definitions": {
+    "BirthCertificate": {
+      "$id": "#/properties/BirthCertificate",
+      "type": "object",
+      "title": "The BirthCertificate Schema",
+      "required": [
+        "name",
+        "gender",
+        "date_of_birth",
+        "place_of_birth",
+        "contact"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "gender": {
+          "type": "string"
+        },
+        "date_of_birth": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "hospital": {
+          "type": "string"
+        },
+        "place_of_birth": {
+          "type": "string",
+          "enum": [
+            "Bangalore",
+            "Mysore",
+            "Mandya"
+          ]
+        },
+        "name_of_mother": {
+          "type": "string"
+        },
+        "name_of_father": {
+          "type": "string"
+        },
+        "present_address": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 50
+        },
+        "contact": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "_osConfig": {
+    "uniqueIndexFields": [
+      "contact"
+    ],
+    "ownershipAttributes": [],
+    "roles": [],
+    "inviteRoles": [
+      "anonymous"
+    ],
+    "credentialTemplate": {
+      "@context": [
+        "https://www.w3.org/2018/credentials/v1",
+        {
+          "@context": {
+            "@version": 1.1,
+            "@protected": true,
+            "BirthCertificate": {
+              "@id": "https://github.com/sunbird-specs/vc-specs#BirthCertificate",
+              "@context": {
+                "id": "@id",
+                "@version": 1.1,
+                "@protected": true,
+                "skills": "schema:Text",
+                "name": "schema:Text",
+                "gender": "schema:Text",
+                "date_of_birth": "schema:Text",
+                "hospital": "schema:Text",
+                "place_of_birth": "schema:Text",
+                "name_of_mother": "schema:Text",
+                "name_of_father": "schema:Text",
+                "present_address": "schema:Text",
+                "contact": "schema:Text"
+              }
+            }
+          }
+        }
+      ],
+      "type": [
+        "VerifiableCredential"
+      ],
+      "issuanceDate": "2021-08-27T10:57:57.237Z",
+      "credentialSubject": {
+        "type": "BirthCertificate",
+        "name": "{{name}}",
+        "gender": "{{gender}}",
+        "date_of_birth": "{{date_of_birth}}",
+        "hospital": "{{hospital}}",
+        "place_of_birth": "{{place_of_birth}}",
+        "name_of_mother": "{{name_of_mother}}",
+        "name_of_father": "{{name_of_father}}",
+        "present_address": "{{present_address}}",
+        "contact": "{{contact}}"
+      },
+      "issuer": "did:web:sunbirdrc.dev/vc/BirthCertificate"
+    },
+    "certificateTemplates": {
+      "html": "https://gist.githubusercontent.com/holashchand/03785ec73f278f955c2dec749afc9e76/raw/b18edeca22980dd388d498e12cb1223e3d6c3a49/BirthCertificate.html"
+    }
+  }
+}

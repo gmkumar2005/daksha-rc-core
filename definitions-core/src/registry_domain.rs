@@ -1,9 +1,10 @@
-//TODO Json Schema Validation with Records
+//TODO RollBack Command
 use crate::definitions_domain::{
-    generate_id_from_title, DefId, DomainEvent, RecordStatus, RegistryDefinition, Version,
+    generate_id_from_title, DefId, DefRecordStatus, DomainEvent, RegistryDefinition, Version,
 };
-use chrono::Utc;
-use disintegrate::{Decision, StateMutate, StateQuery};
+use chrono::{DateTime, Utc};
+use disintegrate::{event_types, union, Decision, StateMutate, StateQuery, StreamQuery};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 use thiserror::Error;
@@ -22,21 +23,23 @@ pub enum EntityError {
     #[error("Invalid Definition")]
     InvalidDefinition,
     #[error("Definition is expected to be `{0}` state. It is in `{1}` state")]
-    DefinitionNotInProperState(RecordStatus, RecordStatus),
+    DefinitionNotInProperState(DefRecordStatus, DefRecordStatus),
+    #[error("Cannot modify entity which is in `{0}")]
+    ModifyNotAllowed(EntityRecordStatus),
     #[error("Validation of the entity {0} failed with following errors : \n{1}")]
     JsonSchemaError(String, String),
+    #[error("Cannot delete entity which is in `{0}")]
+    DeleteNotAllowed(EntityRecordStatus),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Display)]
-pub enum LifecycleState {
+pub enum EntityRecordStatus {
     #[default]
     None,
-    Draft,
-    Invited,
-    Valid,
     Active,
+    Invited,
+    Modified,
     Deactivated,
-    Invalid,
     MarkedForDeletion,
 }
 
@@ -45,7 +48,7 @@ pub enum LifecycleState {
 pub struct RegistryResource {
     #[id]
     id: EntityId,
-    status: LifecycleState,
+    status: EntityRecordStatus,
     /// Version of the definitions used to create or modify this resource
     registry_def_version: Version,
     registry_def_id: DefId,
@@ -80,7 +83,7 @@ impl StateMutate for RegistryResource {
                 self.registry_def_version = registry_def_version;
                 self.entity_body = entity_body;
                 self.entity_type = entity_type;
-                self.status = LifecycleState::Draft;
+                self.status = EntityRecordStatus::Active;
             }
             DomainEvent::EntityInvited {
                 id,
@@ -95,7 +98,7 @@ impl StateMutate for RegistryResource {
                 self.registry_def_version = registry_def_version;
                 self.entity_body = entity_body;
                 self.entity_type = entity_type;
-                self.status = LifecycleState::Invited;
+                self.status = EntityRecordStatus::Invited;
             }
             _ => {}
         }
@@ -115,6 +118,7 @@ impl Decision for CreateEntityCmd {
     type Error = EntityError;
 
     // StateQuery should load schema_def which has an id  same as the generate_id_from_title
+    // TODO ignore records which are in modified status
     fn state_query(&self) -> Self::StateQuery {
         (
             RegistryResource::new(self.id),
@@ -122,19 +126,26 @@ impl Decision for CreateEntityCmd {
         )
     }
 
+    fn validation_query<ID: disintegrate::EventId>(&self) -> Option<StreamQuery<ID, Self::Event>> {
+        let (resource, def_state) = self.state_query();
+        Some(union!(
+            &resource,
+            def_state.exclude_events(event_types!(DomainEvent, [DefUpdated]))
+        ))
+    }
     fn process(
         &self,
         (resource, def_state): &Self::StateQuery,
     ) -> Result<Vec<Self::Event>, Self::Error> {
-        if resource.status != LifecycleState::None {
+        if !state_machine(&resource.status, RegistryEntityAction::Create) {
             return Err(EntityError::EntityAlreadyExists(
                 self.entity_type.clone(),
                 self.id,
             ));
         }
-        if def_state.record_status != RecordStatus::Active {
+        if def_state.record_status != DefRecordStatus::Active {
             return Err(EntityError::DefinitionNotInProperState(
-                RecordStatus::Active,
+                DefRecordStatus::Active,
                 def_state.record_status.clone(),
             ));
         }
@@ -154,6 +165,12 @@ impl Decision for CreateEntityCmd {
             .join("\n");
 
         if !full_errors.is_empty() {
+            let pretty = serde_json::to_string_pretty(&schema).unwrap();
+            debug!("pretty schema = {}", pretty);
+            let pretty = serde_json::to_string_pretty(&instance).unwrap();
+            debug!("pretty instance = {}", pretty);
+        }
+        if !full_errors.is_empty() {
             return Err(EntityError::JsonSchemaError(
                 self.entity_type.clone(),
                 full_errors,
@@ -168,6 +185,141 @@ impl Decision for CreateEntityCmd {
             entity_type: self.entity_type.to_string(),
             created_at: Utc::now(),
             created_by: self.created_by.clone(),
+            version: Default::default(),
         }])
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ModifyEntityCmd {
+    pub id: EntityId,
+    pub entity_body: String,
+    pub entity_type: String,
+    pub modified_by: String,
+}
+
+impl Decision for ModifyEntityCmd {
+    type Event = DomainEvent;
+    type StateQuery = (RegistryResource, RegistryDefinition);
+    type Error = EntityError;
+
+    // StateQuery should load schema_def which has an id  same as the generate_id_from_title
+    // TODO ignore records which are in modified status
+    fn state_query(&self) -> Self::StateQuery {
+        (
+            RegistryResource::new(self.id),
+            RegistryDefinition::new(generate_id_from_title(&self.entity_type)),
+        )
+    }
+
+    fn validation_query<ID: disintegrate::EventId>(&self) -> Option<StreamQuery<ID, Self::Event>> {
+        let (resource, def_state) = self.state_query();
+        Some(union!(
+            &resource,
+            def_state.exclude_events(event_types!(DomainEvent, [DefUpdated]))
+        ))
+    }
+
+    fn process(
+        &self,
+        (resource, def_state): &Self::StateQuery,
+    ) -> Result<Vec<Self::Event>, Self::Error> {
+        if !state_machine(&resource.status, RegistryEntityAction::Modify) {
+            return Err(EntityError::ModifyNotAllowed(resource.status.clone()));
+        }
+
+        let schema: serde_json::Value = serde_json::from_str(&def_state.json_schema_string)
+            .map_err(|e| EntityError::JsonSchemaError(self.entity_type.clone(), e.to_string()))?;
+        let instance: serde_json::Value = serde_json::from_str(&self.entity_body)
+            .map_err(|e| EntityError::JsonSchemaError(self.entity_type.clone(), e.to_string()))?;
+
+        let validator = jsonschema::draft7::new(&schema)
+            .map_err(|e| EntityError::JsonSchemaError(self.entity_type.clone(), e.to_string()))?;
+
+        let full_errors = validator
+            .iter_errors(&instance)
+            .map(|error| format!("Error: {} \tLocation: {}", error, error.instance_path))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        if !full_errors.is_empty() {
+            let pretty = serde_json::to_string_pretty(&schema).unwrap();
+            debug!("pretty schema = {}", pretty);
+            let pretty = serde_json::to_string_pretty(&instance).unwrap();
+            debug!("pretty instance = {}", pretty);
+        }
+        if !full_errors.is_empty() {
+            return Err(EntityError::JsonSchemaError(
+                self.entity_type.clone(),
+                full_errors,
+            ));
+        }
+        Ok(vec![DomainEvent::EntityUpdated {
+            id: self.id,
+            registry_def_id: def_state.id,
+            registry_def_version: def_state.version,
+            entity_body: self.entity_body.clone(),
+            entity_type: self.entity_type.to_string(),
+            updated_at: Utc::now(),
+            updated_by: self.modified_by.clone(),
+            version: resource.version.increment(),
+        }])
+    }
+}
+
+pub struct DeleteCmd {
+    id: DefId,
+    deleted_at: DateTime<Utc>,
+    deleted_by: String,
+}
+impl Decision for DeleteCmd {
+    type Event = DomainEvent;
+    type StateQuery = RegistryResource;
+    type Error = EntityError;
+    fn state_query(&self) -> Self::StateQuery {
+        RegistryResource::new(self.id)
+    }
+
+    fn process(&self, resource: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
+        if !state_machine(&resource.status, RegistryEntityAction::MarkForDeletion) {
+            return Err(EntityError::DeleteNotAllowed(resource.status.clone()));
+        }
+
+        Ok(vec![DomainEvent::EntityDeleted {
+            id: self.id,
+            deleted_at: self.deleted_at,
+            deleted_by: self.deleted_by.clone(),
+        }])
+    }
+}
+
+// Start of state machine
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryEntityAction {
+    Create,
+    Modify,
+    MarkForDeletion,
+    Deactivate,
+    Invite,
+}
+
+pub fn state_machine(current_status: &EntityRecordStatus, action: RegistryEntityAction) -> bool {
+    match action {
+        RegistryEntityAction::Modify => {
+            matches!(
+                current_status,
+                EntityRecordStatus::Active
+                    | EntityRecordStatus::Modified
+                    | EntityRecordStatus::Invited
+            )
+        }
+        RegistryEntityAction::Create => {
+            matches!(current_status, EntityRecordStatus::None)
+        }
+        RegistryEntityAction::MarkForDeletion => {
+            matches!(current_status, EntityRecordStatus::Active)
+        }
+        _ => false,
+        // Add more actions as needed, with appropriate logic
     }
 }
