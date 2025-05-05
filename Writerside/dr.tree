@@ -3,8 +3,8 @@
         SYSTEM "https://resources.jetbrains.com/writerside/1.0/product-profile.dtd">
 
 <instance-profile id="dr"
-                 name="Daksha-RC Registry"
-                 start-page="Overview.md">
+                  name="Daksha-RC Registry"
+                  start-page="Overview.md">
 
     <toc-element topic="daksha-rc-registry.md"/>
     <toc-element topic="Overview.md">
@@ -15,6 +15,8 @@
         <toc-element topic="High-Level-Design.md"/>
         <toc-element topic="Domain-Driven-Design.md">
             <toc-element topic="SchemaDef-Aggregate-Design.md"/>
+            <toc-element topic="RegistryResource-Design-Overview.md">
+            </toc-element>
         </toc-element>
     </toc-element>
     <toc-element topic="Minimum-Viable-Product-MVP-Document.md"/>

@@ -279,34 +279,6 @@ pub struct LoadDefinition {
     json_schema_string: String,
 }
 
-impl Decision for LoadDefinition {
-    type Event = DomainEvent;
-    type StateQuery = RegistryDefinition;
-    type Error = DefError;
-    fn state_query(&self) -> Self::StateQuery {
-        RegistryDefinition::new(self.id)
-    }
-
-    fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
-        if state.record_status != DefRecordStatus::None {
-            return Err(DefError::DefinitionAlreadyExists(
-                self.file_name.clone(),
-                self.id.to_string(),
-            ));
-        }
-        let def_title = read_title(&self.json_schema_string)?;
-        Ok(vec![DomainEvent::DefLoaded {
-            id: self.id,
-            title: def_title,
-            definitions: self.definitions.clone(),
-            file_name: self.file_name.clone(),
-            created_at: self.created_at,
-            created_by: self.created_by.clone(),
-            json_schema_string: self.json_schema_string.clone(),
-        }])
-    }
-}
-
 pub struct CreateDefinitionCmd {
     pub id: DefId,
     pub title: String,
