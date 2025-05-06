@@ -117,8 +117,7 @@ impl Decision for CreateEntityCmd {
     type StateQuery = (RegistryResource, RegistryDefinition);
     type Error = EntityError;
 
-    // StateQuery should load schema_def which has an id  same as the generate_id_from_title
-    // TODO ignore records which are in modified status
+    // StateQuery should load schema_def which has an id same as the generate_id_from_title
     fn state_query(&self) -> Self::StateQuery {
         (
             RegistryResource::new(self.id),

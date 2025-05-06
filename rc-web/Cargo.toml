@@ -7,35 +7,38 @@ license = "MIT"
 [dependencies]
 actix = { workspace = true }
 actix-web = { workspace = true }
-anyhow =  { workspace = true }
+anyhow = { workspace = true }
 async-trait = { workspace = true }
-chrono =  { workspace = true }
+chrono = { workspace = true }
 config = { workspace = true }
-ctor ={ workspace = true }
-definitions-core = {path = "../definitions-core"}
+ctor = { workspace = true }
+definitions-core = { path = "../definitions-core" }
 disintegrate = { workspace = true }
 disintegrate-postgres = { workspace = true }
-env_logger =  { workspace = true }
-log =  { workspace = true }
+env_logger = { workspace = true }
+log = { workspace = true }
 once_cell = { workspace = true }
 postgres = { workspace = true }
-serde =  { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
-thiserror =  { workspace = true }
-tokio =  { workspace = true }
-utoipa =  { workspace = true }
-utoipa-rapidoc =  { workspace = true }
-utoipa-redoc =  { workspace = true }
-utoipa-scalar =  { workspace = true }
-utoipa-swagger-ui =  { workspace = true }
-uuid =  { workspace = true }
-validator =  { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+utoipa = { workspace = true }
+utoipa-rapidoc = { workspace = true }
+utoipa-redoc = { workspace = true }
+utoipa-scalar = { workspace = true }
+utoipa-swagger-ui = { workspace = true }
+uuid = { workspace = true }
+validator = { workspace = true }
 [dev-dependencies]
 hamcrest2 = { workspace = true }
 mockall = { workspace = true }
-testcontainers =  { workspace = true }
-testcontainers-modules =  { workspace = true }
-tokio-postgres ={ workspace = true }
+testcontainers = { workspace = true }
+testcontainers-modules = { workspace = true }
+tokio-postgres = { workspace = true }
 
-
+[features]
+default = ["std"] # Example, can be empty
+std = []
+integration_tests = []

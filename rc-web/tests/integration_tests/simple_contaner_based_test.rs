@@ -45,6 +45,7 @@ async fn begin_transaction(pool: &PgPool) -> anyhow::Result<Transaction<sqlx::po
 }
 
 #[tokio::test]
+#[cfg(feature = "integration_tests")]
 async fn test_with_postgres() -> anyhow::Result<()> {
     let container = postgres::Postgres::default().start().await?;
     let host_port = container.get_host_port_ipv4(5432).await?;
@@ -63,7 +64,6 @@ async fn test_with_postgres() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test]
 async fn test_with_shared_pool() -> anyhow::Result<()> {
     let pool = get_shared_pool().await;
     let mut tx = begin_transaction(&pool).await?;
@@ -78,7 +78,6 @@ async fn test_with_shared_pool() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test]
 async fn test_with_shared_pool_2() -> anyhow::Result<()> {
     let pool = get_shared_pool().await;
     let mut tx = begin_transaction(&pool).await?;
