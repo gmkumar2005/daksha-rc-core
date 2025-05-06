@@ -41,24 +41,6 @@ The projections aka read-side can be extended to support multiple storages.
 
 Several types of databases can be effectively utilized with CQRS-ES architecture:
 
-#### Relational Database Management Systems (RDBMS):
-
-- PostgreSQL
-- MySQL
-- Microsoft SQL Server
-
-#### Document-Oriented Databases:
-
-- MongoDB
-- CouchDB
-- RavenDB
-
-#### Columnar Databases:
-
-- Apache Cassandra
-- Amazon Redshift
-- Google Bigtable
-
 ### Primary Storage Solution
 
 For the initial release of the system, PostgreSQL has been chosen as the primary storage solution.
