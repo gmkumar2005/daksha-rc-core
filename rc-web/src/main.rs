@@ -1,6 +1,6 @@
 use actix_web::http::header::ContentType;
 use actix_web::http::StatusCode;
-use actix_web::web::Data;
+use actix_web::web::{Data, ServiceConfig};
 use actix_web::{error, get, post, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::Context;
 use chrono::Utc;
@@ -9,6 +9,7 @@ use disintegrate::{NoSnapshot, PersistedEvent};
 use disintegrate_postgres::{PgDecisionMaker, PgEventId, PgEventStore};
 use log::debug;
 use rc_web::models::ValidateDefRequest;
+use shuttle_actix_web::ShuttleActixWeb;
 use sqlx::{postgres::PgConnectOptions, PgPool};
 use std::env;
 use std::ops::Deref;
@@ -27,8 +28,13 @@ pub struct DError {
 
 impl error::ResponseError for DError {
     fn status_code(&self) -> StatusCode {
-        match self.source {
-            disintegrate::DecisionError::Domain(_) => StatusCode::BAD_REQUEST,
+        match &self.source {
+            disintegrate::DecisionError::Domain(domain_error) => match domain_error {
+                // Add a match arm for `DefinitionAlreadyExists`
+                DefError::DefinitionAlreadyExists(..) => StatusCode::CONFLICT, // 409
+                _ => StatusCode::BAD_REQUEST,
+            },
+
             disintegrate::DecisionError::EventStore(_) => StatusCode::INTERNAL_SERVER_ERROR,
             disintegrate::DecisionError::StateStore(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -40,6 +46,7 @@ impl error::ResponseError for DError {
             .body(self.to_string())
     }
 }
+
 #[get("/")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
@@ -172,27 +179,24 @@ async fn create_def(
         .finish())
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    env_logger::init();
-    let database_url = env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
-    let connect_options = database_url.parse::<PgConnectOptions>()?;
-    let pool = PgPool::connect_with(connect_options)
-        .await
-        .context("Failed to connect to the database")?;
+#[shuttle_runtime::main]
+async fn main(
+    #[shuttle_shared_db::Postgres] shared_pool: PgPool,
+) -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
     let serde = disintegrate::serde::json::Json::<DomainEvent>::default();
-    let event_store = PgEventStore::new(pool.clone(), serde).await?;
+    let event_store = PgEventStore::new(shared_pool.clone(), serde)
+        .await
+        .map_err(|e| shuttle_runtime::Error::from(anyhow::Error::new(e)))?;
+
     let decision_maker = disintegrate_postgres::decision_maker(event_store, NoSnapshot);
-    Ok(HttpServer::new(move || {
-        App::new()
-            .app_data(Data::new(decision_maker.clone()))
+    let config = move |cfg: &mut ServiceConfig| {
+        cfg.app_data(Data::new(decision_maker.clone()))
             .service(echo)
             .service(create_def)
             .service(hello)
             .service(validate_def)
-            .service(activate_def)
-    })
-    .bind(("127.0.0.1", 8080))?
-    .run()
-    .await?)
+            .service(activate_def);
+    };
+
+    Ok(config.into())
 }

@@ -1,0 +1,4 @@
+[deploy]
+services = [
+    { name = "rc-web", path = "rc-web" },
+]

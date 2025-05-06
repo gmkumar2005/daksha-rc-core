@@ -169,15 +169,15 @@ pub enum DefError {
     DefinitionAlreadyExists(String, String),
     #[error("Definition Not Valid")]
     DefinitionNotValid,
-    #[error("Cannot validate definition which is in `{0}")]
+    #[error("Cannot validate definition which is in `{0}` state")]
     ValidateNotAllowed(DefRecordStatus),
-    #[error("Cannot deactivate definition which is in `{0}")]
+    #[error("Cannot deactivate definition which is in `{0}` state")]
     DeactivateNotAllowed(DefRecordStatus),
-    #[error("Cannot delete definition which is in `{0}")]
+    #[error("Cannot delete definition which is in `{0}` state")]
     DeleteNotAllowed(DefRecordStatus),
-    #[error("Cannot modify definition which is in `{0}")]
+    #[error("Cannot modify definition which is in `{0}` state")]
     ModifyNotAllowed(DefRecordStatus),
-    #[error("Cannot activate definition which is in `{0}")]
+    #[error("Cannot activate definition which is in `{0}` state")]
     ActivateNotAllowed(DefRecordStatus),
     #[error("Updating title: {0} to {1} is not allowed")]
     TitleIsNotMutable(String, String),
@@ -270,14 +270,14 @@ impl StateMutate for RegistryDefinition {
 }
 
 // Start of commands
-pub struct LoadDefinition {
-    id: DefId,
-    definitions: Vec<String>,
-    file_name: String,
-    created_at: DateTime<Utc>,
-    created_by: String,
-    json_schema_string: String,
-}
+// pub struct LoadDefinition {
+//     id: DefId,
+//     definitions: Vec<String>,
+//     file_name: String,
+//     created_at: DateTime<Utc>,
+//     created_by: String,
+//     json_schema_string: String,
+// }
 
 pub struct CreateDefinitionCmd {
     pub id: DefId,
