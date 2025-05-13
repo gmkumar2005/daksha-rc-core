@@ -29,3 +29,5 @@ target/
 .shuttle*
 Secrets*.toml
 .shuttle
+.secrets
+event.json
