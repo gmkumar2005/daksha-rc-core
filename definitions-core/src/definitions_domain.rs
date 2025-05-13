@@ -279,6 +279,7 @@ impl StateMutate for RegistryDefinition {
 //     json_schema_string: String,
 // }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct CreateDefinitionCmd {
     pub id: DefId,
     pub title: String,
@@ -336,13 +337,6 @@ impl Decision for UpdateDefinitionCmd {
         if !state_machine(&state.record_status, RegistryDefAction::Modify) {
             return Err(DefError::ModifyNotAllowed(state.record_status.clone()));
         }
-        //  return Err(EntityError::ModifyNotAllowed(resource.status.clone()));
-        // updates are allowed only for draft definitions and inactive definitions
-        // if state.record_status != DefRecordStatus::Draft
-        //     && state.record_status != DefRecordStatus::Deactivated
-        // {
-        //     return Err(DefError::DefinitionNotValid);
-        // }
         let def_title = read_title(&self.json_schema_string)?;
         if def_title != state.title {
             return Err(DefError::TitleIsNotMutable(def_title, state.title.clone()));

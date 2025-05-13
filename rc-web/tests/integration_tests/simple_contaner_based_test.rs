@@ -1,5 +1,10 @@
+use crate::integration_tests::create_def_cmd_1;
+use definitions_core::definitions_domain::{generate_id_from_title, DomainEvent};
+use disintegrate::NoSnapshot;
+use disintegrate_postgres::PgEventStore;
 use sqlx::{query, PgPool, Row, Transaction};
-use testcontainers::ContainerAsync;
+use std::ops::Deref;
+use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::{postgres, testcontainers::runners::AsyncRunner};
 use tokio::sync::OnceCell;
@@ -11,7 +16,11 @@ static POSTGRES_CONTAINER: OnceCell<ContainerAsync<Postgres>> = OnceCell::const_
 
 // Initialize the shared PostgreSQL container
 async fn initialize_container() -> ContainerAsync<Postgres> {
-    let container = postgres::Postgres::default().start().await.unwrap();
+    let container = postgres::Postgres::default()
+        .with_tag("17.2-bookworm")
+        .start()
+        .await
+        .unwrap();
     container
 }
 
@@ -64,6 +73,8 @@ async fn test_with_postgres() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+#[cfg(feature = "integration_tests")]
 async fn test_with_shared_pool() -> anyhow::Result<()> {
     let pool = get_shared_pool().await;
     let mut tx = begin_transaction(&pool).await?;
@@ -78,6 +89,8 @@ async fn test_with_shared_pool() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+#[cfg(feature = "integration_tests")]
 async fn test_with_shared_pool_2() -> anyhow::Result<()> {
     let pool = get_shared_pool().await;
     let mut tx = begin_transaction(&pool).await?;
@@ -89,38 +102,35 @@ async fn test_with_shared_pool_2() -> anyhow::Result<()> {
     assert!(outcome);
     Ok(())
 }
-//
-// #[tokio::test]
-// async fn test_create_definition_with_postgres() -> anyhow::Result<()> {
-//     let pool = get_shared_pool().await;
-//     let serde = disintegrate::serde::json::Json::<DomainEvent>::default();
-//     let event_store = PgEventStore::new(pool.clone(), serde).await?;
-//     let decision_maker = disintegrate_postgres::decision_maker(event_store, NoSnapshot);
-//     let create_def_cmd = create_def_cmd_1();
-//     let exec_results = decision_maker.make(create_def_cmd).await?;
-//     // assert_def_created(&exec_results);
-//
-//     let (title, def_id) = exec_results
-//         .iter()
-//         .find_map(|ev| match ev.deref() {
-//             DomainEvent::DefCreated { title, def_id, .. } => Some((title, def_id)),
-//             _ => None,
-//         })
-//         .unwrap();
-//
-//     assert_eq!(title, "test_title");
-//     assert_eq!(
-//         def_id.to_string(),
-//         generate_id_from_title("test_title").to_string()
-//     );
-//
-//     // let exec_results: Vec<PersistedEvent<PgEventId, DomainEvent>>
-//     Ok(())
-// }
-//
-// pub fn then_assert(
-//     actual_result: Vec<PersistedEvent<PgEventId, DomainEvent>>,
-//     assertion: impl FnOnce(&Vec<PersistedEvent<PgEventId, DomainEvent>>),
-// ) {
-//     assertion(&actual_result);
-// }
+
+#[tokio::test]
+#[cfg(feature = "integration_tests")]
+async fn test_create_definition_with_postgres() -> anyhow::Result<()> {
+    let pool = get_shared_pool().await;
+    let serde = disintegrate::serde::json::Json::<DomainEvent>::default();
+    let event_store = PgEventStore::new(pool.clone(), serde).await?;
+    let decision_maker = disintegrate_postgres::decision_maker(event_store, NoSnapshot);
+    let create_def_cmd = create_def_cmd_1().clone();
+    let exec_results = decision_maker.make(create_def_cmd).await?;
+
+    let (title, def_id) = exec_results
+        .iter()
+        .find_map(|ev| match ev.deref() {
+            DomainEvent::DefCreated { title, id, .. } => Some((title, id)),
+            _ => None,
+        })
+        .unwrap();
+
+    // assert_eq!(title, "test_title");
+    assert_eq!(
+        title, "test_title",
+        "Expected title to be 'test_title', but got '{}'",
+        title
+    );
+    assert_eq!(
+        def_id.to_string(),
+        generate_id_from_title("test_title").to_string()
+    );
+
+    Ok(())
+}
