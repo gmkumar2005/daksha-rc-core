@@ -52,3 +52,6 @@ jobs:
 
       - name: Run Tests
         run: cargo test
+      - name: Run Integration Tests
+        run: cargo test --features integration_tests
+        continue-on-error: true

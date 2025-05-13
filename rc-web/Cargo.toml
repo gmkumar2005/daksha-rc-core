@@ -6,6 +6,7 @@ version = "0.1.0-SNAPSHOT"
 license = "MIT"
 [dependencies]
 actix = { workspace = true }
+actix-web-httpauth = { workspace = true }
 actix-web = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }

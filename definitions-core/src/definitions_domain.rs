@@ -418,14 +418,8 @@ impl Decision for ActivateDefinitionCmd {
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if !state_machine(&state.record_status, RegistryDefAction::Activate) {
-            return Err(DefError::ActivateNotAllowed(state.record_status.clone()));
+            return Ok(vec![]);
         }
-        // if state.record_status != DefRecordStatus::Valid {
-        //     return Err(DefError::DefinitionNotInProperState(
-        //         DefRecordStatus::Valid,
-        //         state.record_status.clone(),
-        //     ));
-        // }
         Ok(vec![DomainEvent::DefActivated {
             id: self.id,
             activated_at: self.activated_at,
@@ -449,7 +443,7 @@ impl Decision for DeactivateDefinitionCmd {
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if !state_machine(&state.record_status, RegistryDefAction::Deactivate) {
-            return Err(DefError::DeactivateNotAllowed(state.record_status.clone()));
+            return Ok(vec![]);
         }
         Ok(vec![DomainEvent::DefDeactivated {
             id: self.id,
@@ -475,7 +469,7 @@ impl Decision for DeleteDefinitionCmd {
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if !state_machine(&state.record_status, RegistryDefAction::MarkForDeletion) {
-            return Err(DefError::DeleteNotAllowed(state.record_status.clone()));
+            return Ok(vec![]);
         }
         Ok(vec![DomainEvent::DefDeleted {
             id: self.id,

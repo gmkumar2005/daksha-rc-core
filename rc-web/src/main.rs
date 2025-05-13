@@ -1,8 +1,7 @@
 use actix_web::http::header::ContentType;
 use actix_web::http::StatusCode;
 use actix_web::web::{Data, ServiceConfig};
-use actix_web::{error, get, post, web, App, HttpResponse, HttpServer, Responder};
-use anyhow::Context;
+use actix_web::{error, get, post, web, HttpResponse, Responder};
 use chrono::Utc;
 use definitions_core::definitions_domain::*;
 use disintegrate::{NoSnapshot, PersistedEvent};
@@ -10,7 +9,7 @@ use disintegrate_postgres::{PgDecisionMaker, PgEventId, PgEventStore};
 use log::debug;
 use rc_web::models::ValidateDefRequest;
 use shuttle_actix_web::ShuttleActixWeb;
-use sqlx::{postgres::PgConnectOptions, PgPool};
+use sqlx::PgPool;
 use std::env;
 use std::ops::Deref;
 use std::str::FromStr;

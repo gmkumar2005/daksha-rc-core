@@ -281,7 +281,7 @@ impl Decision for DeleteCmd {
 
     fn process(&self, resource: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if !state_machine(&resource.status, RegistryEntityAction::MarkForDeletion) {
-            return Err(EntityError::DeleteNotAllowed(resource.status.clone()));
+            return Ok(vec![]);
         }
 
         Ok(vec![DomainEvent::EntityDeleted {
