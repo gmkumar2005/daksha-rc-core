@@ -3,6 +3,7 @@ use definitions_core::definitions_domain::*;
 use disintegrate::NoSnapshot;
 use disintegrate_postgres::PgEventStore;
 use rc_web::routes::definition_routes::{activate_def, create_def, validate_def};
+use rc_web::routes::entity_routes::create_entity;
 use rc_web::routes::health_check::{echo, healthz, hello, readyz};
 use shuttle_actix_web::ShuttleActixWeb;
 use sqlx::PgPool;
@@ -27,6 +28,7 @@ async fn main(
             .service(create_def)
             .service(hello)
             .service(validate_def)
+            .service(create_entity)
             .service(activate_def);
     };
 

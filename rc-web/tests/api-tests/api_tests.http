@@ -51,3 +51,44 @@ Content-Type: application/json
   "def_id": "4b736e56-8c99-c1c0-bd55-16175ec63f76"
 }
 
+
+### Test create student schema
+POST {{host}}/create_def
+Content-Type: application/json
+
+< ./Student_Schema.json
+
+### Validate Student
+POST {{host}}/validate_def
+Content-Type: application/json
+
+{
+  "def_id": "1bd23c91-3379-b65b-11cc-64984050e35c"
+}
+
+
+### Activate Student
+POST {{host}}/activate_def
+Content-Type: application/json
+
+{
+  "def_id": "1bd23c91-3379-b65b-11cc-64984050e35c"
+}
+
+### Create Student
+POST {{host}}/entity/Student
+Content-Type: application/json
+
+{
+  "Student": {
+    "identityDetails": {
+      "fullName": "John",
+      "gender": "Male"
+    },
+    "contactDetails": {
+      "email": "abc@abc.com",
+      "address": "line1"
+    }
+  }
+}
+

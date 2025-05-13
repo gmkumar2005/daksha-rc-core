@@ -2,8 +2,10 @@ use actix_web::http::header::ContentType;
 use actix_web::http::StatusCode;
 use actix_web::{error, HttpResponse};
 use definitions_core::definitions_domain::{DefError, DomainEvent};
-use disintegrate::NoSnapshot;
+use definitions_core::registry_domain::EntityError;
+use disintegrate::{DecisionError, NoSnapshot};
 use disintegrate_postgres::PgDecisionMaker;
+use std::error::Error;
 
 pub mod config;
 pub mod errors;
@@ -16,23 +18,35 @@ type DecisionMaker =
     PgDecisionMaker<DomainEvent, disintegrate::serde::json::Json<DomainEvent>, NoSnapshot>;
 
 #[derive(thiserror::Error, Debug)]
-#[error(transparent)]
-pub struct DError {
-    #[from]
-    source: disintegrate::DecisionError<DefError>,
+pub enum DError {
+    #[error(transparent)]
+    Def(#[from] DecisionError<DefError>),
+
+    #[error(transparent)]
+    Entity(#[from] DecisionError<EntityError>),
+    // You may have other variants as needed
 }
 
 impl error::ResponseError for DError {
     fn status_code(&self) -> StatusCode {
-        match &self.source {
-            disintegrate::DecisionError::Domain(domain_error) => match domain_error {
-                // Add a match arm for `DefinitionAlreadyExists`
-                DefError::DefinitionAlreadyExists(..) => StatusCode::CONFLICT, // 409
-                _ => StatusCode::BAD_REQUEST,
-            },
+        match &self {
+            DError::Def(decision_error) => match decision_error {
+                DecisionError::Domain(domain_error) => match domain_error {
+                    DefError::DefinitionAlreadyExists(..) => StatusCode::CONFLICT,
+                    _ => StatusCode::BAD_REQUEST,
+                },
 
-            disintegrate::DecisionError::EventStore(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            disintegrate::DecisionError::StateStore(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                DecisionError::EventStore(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                DecisionError::StateStore(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            },
+            DError::Entity(entity_error) => match entity_error {
+                DecisionError::Domain(entity_error) => match entity_error {
+                    EntityError::EntityAlreadyExists(..) => StatusCode::CONFLICT,
+                    _ => StatusCode::BAD_REQUEST,
+                },
+                DecisionError::EventStore(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                DecisionError::StateStore(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            },
         }
     }
 

@@ -270,14 +270,6 @@ impl StateMutate for RegistryDefinition {
 }
 
 // Start of commands
-// pub struct LoadDefinition {
-//     id: DefId,
-//     definitions: Vec<String>,
-//     file_name: String,
-//     created_at: DateTime<Utc>,
-//     created_by: String,
-//     json_schema_string: String,
-// }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct CreateDefinitionCmd {
