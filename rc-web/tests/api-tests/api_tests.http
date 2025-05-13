@@ -1,8 +1,14 @@
-#@host = http://localhost:8000
-@host = https://daksha-ox98.shuttle.app
+@host = http://localhost:8000
+#@host = https://daksha-ox98.shuttle.app
 
 ### Test GET request
 GET {{host}}/
+
+### Check health
+GET {{host}}/healthz
+
+### Check readiness
+GET {{host}}/readyz
 
 ### Test POST request Should fail
 POST {{host}}/create_def
