@@ -107,3 +107,14 @@ Content-Type: application/json
   }
 }
 
+### Get Definitions
+GET {{host}}/definitions
+
+### Get Definitions by id
+GET {{host}}/definitions/1bd23c91-3379-b65b-11cc-64984050e35c
+
+### Get Definitions by record_status
+GET {{host}}/definitions?record_status=Active
+
+### Get Definitions by title
+GET {{host}}/definitions?TITLE=Student

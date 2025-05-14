@@ -5,7 +5,9 @@ use disintegrate_postgres::{PgEventListener, PgEventListenerConfig, PgEventStore
 use log::error;
 use rc_web::projections::definitions_read_model;
 use rc_web::projections::definitions_read_model::ReadModelProjection;
-use rc_web::routes::definition_routes::{activate_def, create_def, validate_def};
+use rc_web::routes::definition_routes::{
+    activate_def, create_def, get_definitions, get_definitions_by_id, validate_def,
+};
 use rc_web::routes::entity_routes::create_entity;
 use rc_web::routes::health_check::{echo, healthz, hello, readyz};
 use shuttle_actix_web::ShuttleActixWeb;
@@ -35,7 +37,9 @@ async fn main(
             .service(hello)
             .service(validate_def)
             .service(create_entity)
-            .service(activate_def);
+            .service(activate_def)
+            .service(get_definitions)
+            .service(get_definitions_by_id);
     };
 
     let listener_event_store = event_store.clone();
