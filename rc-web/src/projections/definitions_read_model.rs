@@ -51,10 +51,10 @@ impl EventListener<i64, DomainEvent> for ReadModelProjection {
             DomainEvent::DefCreated {
                 id,
                 title,
-                definitions,
                 created_at,
                 created_by,
                 json_schema_string,
+                ..
             } => {
                 debug!(
                     "DomainEvent::DefCreated id {:#?} title is {}",
@@ -73,16 +73,15 @@ impl EventListener<i64, DomainEvent> for ReadModelProjection {
                     .execute(&self.pool)
                     .await;
                 if let Err(e) = &result {
-                    // Print the error in debug format
                     debug!("Failed to insert definition: {:?}", e);
                 }
                 result?;
             }
             DomainEvent::DefActivated {
                 id,
-                activated_at,
                 activated_by,
                 json_schema_string,
+                ..
             } => {
                 debug!(
                     "DomainEvent::DefActivated id {:#?} activated_by is {}",

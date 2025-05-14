@@ -246,10 +246,7 @@ impl StateMutate for RegistryDefinition {
                 self.record_status = DefRecordStatus::Invalid;
             }
             DomainEvent::DefActivated {
-                id,
-                activated_at,
-                activated_by,
-                json_schema_string,
+                json_schema_string, ..
             } => {
                 self.record_status = DefRecordStatus::Active;
                 self.json_schema_string = json_schema_string;
