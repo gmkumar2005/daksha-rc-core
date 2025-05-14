@@ -5,7 +5,6 @@ use definitions_core::definitions_domain::{DefError, DomainEvent};
 use definitions_core::registry_domain::EntityError;
 use disintegrate::{DecisionError, NoSnapshot};
 use disintegrate_postgres::PgDecisionMaker;
-use std::error::Error;
 
 pub mod config;
 pub mod errors;
@@ -14,6 +13,7 @@ pub mod models;
 pub mod routes;
 pub mod services;
 
+pub mod projections;
 type DecisionMaker =
     PgDecisionMaker<DomainEvent, disintegrate::serde::json::Json<DomainEvent>, NoSnapshot>;
 

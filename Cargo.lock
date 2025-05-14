@@ -1252,6 +1252,7 @@ dependencies = [
  "sqlx",
  "thiserror 2.0.12",
  "tokio",
+ "tokio-util",
  "uuid",
 ]
 

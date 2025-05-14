@@ -34,6 +34,21 @@ Content-Type: application/json
   }
 }
 
+### Test POST request with valid json
+POST {{host}}/create_def
+Content-Type: application/json
+
+{
+  "title": "test_title_11",
+  "type": "object",
+  "properties": {
+    "example": {
+      "type": "string"
+    }
+  }
+}
+
+
 ### Test validation
 POST {{host}}/validate_def
 Content-Type: application/json

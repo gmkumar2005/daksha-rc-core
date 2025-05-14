@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub mod test_harness;
 
 // #[cfg(test)]
@@ -165,6 +166,7 @@ pub fn get_def_created_invalid_json() -> DomainEvent {
         json_schema_string: get_in_valid_json_string(),
     }
 }
+
 pub fn def_created_valid_json_draft() -> DomainEvent {
     DomainEvent::DefCreated {
         id: generate_id_from_title("test_title"),
@@ -175,6 +177,7 @@ pub fn def_created_valid_json_draft() -> DomainEvent {
         json_schema_string: get_valid_json_string(),
     }
 }
+
 pub fn def_validated_valid_json() -> DomainEvent {
     DomainEvent::DefValidated {
         id: generate_id_from_title("test_title"),
@@ -189,6 +192,7 @@ pub fn def_activated_valid_json() -> DomainEvent {
         id: generate_id_from_title("test_title"),
         activated_at: get_created_at(),
         activated_by: "".to_string(),
+        json_schema_string: get_valid_json_string(),
     }
 }
 
@@ -217,8 +221,10 @@ pub fn get_def_activated_valid_student_json() -> DomainEvent {
         id: generate_id_from_title("Student"),
         activated_at: Utc::now(),
         activated_by: "".to_string(),
+        json_schema_string: get_valid_student_schema_string(),
     }
 }
+
 pub fn get_def_created_empty_title() -> DomainEvent {
     DomainEvent::DefCreated {
         id: generate_id_from_title("test_title"),
@@ -229,6 +235,7 @@ pub fn get_def_created_empty_title() -> DomainEvent {
         json_schema_string: get_json_string_empty_title(),
     }
 }
+
 pub fn get_validate_def_cmd() -> ValidateDefinitionCmd {
     ValidateDefinitionCmd {
         id: generate_id_from_title("test_title"),
@@ -265,6 +272,7 @@ pub fn get_update_def_cmd() -> UpdateDefinitionCmd {
         json_schema_string: get_updated_json_string_test_title(),
     }
 }
+
 pub fn get_expected_def_created_empty_json() -> DomainEvent {
     DomainEvent::DefCreated {
         id: generate_id_from_title("test_title"),
@@ -285,6 +293,7 @@ pub fn get_expected_validation_failed() -> DomainEvent {
         validation_errors: vec!["Invalid Schema: Schema is empty".to_string()],
     }
 }
+
 pub fn get_expected_validation_failed_invalid_json() -> DomainEvent {
     DomainEvent::DefValidatedFailed {
         id: generate_id_from_title("test_title"),
@@ -353,6 +362,7 @@ pub fn get_valid_student_document() -> String {
 "###
     .to_string()
 }
+
 pub fn get_create_entity_cmd() -> CreateEntityCmd {
     CreateEntityCmd {
         id: Uuid::now_v7(),
