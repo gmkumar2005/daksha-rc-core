@@ -6,7 +6,7 @@ use disintegrate::{Decision, Event, StateMutate, StateQuery};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::num::NonZeroU16;
-use strum_macros::Display;
+use strum_macros::{Display, EnumString};
 use thiserror::Error;
 use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
@@ -31,20 +31,10 @@ impl Version {
 pub type DefId = Uuid;
 // Start of domain events
 #[derive(Debug, Clone, PartialEq, Eq, Event, Serialize, Deserialize)]
-#[stream(DefStateEvent, [DefLoaded, DefCreated, DefUpdated, DefDeleted, DefValidated, DefActivated,
+#[stream(DefStateEvent, [DefCreated, DefUpdated, DefDeleted, DefValidated, DefActivated,
 DefDeactivated]
 )]
 pub enum DomainEvent {
-    DefLoaded {
-        #[id]
-        id: DefId,
-        title: String,
-        definitions: Vec<String>,
-        file_name: String,
-        created_at: DateTime<Utc>,
-        created_by: String,
-        json_schema_string: String,
-    },
     DefCreated {
         #[id]
         id: DefId,
@@ -89,13 +79,13 @@ pub enum DomainEvent {
         id: DefId,
         activated_at: DateTime<Utc>,
         activated_by: String,
+        json_schema_string: String,
     },
     DefDeactivated {
         #[id]
         id: DefId,
         deactivated_at: DateTime<Utc>,
         deactivated_by: String,
-        json_schema_string: String,
     },
     EntityCreated {
         #[id]
@@ -187,7 +177,7 @@ pub enum DefError {
 
 // start of mutations
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Display, EnumString)]
 pub enum DefRecordStatus {
     #[default]
     None,
@@ -255,8 +245,11 @@ impl StateMutate for RegistryDefinition {
             DomainEvent::DefValidatedFailed { .. } => {
                 self.record_status = DefRecordStatus::Invalid;
             }
-            DomainEvent::DefActivated { .. } => {
+            DomainEvent::DefActivated {
+                json_schema_string, ..
+            } => {
                 self.record_status = DefRecordStatus::Active;
+                self.json_schema_string = json_schema_string;
             }
             DomainEvent::DefDeactivated { .. } => {
                 self.record_status = DefRecordStatus::Deactivated;
@@ -270,14 +263,6 @@ impl StateMutate for RegistryDefinition {
 }
 
 // Start of commands
-// pub struct LoadDefinition {
-//     id: DefId,
-//     definitions: Vec<String>,
-//     file_name: String,
-//     created_at: DateTime<Utc>,
-//     created_by: String,
-//     json_schema_string: String,
-// }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct CreateDefinitionCmd {
@@ -418,6 +403,7 @@ impl Decision for ActivateDefinitionCmd {
             id: self.id,
             activated_at: self.activated_at,
             activated_by: self.activated_by.clone(),
+            json_schema_string: state.json_schema_string.clone(),
         }])
     }
 }
@@ -443,7 +429,6 @@ impl Decision for DeactivateDefinitionCmd {
             id: self.id,
             deactivated_at: self.deactivated_at,
             deactivated_by: self.deactivated_by.clone(),
-            json_schema_string: state.json_schema_string.clone(),
         }])
     }
 }

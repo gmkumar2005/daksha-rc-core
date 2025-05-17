@@ -80,6 +80,7 @@ mod birth_certificate_tests {
             id: generate_id_from_title("BirthCertificate"),
             activated_at: Utc::now(),
             activated_by: "Admin".to_string(),
+            json_schema_string: read_birth_certificate_schema().unwrap(),
         }
     }
     pub fn entity_created_birth_certificate_event() -> DomainEvent {

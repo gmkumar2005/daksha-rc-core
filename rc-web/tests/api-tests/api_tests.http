@@ -1,8 +1,14 @@
-#@host = http://localhost:8000
-@host = https://daksha-ox98.shuttle.app
+@host = http://localhost:8000
+#@host = https://daksha-ox98.shuttle.app
 
 ### Test GET request
 GET {{host}}/
+
+### Check health
+GET {{host}}/healthz
+
+### Check readiness
+GET {{host}}/readyz
 
 ### Test POST request Should fail
 POST {{host}}/create_def
@@ -28,6 +34,21 @@ Content-Type: application/json
   }
 }
 
+### Test POST request with valid json
+POST {{host}}/create_def
+Content-Type: application/json
+
+{
+  "title": "test_title_11",
+  "type": "object",
+  "properties": {
+    "example": {
+      "type": "string"
+    }
+  }
+}
+
+
 ### Test validation
 POST {{host}}/validate_def
 Content-Type: application/json
@@ -45,3 +66,55 @@ Content-Type: application/json
   "def_id": "4b736e56-8c99-c1c0-bd55-16175ec63f76"
 }
 
+
+### Test create student schema
+POST {{host}}/create_def
+Content-Type: application/json
+
+< ./Student_Schema.json
+
+### Validate Student
+POST {{host}}/validate_def
+Content-Type: application/json
+
+{
+  "def_id": "1bd23c91-3379-b65b-11cc-64984050e35c"
+}
+
+
+### Activate Student
+POST {{host}}/activate_def
+Content-Type: application/json
+
+{
+  "def_id": "1bd23c91-3379-b65b-11cc-64984050e35c"
+}
+
+### Create Student
+POST {{host}}/entity/Student
+Content-Type: application/json
+
+{
+  "Student": {
+    "identityDetails": {
+      "fullName": "John",
+      "gender": "Male"
+    },
+    "contactDetails": {
+      "email": "abc@abc.com",
+      "address": "line1"
+    }
+  }
+}
+
+### Get Definitions
+GET {{host}}/definitions
+
+### Get Definitions by id
+GET {{host}}/definitions/1bd23c91-3379-b65b-11cc-64984050e35c
+
+### Get Definitions by record_status
+GET {{host}}/definitions?record_status=Active
+
+### Get Definitions by title
+GET {{host}}/definitions?TITLE=Student

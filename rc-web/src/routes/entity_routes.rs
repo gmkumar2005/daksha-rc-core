@@ -1,0 +1,53 @@
+use crate::{DError, DecisionMaker};
+use actix_web::web::Data;
+use actix_web::{post, web, HttpResponse};
+use definitions_core::definitions_domain::DomainEvent;
+use definitions_core::registry_domain::CreateEntityCmd;
+use disintegrate::PersistedEvent;
+use disintegrate_postgres::PgEventId;
+use std::ops::Deref;
+use uuid::Uuid;
+
+#[post("/entity/{entity_type}")]
+async fn create_entity(
+    decision_maker: Data<DecisionMaker>,
+    entity_type: web::Path<String>,
+    web_cmd: web::Json<serde_json::Value>,
+) -> Result<HttpResponse, DError> {
+    let create_entity_cmd = CreateEntityCmd {
+        id: Uuid::now_v7(),
+        entity_body: web_cmd.to_string(),
+        entity_type: entity_type.into_inner(),
+        created_by: "demo".to_string(),
+    };
+
+    let exec_results: Vec<PersistedEvent<PgEventId, DomainEvent>> =
+        decision_maker.make(create_entity_cmd).await?;
+
+    let (id, registry_def_id, registry_def_version, entity_type) = exec_results
+        .iter()
+        .find_map(|ev| match ev.deref() {
+            DomainEvent::EntityCreated {
+                id,
+                registry_def_id,
+                registry_def_version,
+                entity_type,
+                ..
+            } => Some((id, registry_def_id, registry_def_version, entity_type)),
+            _ => None,
+        })
+        .unwrap();
+
+    let response_message = format!(
+        "Entity created with ID: {}, definition used {} version {} for entity type {} ",
+        id,
+        registry_def_id,
+        registry_def_version.get(),
+        entity_type
+    );
+
+    Ok(HttpResponse::Ok()
+        .append_header(("Location", format!("/entity/{}", id)))
+        .append_header(("message", response_message))
+        .finish())
+}

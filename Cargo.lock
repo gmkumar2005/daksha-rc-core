@@ -1073,6 +1073,7 @@ dependencies = [
  "blake3",
  "chrono",
  "ctor",
+ "derive_more",
  "disintegrate",
  "env_logger",
  "jsonschema",
@@ -1251,6 +1252,7 @@ dependencies = [
  "sqlx",
  "thiserror 2.0.12",
  "tokio",
+ "tokio-util",
  "uuid",
 ]
 
@@ -3287,6 +3289,7 @@ dependencies = [
  "config",
  "ctor",
  "definitions-core",
+ "derive_more",
  "disintegrate",
  "disintegrate-postgres",
  "env_logger",

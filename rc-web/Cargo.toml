@@ -6,14 +6,15 @@ version = "0.1.0-SNAPSHOT"
 license = "MIT"
 [dependencies]
 actix = { workspace = true }
-actix-web-httpauth = { workspace = true }
 actix-web = { workspace = true }
+actix-web-httpauth = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 config = { workspace = true }
 ctor = { workspace = true }
 definitions-core = { path = "../definitions-core" }
+derive_more = "2.0.1"
 disintegrate = { workspace = true }
 disintegrate-postgres = { workspace = true }
 env_logger = { workspace = true }

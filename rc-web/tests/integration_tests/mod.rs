@@ -1,5 +1,6 @@
 use definitions_core::definitions_domain::{generate_id_from_title, CreateDefinitionCmd};
 
+#[cfg(feature = "integration_tests")]
 mod simple_contaner_based_test;
 
 pub fn create_def_cmd_1() -> CreateDefinitionCmd {

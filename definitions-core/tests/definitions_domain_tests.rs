@@ -152,22 +152,6 @@ mod test {
 
     #[test]
     fn simple_schema_test() {
-        // let schema = r###"
-        //     {"type": "string"}
-        //     "###.to_string();
-
-        let schema = r###"
-        {
-            "title": "example_schema",
-            "type": "object",
-            "properties": {
-                "example": {
-                    "type": "string"
-                }
-            }
-        }
-        "###
-        .to_string();
         let schema = r###"
         {
             "title": "example_schema",

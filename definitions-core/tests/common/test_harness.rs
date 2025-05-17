@@ -90,11 +90,12 @@ where
     /// Panics if the action result is not `Ok` or if the changes do not match the expected changes.
     ///
     /// # Examples
+    #[allow(dead_code)]
     #[track_caller]
     pub fn then(self, expected: impl Into<Vec<R>>) {
         assert_eq!(Ok(expected.into()), self._step.result);
     }
-
+    #[allow(dead_code)]
     #[track_caller]
     pub fn then_assert(self, assertion: impl FnOnce(&Vec<R>)) {
         assertion(&self._step.result.unwrap());
@@ -109,12 +110,14 @@ where
     /// # Panics
     ///
     /// Panics if the action result is not `Err` or if the error does not match the expected error.
+    #[allow(dead_code)]
     #[track_caller]
     pub fn then_err(self, expected: ERR) {
         let err = self._step.result.unwrap_err();
         assert_eq!(err, expected);
     }
 
+    #[allow(dead_code)]
     #[track_caller]
     pub fn then_err_assert(self, assertion: impl FnOnce(&ERR)) {
         assertion(&self._step.result.unwrap_err());
