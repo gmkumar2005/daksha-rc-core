@@ -2,7 +2,7 @@
 #@host = https://daksha-ox98.shuttle.app
 
 ### Test GET request
-GET {{host}}/
+GET {{host}}/hello
 
 ### Check health
 GET {{host}}/healthz
@@ -11,7 +11,7 @@ GET {{host}}/healthz
 GET {{host}}/readyz
 
 ### Test POST request Should fail
-POST {{host}}/create_def
+POST {{host}}/api/v1/schema/create_def
 Content-Type: application/json
 
 {
@@ -21,7 +21,7 @@ Content-Type: application/json
 
 
 ### Test POST request with valid json
-POST {{host}}/create_def
+POST {{host}}/api/v1/schema/create_def
 Content-Type: application/json
 
 {
@@ -35,7 +35,7 @@ Content-Type: application/json
 }
 
 ### Test POST request with valid json
-POST {{host}}/create_def
+POST {{host}}/api/v1/schema/create_def
 Content-Type: application/json
 
 {
@@ -50,7 +50,7 @@ Content-Type: application/json
 
 
 ### Test validation
-POST {{host}}/validate_def
+POST {{host}}/api/v1/schema/validate_def
 Content-Type: application/json
 
 {
@@ -59,7 +59,7 @@ Content-Type: application/json
 
 
 ### Test Activation
-POST {{host}}/activate_def
+POST {{host}}/api/v1/schema/activate_def
 Content-Type: application/json
 
 {
@@ -68,13 +68,13 @@ Content-Type: application/json
 
 
 ### Test create student schema
-POST {{host}}/create_def
+POST {{host}}/api/v1/schema/create_def
 Content-Type: application/json
 
 < ./Student_Schema.json
 
 ### Validate Student
-POST {{host}}/validate_def
+POST {{host}}/api/v1/schema/validate_def
 Content-Type: application/json
 
 {
@@ -83,15 +83,19 @@ Content-Type: application/json
 
 
 ### Activate Student
-POST {{host}}/activate_def
+POST {{host}}/api/v1/schema/activate_def
 Content-Type: application/json
 
 {
   "def_id": "1bd23c91-3379-b65b-11cc-64984050e35c"
 }
 
+
+### Hello Entity
+GET {{host}}/api/v1/entity/hello
+
 ### Create Student
-POST {{host}}/entity/Student
+POST {{host}}/api/v1/entity/Student
 Content-Type: application/json
 
 {
@@ -107,14 +111,27 @@ Content-Type: application/json
   }
 }
 
-### Get Definitions
-GET {{host}}/definitions
 
-### Get Definitions by id
-GET {{host}}/definitions/1bd23c91-3379-b65b-11cc-64984050e35c
+
 
 ### Get Definitions by record_status
-GET {{host}}/definitions?record_status=Active
+GET {{host}}/api/v1/schema?record_status=Active
 
-### Get Definitions by title
-GET {{host}}/definitions?TITLE=Student
+### Get Definitions by titles
+GET {{host}}/api/v1/schema?TITLE=Student
+
+
+### Test POST request Should fail
+POST {{host}}/api/v1/schema/create_def
+Content-Type: application/json
+
+{
+  "id": "test_id",
+  "schema": "test_schema"
+}
+
+### Get Definitions by id
+GET {{host}}/api/v1/schema/1bd23c91-3379-b65b-11cc-64984050e35c
+
+### Get Definitions
+GET {{host}}/api/v1/schema

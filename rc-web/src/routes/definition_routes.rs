@@ -2,7 +2,7 @@ use crate::models::ValidateDefRequest;
 // use rc_web::{DError, DecisionMaker};
 use crate::{DError, DecisionMaker};
 use actix_web::web::{Data, Query};
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpResponse, Responder, Scope};
 use chrono::Utc;
 use definitions_core::definitions_domain::{
     generate_id_from_title, read_title, ActivateDefinitionCmd, CreateDefinitionCmd, DefError,
@@ -16,6 +16,16 @@ use sqlx::{FromRow, PgPool};
 use std::ops::Deref;
 use std::str::FromStr;
 use uuid::Uuid;
+
+pub fn routes() -> Scope {
+    web::scope("")
+        // .service(handlers::admin)
+        .service(activate_def)
+        .service(validate_def)
+        .service(create_def)
+        .service(get_definitions)
+        .service(get_definitions_by_id)
+}
 
 #[post("/activate_def")]
 async fn activate_def(
@@ -37,10 +47,7 @@ async fn activate_def(
     );
 
     Ok(HttpResponse::Ok()
-        .append_header((
-            "Location",
-            format!("/schema_def/{}", web_cmd.def_id.as_str()),
-        ))
+        .append_header(("Location", format!("/schema/{}", web_cmd.def_id.as_str())))
         .append_header(("message", response_message))
         .finish())
 }
@@ -86,7 +93,7 @@ async fn validate_def(
     }
 
     Ok(HttpResponse::Ok()
-        .append_header(("Location", format!("/schema_def/{}", validated_defid)))
+        .append_header(("Location", format!("/schema/{}", validated_defid)))
         .append_header(("message", response_message))
         .finish())
 }
@@ -126,7 +133,7 @@ async fn create_def(
         created_defid, created_title
     );
     Ok(HttpResponse::Created()
-        .append_header(("Location", format!("/schema_def/{}", created_defid)))
+        .append_header(("Location", format!("/schema/{}", created_defid)))
         .append_header(("message", response_message))
         .finish())
 }
@@ -148,7 +155,7 @@ pub struct DefinitionQuery {
     record_status: Option<String>,
 }
 
-#[get("/definitions")]
+#[get("")]
 async fn get_definitions(db_pool: Data<PgPool>, query: Query<DefinitionQuery>) -> impl Responder {
     let mut sql = String::from(
         r#"
@@ -192,7 +199,7 @@ async fn get_definitions(db_pool: Data<PgPool>, query: Query<DefinitionQuery>) -
     }
 }
 
-#[get("/definitions/{id}")]
+#[get("/{id}")]
 async fn get_definitions_by_id(db_pool: Data<PgPool>, path: web::Path<Uuid>) -> impl Responder {
     let id = path.into_inner();
     debug!("querying id: {}", id);

@@ -1,7 +1,15 @@
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpResponse, Responder, Scope};
 use sqlx::PgPool;
 
-#[get("/")]
+pub fn routes() -> Scope {
+    web::scope("")
+        // .service(handlers::admin)
+        .service(hello)
+        .service(echo)
+        .service(healthz)
+        .service(readyz)
+}
+#[get("/hello")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }

@@ -10,6 +10,7 @@ use rc_web::routes::definition_routes::{
 };
 use rc_web::routes::entity_routes::create_entity;
 use rc_web::routes::health_check::{echo, healthz, hello, readyz};
+use rc_web::routes::{api_routes, definition_routes, entity_routes, health_check};
 use shuttle_actix_web::ShuttleActixWeb;
 use sqlx::PgPool;
 use std::env;
@@ -30,16 +31,8 @@ async fn main(
     let config = move |cfg: &mut ServiceConfig| {
         cfg.app_data(Data::new(decision_maker.clone()))
             .app_data(Data::new(shared_pool_for_web.clone()))
-            .service(echo)
-            .service(healthz)
-            .service(readyz)
-            .service(create_def)
-            .service(hello)
-            .service(validate_def)
-            .service(create_entity)
-            .service(activate_def)
-            .service(get_definitions)
-            .service(get_definitions_by_id);
+            .service(api_routes::routes())
+            .service(health_check::routes());
     };
 
     let listener_event_store = event_store.clone();

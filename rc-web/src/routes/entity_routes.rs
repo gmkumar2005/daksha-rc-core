@@ -1,6 +1,6 @@
 use crate::{DError, DecisionMaker};
 use actix_web::web::Data;
-use actix_web::{post, web, HttpResponse};
+use actix_web::{get, post, web, HttpResponse, Responder, Scope};
 use definitions_core::definitions_domain::DomainEvent;
 use definitions_core::registry_domain::CreateEntityCmd;
 use disintegrate::PersistedEvent;
@@ -8,7 +8,19 @@ use disintegrate_postgres::PgEventId;
 use std::ops::Deref;
 use uuid::Uuid;
 
-#[post("/entity/{entity_type}")]
+pub fn routes() -> Scope {
+    web::scope("")
+        // .service(handlers::admin)
+        .service(create_entity)
+        .service(hello)
+}
+
+#[get("/hello")]
+async fn hello() -> impl Responder {
+    HttpResponse::Ok().body("Hello world!")
+}
+
+#[post("/{entity_type}")]
 async fn create_entity(
     decision_maker: Data<DecisionMaker>,
     entity_type: web::Path<String>,
