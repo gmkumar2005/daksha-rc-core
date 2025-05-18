@@ -5,16 +5,45 @@ use disintegrate_postgres::{PgEventListener, PgEventListenerConfig, PgEventStore
 use log::error;
 use rc_web::projections::definitions_read_model;
 use rc_web::projections::definitions_read_model::ReadModelProjection;
-use rc_web::routes::definition_routes::{
-    activate_def, create_def, get_definitions, get_definitions_by_id, validate_def,
-};
-use rc_web::routes::entity_routes::create_entity;
-use rc_web::routes::health_check::{echo, healthz, hello, readyz};
-use rc_web::routes::{api_routes, definition_routes, entity_routes, health_check};
+use rc_web::routes::{api_routes, health_check};
+use rc_web::{COMMANDS, DEFINITIONS, ENTITY, HEALTH, QUERY};
 use shuttle_actix_web::ShuttleActixWeb;
 use sqlx::PgPool;
 use std::env;
 use std::time::Duration;
+use utoipa::OpenApi;
+use utoipa_rapidoc::RapiDoc;
+use utoipa_scalar::{Scalar, Servable};
+use utoipa_swagger_ui::SwaggerUi;
+
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "RC Web API",
+        description = "Rest endpoints for the RC Web API",
+    ),
+
+    paths(
+        rc_web::routes::health_check::hello,
+        rc_web::routes::health_check::echo,
+        rc_web::routes::health_check::healthz,
+        rc_web::routes::health_check::readyz,
+        rc_web::routes::definition_routes::activate_def,
+        rc_web::routes::definition_routes::get_definitions,
+        rc_web::routes::definition_routes::get_definitions_by_id,
+        rc_web::routes::definition_routes::validate_def,
+        rc_web::routes::definition_routes::create_def,
+        rc_web::routes::entity_routes::create_entity,
+    ),
+    tags(
+    (name = DEFINITIONS, description = "Manage Definitions and Schemas"),
+    (name = QUERY, description = "Order API endpoints"),
+    (name = HEALTH, description = "Health API endpoints and Debug"),
+    (name = ENTITY, description = "Manage Entities and Entity LifeCycle"),
+    (name = COMMANDS, description = "Write side commands which makes updates to the state"),
+    )
+)]
+pub struct ApiDoc;
 
 #[shuttle_runtime::main]
 async fn main(
@@ -28,9 +57,15 @@ async fn main(
     let shared_pool_for_web = shared_pool.clone();
 
     let decision_maker = disintegrate_postgres::decision_maker(event_store.clone(), NoSnapshot);
+    let api = ApiDoc::openapi();
     let config = move |cfg: &mut ServiceConfig| {
         cfg.app_data(Data::new(decision_maker.clone()))
             .app_data(Data::new(shared_pool_for_web.clone()))
+            .service(
+                SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", api.clone()),
+            )
+            .service(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc"))
+            .service(Scalar::with_url("/scalar", api))
             .service(api_routes::routes())
             .service(health_check::routes());
     };

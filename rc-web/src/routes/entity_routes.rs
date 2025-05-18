@@ -1,4 +1,5 @@
 use crate::{DError, DecisionMaker};
+use crate::{COMMANDS, ENTITY};
 use actix_web::web::Data;
 use actix_web::{get, post, web, HttpResponse, Responder, Scope};
 use definitions_core::definitions_domain::DomainEvent;
@@ -7,7 +8,6 @@ use disintegrate::PersistedEvent;
 use disintegrate_postgres::PgEventId;
 use std::ops::Deref;
 use uuid::Uuid;
-
 pub fn routes() -> Scope {
     web::scope("")
         // .service(handlers::admin)
@@ -20,6 +20,17 @@ async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entity/{entity_type}",
+    tags= [ENTITY, COMMANDS],
+    params(
+        ("entity_id" = String, Path, description = "Entity type", example = "Student")
+    ),
+    responses(
+        (status = 200, description = "Entity created", body = String),
+    )
+)]
 #[post("/{entity_type}")]
 async fn create_entity(
     decision_maker: Data<DecisionMaker>,

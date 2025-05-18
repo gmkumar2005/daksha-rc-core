@@ -56,3 +56,10 @@ impl error::ResponseError for DError {
             .body(self.to_string())
     }
 }
+
+pub const DEFINITIONS: &str = "Definitions";
+pub const COMMANDS: &str = "Commands";
+pub const QUERY: &str = "Query";
+pub const HEALTH: &str = "Health";
+pub const ENTITY: &str = "Entity";
+pub const API_PREFIX: &str = "/api/v1";

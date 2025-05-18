@@ -4,6 +4,16 @@
 ### Test GET request
 GET {{host}}/hello
 
+### Test GET echo
+POST {{host}}/echo
+Content-Type: application/json
+
+{
+  "id": "test_id",
+  "schema": "test_schema"
+}
+
+
 ### Check health
 GET {{host}}/healthz
 
@@ -135,3 +145,9 @@ GET {{host}}/api/v1/schema/1bd23c91-3379-b65b-11cc-64984050e35c
 
 ### Get Definitions
 GET {{host}}/api/v1/schema
+
+### OpenAPI
+GET {{host}}/api-docs/openapi.json
+
+### SwaggerUI
+GET {{host}}/swagger-ui/

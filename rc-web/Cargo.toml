@@ -7,6 +7,7 @@ license = "MIT"
 [dependencies]
 actix = { workspace = true }
 actix-web = { workspace = true }
+actix-files = { workspace = true }
 actix-web-httpauth = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }

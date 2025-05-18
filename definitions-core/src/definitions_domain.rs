@@ -9,6 +9,7 @@ use std::num::NonZeroU16;
 use strum_macros::{Display, EnumString};
 use thiserror::Error;
 use unicode_normalization::UnicodeNormalization;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -177,7 +178,9 @@ pub enum DefError {
 
 // start of mutations
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Display, EnumString)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Display, EnumString, ToSchema,
+)]
 pub enum DefRecordStatus {
     #[default]
     None,
