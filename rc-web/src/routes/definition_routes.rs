@@ -1,12 +1,12 @@
 use crate::models::ValidateDefRequest;
 // use rc_web::{DError, DecisionMaker};
-use crate::{DError, DecisionMaker};
+use crate::{DError, DecisionMaker, COMMANDS, DEFINITIONS, QUERY};
 use actix_web::web::{Data, Query};
-use actix_web::{get, post, web, HttpResponse, Responder};
-use chrono::Utc;
+use actix_web::{get, post, web, HttpResponse, Responder, Scope};
+use chrono::{DateTime, Utc};
 use definitions_core::definitions_domain::{
     generate_id_from_title, read_title, ActivateDefinitionCmd, CreateDefinitionCmd, DefError,
-    DomainEvent, ValidateDefinitionCmd,
+    DefRecordStatus, DomainEvent, ValidateDefinitionCmd,
 };
 use disintegrate::PersistedEvent;
 use disintegrate_postgres::PgEventId;
@@ -15,15 +15,53 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 use std::ops::Deref;
 use std::str::FromStr;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct DefinitionsResponse {
+    /// Unique identifier
+    pub id: String,
+    /// Title or name
+    pub title: String,
+    /// The schema as a JSON string
+    pub json_schema_string: String,
+    /// Record status (e.g. Active, Inactive)
+    pub record_status: DefRecordStatus,
+    /// Creation timestamp
+    pub created_at: DateTime<Utc>,
+    /// Who created the entry
+    pub created_by: String,
+    /// Who activated the entry (if any)
+    pub activated_by: Option<String>,
+}
+
+pub fn routes() -> Scope {
+    web::scope("")
+        // .service(handlers::admin)
+        .service(activate_def)
+        .service(validate_def)
+        .service(create_def)
+        .service(get_definitions)
+        .service(get_definitions_by_id)
+}
+
+/// Activate a definition
+#[utoipa::path(
+    post,
+    path = "/api/v1/schema/activate_def",
+    tags= [DEFINITIONS, COMMANDS],
+    responses(
+        (status = 200, description = "Activation successful", body = String)
+    )
+)]
 #[post("/activate_def")]
 async fn activate_def(
     decision_maker: Data<DecisionMaker>,
     web_cmd: web::Json<ValidateDefRequest>,
 ) -> Result<HttpResponse, DError> {
     let validate_def_cmd = ActivateDefinitionCmd {
-        id: Uuid::from_str(web_cmd.def_id.as_str()).unwrap(),
+        id: Uuid::from_str(web_cmd.id.as_str()).unwrap(),
         activated_at: Utc::now(),
         activated_by: "test_activated_by".to_string(),
     };
@@ -33,25 +71,31 @@ async fn activate_def(
 
     let response_message = format!(
         "Activation successful for Definition with ID: {}",
-        web_cmd.def_id.as_str()
+        web_cmd.id.as_str()
     );
 
     Ok(HttpResponse::Ok()
-        .append_header((
-            "Location",
-            format!("/schema_def/{}", web_cmd.def_id.as_str()),
-        ))
+        .append_header(("Location", format!("/schema/{}", web_cmd.id.as_str())))
         .append_header(("message", response_message))
         .finish())
 }
 
+/// Validate a definition
+#[utoipa::path(
+    post,
+    path = "/api/v1/schema/validate_def",
+    tags= [DEFINITIONS, COMMANDS],
+    responses(
+        (status = 200, description = "Validation successful", body = String)
+    )
+)]
 #[post("/validate_def")]
 async fn validate_def(
     decision_maker: Data<DecisionMaker>,
     web_cmd: web::Json<ValidateDefRequest>,
 ) -> Result<HttpResponse, DError> {
     let validate_def_cmd = ValidateDefinitionCmd {
-        id: Uuid::from_str(web_cmd.def_id.as_str()).unwrap(),
+        id: Uuid::from_str(web_cmd.id.as_str()).unwrap(),
         validated_at: Utc::now(),
         validated_by: "test_validated_by".to_string(),
     };
@@ -86,11 +130,22 @@ async fn validate_def(
     }
 
     Ok(HttpResponse::Ok()
-        .append_header(("Location", format!("/schema_def/{}", validated_defid)))
+        .append_header(("Location", format!("/schema/{}", validated_defid)))
         .append_header(("message", response_message))
         .finish())
 }
+/// Create a definition
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/schema/create_def",
+    tags= [DEFINITIONS, COMMANDS],
+    responses(
+        (status = 200, description = "Definition created", body = String),
+        (status = 400, description = "Invalid Schema", body = String),
+        (status = 409, description = "Definition Already Exists", body = String),
+    )
+)]
 #[post("/create_def")]
 async fn create_def(
     decision_maker: Data<DecisionMaker>,
@@ -126,7 +181,7 @@ async fn create_def(
         created_defid, created_title
     );
     Ok(HttpResponse::Created()
-        .append_header(("Location", format!("/schema_def/{}", created_defid)))
+        .append_header(("Location", format!("/schema/{}", created_defid)))
         .append_header(("message", response_message))
         .finish())
 }
@@ -142,13 +197,28 @@ struct Definition {
     activated_by: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, IntoParams, Default)]
+#[into_params(parameter_in = Query)]
 pub struct DefinitionQuery {
-    title: Option<String>,
-    record_status: Option<String>,
+    #[param(example = "Student")]
+    pub title: Option<String>,
+    #[param(example = "Active")]
+    pub record_status: Option<String>,
 }
 
-#[get("/definitions")]
+/// Show all definitions
+#[utoipa::path(
+    get,
+    path = "/api/v1/schema",
+    tags= [DEFINITIONS, QUERY],
+    params(
+        DefinitionQuery
+    ),
+    responses(
+        (status = 200, body = DefinitionsResponse)
+    )
+)]
+#[get("")]
 async fn get_definitions(db_pool: Data<PgPool>, query: Query<DefinitionQuery>) -> impl Responder {
     let mut sql = String::from(
         r#"
@@ -192,7 +262,19 @@ async fn get_definitions(db_pool: Data<PgPool>, query: Query<DefinitionQuery>) -
     }
 }
 
-#[get("/definitions/{id}")]
+/// Show definitions by ID
+#[utoipa::path(
+    get,
+    path = "/api/v1/schema/{id}",
+    tags= [DEFINITIONS, QUERY],
+    params(
+        ("id" = Uuid, Path, description = "ID of the definition to fetch",example = "4b736e56-8c99-c1c0-bd55-16175ec63f76")
+    ),
+    responses(
+        (status = 200, body = DefinitionsResponse)
+    )
+)]
+#[get("/{id}")]
 async fn get_definitions_by_id(db_pool: Data<PgPool>, path: web::Path<Uuid>) -> impl Responder {
     let id = path.into_inner();
     debug!("querying id: {}", id);

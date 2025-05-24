@@ -19,10 +19,10 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 unicode-normalization = { workspace = true }
+utoipa = { workspace = true }
 uuid = { workspace = true }
 [dev-dependencies]
 mockall = { workspace = true }
 ctor = { workspace = true }
 [package.metadata.sqlx]
 query = true
-

@@ -5,15 +5,16 @@ use definitions_core::definitions_domain::{DefError, DomainEvent};
 use definitions_core::registry_domain::EntityError;
 use disintegrate::{DecisionError, NoSnapshot};
 use disintegrate_postgres::PgDecisionMaker;
+use serde::Serialize;
 
 pub mod config;
 pub mod errors;
 pub mod handlers;
+pub mod middleware;
 pub mod models;
+pub mod projections;
 pub mod routes;
 pub mod services;
-
-pub mod projections;
 type DecisionMaker =
     PgDecisionMaker<DomainEvent, disintegrate::serde::json::Json<DomainEvent>, NoSnapshot>;
 
@@ -55,4 +56,20 @@ impl error::ResponseError for DError {
             .insert_header(ContentType::html())
             .body(self.to_string())
     }
+}
+
+pub const DEFINITIONS: &str = "Definitions";
+pub const COMMANDS: &str = "Commands";
+pub const QUERY: &str = "Query";
+pub const HEALTH: &str = "Health";
+pub const ENTITY: &str = "Entity";
+pub const API_PREFIX: &str = "/api/v1";
+
+#[derive(Serialize)]
+pub struct ErrorMessage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_description: Option<String>,
+    pub message: String,
 }

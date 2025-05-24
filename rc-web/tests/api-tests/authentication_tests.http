@@ -1,0 +1,123 @@
+@host = http://localhost:8000
+#@host = https://daksha-ox98.shuttle.app
+@yourDomain =daksha-ox98.shuttle.app
+### GET request to example server
+GET https://examples.http-client.intellij.net/get
+    ?generated-in=RustRover
+
+###
+
+POST https://daksha.us.auth0.com/oauth/token
+Content-Type: application/json
+
+{
+  "client_id": "y7dJszHOZ0bbAbbJZAsaKcR3BvSUR89b",
+  "client_secret": "M1hwLoR9vtkmTk8h2bEl3zlU9VOh-VWt5CE4o0uHm9lkWH5-83LDGmHTg6aGTNeS",
+  "audience": "https://daksha.us.auth0.com/api/v2/",
+  "grant_type": "client_credentials"
+}
+> {%
+client.global.set("access_token", response.body.access_token);
+%}
+
+
+### Test GET echo
+POST {{host}}/echo
+authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "id": "test_id",
+  "schema": "test_schema"
+}
+
+
+### User login
+GET https://{yourDomain}/authorize?response_type=token&client_id=jJ5OS9I0pAQ9zv5ecfBjxQvTcP4kgaLT
+
+
+
+curl -L -g 'https://{{yourDomain}}/authorize?response_type=token&client_id=jJ5OS9I0pAQ9zv5ecfBjxQvTcP4kgaLT'
+
+### User direct login
+
+POST https://{{yourDomain}}/oauth/token
+
+Content-type: application/json
+
+  {
+    "grant_type": "password",
+    "username": "demo@daksha-rc.org",
+    "password": "Demo@192",
+    "audience": "https://daksha.us.auth0.com/api/v2/",
+    "scope": "dmkumar2014@gmail.com",
+    "client_id": "jJ5OS9I0pAQ9zv5ecfBjxQvTcP4kgaLT",
+    "client_secret": "QB5rJ7vkrhlF0gcmP96BK8lUyDvPOwS-D3JVKCcZo3t5R_RrRCvXvL-mkFqj5sZx"
+  }
+
+
+
+### Auth0 Username-Password Authentication Request
+POST https://daksha-ox98.shuttle.app/oauth/token
+Content-Type: application/json
+
+{
+  "grant_type": "password",
+  "username": "demo@daksha-rc.org",
+  "password": "Demo@192",
+  "audience": "https://daksha.us.auth0.com/api/v2/",
+  "scope": "dmkumar2014@gmail.com",
+  "client_id": "jJ5OS9I0pAQ9zv5ecfBjxQvTcP4kgaLT",
+  "client_secret": "QB5rJ7vkrhlF0gcmP96BK8lUyDvPOwS-D3JVKCcZo3t5R_RrRCvXvL-mkFqj5sZx",
+  "realm": "Username-Password-Authentication"
+}
+
+### Wortking
+
+
+POST https://daksha.us.auth0.com/oauth/token
+Content-Type: application/json
+
+{
+  "client_id": "jJ5OS9I0pAQ9zv5ecfBjxQvTcP4kgaLT",
+  "client_secret": "QB5rJ7vkrhlF0gcmP96BK8lUyDvPOwS-D3JVKCcZo3t5R_RrRCvXvL-mkFqj5sZx",
+  "audience": "https://daksha.us.auth0.com/api/v2/",
+  "grant_type": "password",
+  "username": "demo@daksha-rc.org",
+  "password": "Demo@192"
+}
+
+
+### Wortking 2 minimal
+
+
+POST https://daksha.us.auth0.com/oauth/token
+Content-Type: application/json
+
+{
+  "client_id": "jJ5OS9I0pAQ9zv5ecfBjxQvTcP4kgaLT",
+  "client_secret": "QB5rJ7vkrhlF0gcmP96BK8lUyDvPOwS-D3JVKCcZo3t5R_RrRCvXvL-mkFqj5sZx",
+  "grant_type": "password",
+  "username": "demo@daksha-rc.org",
+  "audience": "simpleapi",
+  "password": "Demo@192"
+}
+> {%
+
+
+
+client.global.set("access_token", response.body.access_token);
+
+
+
+%}
+
+### Test GET echo with normal user
+POST {{host}}/echo
+authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "id": "test_id",
+  "schema": "test_schema"
+}
