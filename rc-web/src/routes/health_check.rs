@@ -1,6 +1,9 @@
+use crate::middleware::claims::Claims;
 use crate::HEALTH;
 use actix_web::{get, post, web, HttpResponse, Responder, Scope};
+use log::debug;
 use sqlx::PgPool;
+
 pub fn routes() -> Scope {
     web::scope("")
         // .service(handlers::admin)
@@ -33,7 +36,8 @@ async fn hello() -> impl Responder {
     )
 )]
 #[post("/echo")]
-async fn echo(req_body: String) -> impl Responder {
+async fn echo(req_body: String, claims: Claims) -> impl Responder {
+    debug!("Claims: {:?}", claims);
     HttpResponse::Ok().body(req_body)
 }
 /// Liveness probe

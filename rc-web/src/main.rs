@@ -1,4 +1,6 @@
+use actix_web::web;
 use actix_web::web::{Data, ServiceConfig};
+use anyhow::Context;
 use definitions_core::definitions_domain::*;
 use disintegrate::NoSnapshot;
 use disintegrate_postgres::{PgEventListener, PgEventListenerConfig, PgEventStore};
@@ -6,8 +8,9 @@ use log::error;
 use rc_web::projections::definitions_read_model;
 use rc_web::projections::definitions_read_model::ReadModelProjection;
 use rc_web::routes::{api_routes, health_check};
-use rc_web::{COMMANDS, DEFINITIONS, ENTITY, HEALTH, QUERY};
+use rc_web::{middleware, COMMANDS, DEFINITIONS, ENTITY, HEALTH, QUERY};
 use shuttle_actix_web::ShuttleActixWeb;
+use shuttle_runtime::SecretStore;
 use sqlx::PgPool;
 use std::env;
 use std::time::Duration;
@@ -48,7 +51,12 @@ pub struct ApiDoc;
 #[shuttle_runtime::main]
 async fn main(
     #[shuttle_shared_db::Postgres] shared_pool: PgPool,
+    #[shuttle_runtime::Secrets] secrets: SecretStore,
 ) -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
+    // get secret defined in `Secrets.toml` file.
+    let client_origin_url = secrets
+        .get("CLIENT_ORIGIN_URL")
+        .context("CLIENT_ORIGIN_URL was not found")?;
     let serde = disintegrate::serde::json::Json::<DomainEvent>::default();
     let event_store = PgEventStore::new(shared_pool.clone(), serde)
         .await
@@ -58,16 +66,24 @@ async fn main(
 
     let decision_maker = disintegrate_postgres::decision_maker(event_store.clone(), NoSnapshot);
     let api = ApiDoc::openapi();
+    //  .wrap(middleware::cors::cors(&client_origin_url))
     let config = move |cfg: &mut ServiceConfig| {
         cfg.app_data(Data::new(decision_maker.clone()))
             .app_data(Data::new(shared_pool_for_web.clone()))
+            .app_data(Data::new(secrets.clone()))
             .service(
                 SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", api.clone()),
             )
             .service(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc"))
             .service(Scalar::with_url("/scalar", api))
             .service(api_routes::routes())
-            .service(health_check::routes());
+            .service(
+                web::scope("")
+                    .service(health_check::routes())
+                    .wrap(middleware::security_headers::security_headers())
+                    .wrap(middleware::logger::logger())
+                    .wrap(middleware::cors::cors(&client_origin_url)),
+            );
     };
 
     let listener_event_store = event_store.clone();

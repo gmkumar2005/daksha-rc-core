@@ -6,8 +6,9 @@ version = "0.1.0-SNAPSHOT"
 license = "MIT"
 [dependencies]
 actix = { workspace = true }
-actix-web = { workspace = true }
+actix-cors = { workspace = true }
 actix-files = { workspace = true }
+actix-web = { workspace = true }
 actix-web-httpauth = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -19,9 +20,11 @@ derive_more = "2.0.1"
 disintegrate = { workspace = true }
 disintegrate-postgres = { workspace = true }
 env_logger = { workspace = true }
+jsonwebtoken = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }
 postgres = { workspace = true }
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shuttle-actix-web = { workspace = true }

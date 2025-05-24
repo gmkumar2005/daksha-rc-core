@@ -26,4 +26,3 @@ mockall = { workspace = true }
 ctor = { workspace = true }
 [package.metadata.sqlx]
 query = true
-
