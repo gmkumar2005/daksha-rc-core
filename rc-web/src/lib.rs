@@ -65,6 +65,12 @@ pub const HEALTH: &str = "Health";
 pub const ENTITY: &str = "Entity";
 pub const API_PREFIX: &str = "/api/v1";
 
+#[cfg(feature = "shuttle")]
+const BASE_URL: &str = "https://daksha-ox98.shuttle.app";
+
+#[cfg(not(feature = "shuttle"))]
+const BASE_URL: &str = "http://localhost:8000";
+
 #[derive(Serialize)]
 pub struct ErrorMessage {
     #[serde(skip_serializing_if = "Option::is_none")]

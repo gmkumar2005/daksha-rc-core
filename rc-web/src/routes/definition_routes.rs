@@ -1,7 +1,7 @@
 use crate::models::ValidateDefRequest;
 // use rc_web::{DError, DecisionMaker};
-use crate::{DError, DecisionMaker, COMMANDS, DEFINITIONS, QUERY};
-use actix_web::web::{Data, Query};
+use crate::{DError, DecisionMaker, API_PREFIX, BASE_URL, COMMANDS, DEFINITIONS, QUERY};
+use actix_web::web::{Data, Json, Query};
 use actix_web::{get, post, web, HttpResponse, Responder, Scope};
 use chrono::{DateTime, Utc};
 use definitions_core::definitions_domain::{
@@ -60,8 +60,9 @@ async fn activate_def(
     decision_maker: Data<DecisionMaker>,
     web_cmd: web::Json<ValidateDefRequest>,
 ) -> Result<HttpResponse, DError> {
+    let identifier = validate_id(&web_cmd)?;
     let validate_def_cmd = ActivateDefinitionCmd {
-        id: Uuid::from_str(web_cmd.id.as_str()).unwrap(),
+        id: identifier,
         activated_at: Utc::now(),
         activated_by: "test_activated_by".to_string(),
     };
@@ -75,9 +76,21 @@ async fn activate_def(
     );
 
     Ok(HttpResponse::Ok()
-        .append_header(("Location", format!("/schema/{}", web_cmd.id.as_str())))
+        .append_header((
+            "Location",
+            format!("{BASE_URL}{API_PREFIX}/schema/{}", web_cmd.id.as_str()),
+        ))
         .append_header(("message", response_message))
         .finish())
+}
+
+fn validate_id(web_cmd: &Json<ValidateDefRequest>) -> Result<Uuid, DError> {
+    Uuid::from_str(web_cmd.id.trim()).map_err(|e| {
+        DError::from(disintegrate::DecisionError::Domain(DefError::InvalidUUID(
+            e.to_string(),
+            web_cmd.id.clone(),
+        )))
+    })
 }
 
 /// Validate a definition
@@ -94,8 +107,10 @@ async fn validate_def(
     decision_maker: Data<DecisionMaker>,
     web_cmd: web::Json<ValidateDefRequest>,
 ) -> Result<HttpResponse, DError> {
+    let identifier = validate_id(&web_cmd)?;
+
     let validate_def_cmd = ValidateDefinitionCmd {
-        id: Uuid::from_str(web_cmd.id.as_str()).unwrap(),
+        id: identifier.clone(),
         validated_at: Utc::now(),
         validated_by: "test_validated_by".to_string(),
     };
@@ -107,9 +122,9 @@ async fn validate_def(
         .find_map(|ev| match ev.deref() {
             DomainEvent::DefValidated {
                 validation_result,
-                id: def_id,
+                id,
                 ..
-            } => Some((validation_result, def_id)),
+            } => Some((validation_result, id)),
             _ => None,
         })
         .unwrap();
@@ -130,7 +145,10 @@ async fn validate_def(
     }
 
     Ok(HttpResponse::Ok()
-        .append_header(("Location", format!("/schema/{}", validated_defid)))
+        .append_header((
+            "Location",
+            format!("{BASE_URL}{API_PREFIX}/schema/{}", validated_defid),
+        ))
         .append_header(("message", response_message))
         .finish())
 }
@@ -166,9 +184,7 @@ async fn create_def(
     let (created_title, created_defid) = exec_results
         .iter()
         .find_map(|ev| match ev.deref() {
-            DomainEvent::DefCreated {
-                title, id: def_id, ..
-            } => Some((title, def_id)),
+            DomainEvent::DefCreated { title, id, .. } => Some((title, id)),
             _ => None,
         })
         .unwrap();
@@ -181,7 +197,10 @@ async fn create_def(
         created_defid, created_title
     );
     Ok(HttpResponse::Created()
-        .append_header(("Location", format!("/schema/{}", created_defid)))
+        .append_header((
+            "Location",
+            format!("{BASE_URL}{API_PREFIX}/schema/{}", created_defid),
+        ))
         .append_header(("message", response_message))
         .finish())
 }

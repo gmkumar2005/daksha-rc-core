@@ -174,6 +174,8 @@ pub enum DefError {
     TitleIsNotMutable(String, String),
     #[error("Title  `{0}` and its Id `{1}` does not match")]
     DigestMismatch(String, DefId),
+    #[error("Invalid UUID: {0} for value {1}")]
+    InvalidUUID(String, String),
 }
 
 // start of mutations
