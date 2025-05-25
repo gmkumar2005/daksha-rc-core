@@ -119,7 +119,7 @@ async fn test_create_definition_with_postgres() -> anyhow::Result<()> {
     let create_def_cmd = create_def_cmd_1().clone();
     let exec_results = decision_maker.make(create_def_cmd).await?;
 
-    let (title, def_id) = exec_results
+    let (title, id) = exec_results
         .iter()
         .find_map(|ev| match ev.deref() {
             DomainEvent::DefCreated { title, id, .. } => Some((title, id)),
@@ -134,7 +134,7 @@ async fn test_create_definition_with_postgres() -> anyhow::Result<()> {
         title
     );
     assert_eq!(
-        def_id.to_string(),
+        id.to_string(),
         generate_id_from_title("test_title").to_string()
     );
 

@@ -1,5 +1,5 @@
 use crate::{DError, DecisionMaker};
-use crate::{COMMANDS, ENTITY};
+use crate::{API_PREFIX, BASE_URL, COMMANDS, ENTITY};
 use actix_web::web::Data;
 use actix_web::{get, post, web, HttpResponse, Responder, Scope};
 use definitions_core::definitions_domain::DomainEvent;
@@ -70,7 +70,7 @@ async fn create_entity(
     );
 
     Ok(HttpResponse::Ok()
-        .append_header(("Location", format!("/entity/{}", id)))
+        .append_header(("Location", format!("{BASE_URL}{API_PREFIX}/entity/{}", id)))
         .append_header(("message", response_message))
         .finish())
 }

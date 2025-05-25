@@ -16,7 +16,7 @@ chrono = { workspace = true }
 config = { workspace = true }
 ctor = { workspace = true }
 definitions-core = { path = "../definitions-core" }
-derive_more = "2.0.1"
+derive_more = { workspace = true }
 disintegrate = { workspace = true }
 disintegrate-postgres = { workspace = true }
 env_logger = { workspace = true }

@@ -1,10 +1,11 @@
-#@host = http://localhost:8000
-@host = https://daksha-ox98.shuttle.app
+@host = http://localhost:8000
+#@host = https://daksha-ox98.shuttle.app
 
-### Test GET request
+# Health Check
+### Simple hello returns Hello world!
 GET {{host}}/hello
 
-### Test GET echo
+### Test GET echo Returns auth failure
 POST {{host}}/echo
 Content-Type: application/json
 
@@ -14,13 +15,14 @@ Content-Type: application/json
 }
 
 
-### Check health
+### Check health returns healthy
 GET {{host}}/healthz
 
-### Check readiness
+### Check readiness returns ready
 GET {{host}}/readyz
 
-### Test POST request Should fail
+# Schema apis
+### Create schema Should fail
 POST {{host}}/api/v1/schema/create_def
 Content-Type: application/json
 
@@ -30,7 +32,7 @@ Content-Type: application/json
 }
 
 
-### Test POST request with valid json
+### Create schema with valid json test_title_3
 POST {{host}}/api/v1/schema/create_def
 Content-Type: application/json
 
@@ -44,7 +46,7 @@ Content-Type: application/json
   }
 }
 
-### Test POST request with valid json
+### Create schema with valid json test_title_11
 POST {{host}}/api/v1/schema/create_def
 Content-Type: application/json
 
@@ -59,25 +61,43 @@ Content-Type: application/json
 }
 
 
-### Test validation
+### Validate Schema test_title_3
 POST {{host}}/api/v1/schema/validate_def
 Content-Type: application/json
 
 {
-  "def_id": "4b736e56-8c99-c1c0-bd55-16175ec63f76"
+  "id": "4b736e56-8c99-c1c0-bd55-16175ec63f76"
 }
 
 
-### Test Activation
+### Validate Schema test_title_11
+POST {{host}}/api/v1/schema/validate_def
+Content-Type: application/json
+
+{
+  "id": "87603da8-1778-0450-b5a6-42d26c3adc7e"
+}
+
+
+### Activate Schema test_title_3
 POST {{host}}/api/v1/schema/activate_def
 Content-Type: application/json
 
 {
-  "def_id": "4b736e56-8c99-c1c0-bd55-16175ec63f76"
+  "id": "4b736e56-8c99-c1c0-bd55-16175ec63f76 "
 }
 
 
-### Test create student schema
+### Activate Schema test_title_11
+POST {{host}}/api/v1/schema/activate_def
+Content-Type: application/json
+
+{
+  "id": "87603da8-1778-0450-b5a6-42d26c3adc7e"
+}
+
+
+### Create Schema Student
 POST {{host}}/api/v1/schema/create_def
 Content-Type: application/json
 
@@ -88,7 +108,7 @@ POST {{host}}/api/v1/schema/validate_def
 Content-Type: application/json
 
 {
-  "def_id": "1bd23c91-3379-b65b-11cc-64984050e35c"
+  "id": "1bd23c91-3379-b65b-11cc-64984050e35c"
 }
 
 
@@ -97,14 +117,14 @@ POST {{host}}/api/v1/schema/activate_def
 Content-Type: application/json
 
 {
-  "def_id": "1bd23c91-3379-b65b-11cc-64984050e35c"
+  "id": "1bd23c91-3379-b65b-11cc-64984050e35c"
 }
 
 
-### Hello Entity
+### Hello Entity return Hello world!
 GET {{host}}/api/v1/entity/hello
 
-### Create Student
+### Create Entity Student
 POST {{host}}/api/v1/entity/Student
 Content-Type: application/json
 
@@ -140,8 +160,14 @@ Content-Type: application/json
   "schema": "test_schema"
 }
 
-### Get Definitions by id
+### Get Definitions by id Student
 GET {{host}}/api/v1/schema/1bd23c91-3379-b65b-11cc-64984050e35c
+
+### Get Definitions by id test_title_11
+GET {{host}}/api/v1/schema/87603da8-1778-0450-b5a6-42d26c3adc7e
+
+### Get Definitions by id test_title_3
+GET {{host}}/api/v1/schema/4b736e56-8c99-c1c0-bd55-16175ec63f76
 
 ### Get Definitions
 GET {{host}}/api/v1/schema

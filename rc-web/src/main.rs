@@ -4,7 +4,7 @@ use anyhow::Context;
 use definitions_core::definitions_domain::*;
 use disintegrate::NoSnapshot;
 use disintegrate_postgres::{PgEventListener, PgEventListenerConfig, PgEventStore};
-use log::error;
+use log::{debug, error};
 use rc_web::projections::definitions_read_model;
 use rc_web::projections::definitions_read_model::ReadModelProjection;
 use rc_web::routes::{api_routes, health_check};
@@ -72,7 +72,17 @@ async fn main(
     #[shuttle_shared_db::Postgres] shared_pool: PgPool,
     #[shuttle_runtime::Secrets] secrets: SecretStore,
 ) -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
-    // get secret defined in `Secrets.toml` file.
+    if cfg!(feature = "shuttle") {
+        debug!("Shuttle feature is enabled!");
+    } else {
+        debug!("Running locally.");
+    }
+    let is_remote = std::env::var("SHUTTLE_PUBLIC_URL").is_ok();
+    if is_remote {
+        debug!("Shuttle SHUTTLE_ENV is enabled!");
+    } else {
+        debug!("Running SHUTTLE_ENV locally.");
+    }
     let client_origin_url = secrets
         .get("CLIENT_ORIGIN_URL")
         .context("CLIENT_ORIGIN_URL was not found")?;
