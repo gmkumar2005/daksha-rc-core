@@ -178,6 +178,7 @@ mod tests {
     use crate::middleware::claims::Claims;
 
     // #[actix_web::test]
+    #[allow(dead_code)]
     async fn test_claims_from_request_success() {
         // Construct a dummy JWT token header with the correct kid
         let token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InFFWXNKVHRUU0tUU1hpQndjT2U4ciJ9.eyJpc3MiOiJodHRwczovL2Rha3NoYS51cy5hdXRoMC5jb20vIiwic3ViIjoieTdkSnN6SE9aMGJiQWJiSlpBc2FLY1IzQnZTVVI4OWJAY2xpZW50cyIsImF1ZCI6Imh0dHBzOi8vZGFrc2hhLnVzLmF1dGgwLmNvbS9hcGkvdjIvIiwiaWF0IjoxNzQ3OTM2ODk3LCJleHAiOjE3NDgwMjMyOTcsImd0eSI6ImNsaWVudC1jcmVkZW50aWFscyIsImF6cCI6Ink3ZEpzekhPWjBiYkFiYkpaQXNhS2NSM0J2U1VSODliIn0.E00qQvo2KtVLsK_e2vfb-npMWheK-ss_3Gnz28hj878AfhFkG8c_qAJNaStLedjYLGB4F54ZiIm2FN5Y1ST80wbeooLQS1fZ-hWoNZfcvpctGsbGtVUN9Nsb7VtB8J43qAB-f8nL59BxDSM5mds2ZxDaS1FMa-eozpdl27rLZyBaLMWEXgI44HE3XEUDhv62Db1VIizDZNM2k3ibH6IjuLPJg2PykalKwOaQpko7EhXCLjVAiovF5XrGwdxXpWJRkDs0ZIGzqH_kR0pVHsew-Y_SvUxxFuDHTe8Wi0XqBnjBtz6BRNsBF-jYgn_EeYBN2FQ3JefcqSonoBvBQU2pIA";

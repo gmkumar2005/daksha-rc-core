@@ -17,7 +17,9 @@ Content-Type: application/json
   "grant_type": "client_credentials"
 }
 > {%
+
 client.global.set("access_token", response.body.access_token);
+
 %}
 
 
@@ -106,7 +108,9 @@ Content-Type: application/json
 
 
 
+
 client.global.set("access_token", response.body.access_token);
+
 
 
 
@@ -114,7 +118,7 @@ client.global.set("access_token", response.body.access_token);
 
 ### Test GET echo with normal user
 POST {{host}}/echo
-authorization: Bearer {{access_token}}
+Authorization: Bearer {{access_token}}
 Content-Type: application/json
 
 {
