@@ -1,7 +1,9 @@
 use crate::middleware::claims::Claims;
 use crate::HEALTH;
 use actix_web::{get, post, web, HttpResponse, Responder, Scope};
+use chrono::Utc;
 use log::debug;
+use serde_json::{json, Value};
 use sqlx::PgPool;
 
 pub fn routes() -> Scope {
@@ -23,22 +25,41 @@ pub fn routes() -> Scope {
 )]
 #[get("/hello")]
 async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
+    HttpResponse::Ok()
+        .content_type("text/plain; charset=utf-8")
+        .body("Hello world!")
 }
 
 /// Simple endpoint to test if the server is running
 #[utoipa::path(
     path = "/echo",
-    request_body = String,
-    tag = HEALTH,
-    responses(
-        (status = 200, description = "Echo", body = String)
-    )
+     request_body(
+        content = Value,
+        content_type = "application/json",
+        example = json!({
+                "Hello": 123,
+                "Message": [1, 2, 3]
+            })
+
+        ),
+        tag = HEALTH,
+        responses(
+            (status = 200, description = "Echo", body = Value, content_type = "application/json")
+        ),
+    security(
+           ("bearer_auth" = []),
+       )
 )]
 #[post("/echo")]
-async fn echo(req_body: String, claims: Claims) -> impl Responder {
+async fn echo(req_body: web::Json<Value>, claims: Claims) -> impl Responder {
     debug!("Claims: {:?}", claims);
-    HttpResponse::Ok().body(req_body)
+    let response = json!({
+        "version": "1.0.0",
+        "timestamp": Utc::now().to_rfc3339(),
+        "data": req_body.into_inner()
+    });
+
+    HttpResponse::Ok().json(response)
 }
 /// Liveness probe
 #[utoipa::path(
@@ -51,11 +72,12 @@ async fn echo(req_body: String, claims: Claims) -> impl Responder {
 )]
 #[get("/healthz")]
 async fn healthz() -> impl Responder {
-    HttpResponse::Ok().body("ok")
+    HttpResponse::Ok()
+        .content_type("text/plain; charset=utf-8")
+        .body("healthy")
 }
 
 /// Readiness probe with DB check
-
 #[utoipa::path(
     get,
     path = "/readyz",
@@ -68,7 +90,9 @@ async fn healthz() -> impl Responder {
 async fn readyz(db_pool: web::Data<PgPool>) -> impl Responder {
     // Run a simple query to check DB connectivity (adapt query to your DB as needed)
     match sqlx::query("SELECT 1").execute(db_pool.get_ref()).await {
-        Ok(_) => HttpResponse::Ok().body("ready"),
+        Ok(_) => HttpResponse::Ok()
+            .content_type("text/plain; charset=utf-8")
+            .body("ready"),
         Err(_) => HttpResponse::ServiceUnavailable().body("db unavailable"),
     }
 }

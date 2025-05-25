@@ -1,5 +1,5 @@
-@host = http://localhost:8000
-#@host = https://daksha-ox98.shuttle.app
+#@host = http://localhost:8000
+@host = https://daksha-ox98.shuttle.app
 
 ### Test GET request
 GET {{host}}/hello

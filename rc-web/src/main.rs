@@ -14,6 +14,7 @@ use shuttle_runtime::SecretStore;
 use sqlx::PgPool;
 use std::env;
 use std::time::Duration;
+use utoipa::openapi::security::{HttpAuthScheme, SecurityScheme};
 use utoipa::OpenApi;
 use utoipa_rapidoc::RapiDoc;
 use utoipa_scalar::{Scalar, Servable};
@@ -21,11 +22,12 @@ use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(OpenApi)]
 #[openapi(
+    modifiers(&SecurityAddon),
+    security(("bearer_auth" = [])),
     info(
         title = "RC Web API",
         description = "Rest endpoints for the RC Web API",
     ),
-
     paths(
         rc_web::routes::health_check::hello,
         rc_web::routes::health_check::echo,
@@ -48,6 +50,23 @@ use utoipa_swagger_ui::SwaggerUi;
 )]
 pub struct ApiDoc;
 
+/// Add the bearer_auth security scheme
+struct SecurityAddon;
+
+impl utoipa::Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        openapi.components.as_mut().unwrap().add_security_scheme(
+            "bearer_auth",
+            SecurityScheme::Http(
+                utoipa::openapi::security::HttpBuilder::new()
+                    .scheme(HttpAuthScheme::Bearer)
+                    .bearer_format("JWT")
+                    .build(),
+            ),
+        );
+    }
+}
+
 #[shuttle_runtime::main]
 async fn main(
     #[shuttle_shared_db::Postgres] shared_pool: PgPool,
@@ -66,7 +85,6 @@ async fn main(
 
     let decision_maker = disintegrate_postgres::decision_maker(event_store.clone(), NoSnapshot);
     let api = ApiDoc::openapi();
-    //  .wrap(middleware::cors::cors(&client_origin_url))
     let config = move |cfg: &mut ServiceConfig| {
         cfg.app_data(Data::new(decision_maker.clone()))
             .app_data(Data::new(shared_pool_for_web.clone()))
