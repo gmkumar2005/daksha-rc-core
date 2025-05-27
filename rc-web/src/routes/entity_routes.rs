@@ -3,7 +3,7 @@ use crate::{API_PREFIX, BASE_URL, COMMANDS, ENTITY};
 use actix_web::web::Data;
 use actix_web::{get, post, web, HttpResponse, Responder, Scope};
 use definitions_core::definitions_domain::DomainEvent;
-use definitions_core::registry_domain::CreateEntityCmd;
+use definitions_core::registry_domain::{CreateEntityCmd, EntityError};
 use disintegrate::PersistedEvent;
 use disintegrate_postgres::PgEventId;
 use std::ops::Deref;
@@ -59,7 +59,11 @@ async fn create_entity(
             } => Some((id, registry_def_id, registry_def_version, entity_type)),
             _ => None,
         })
-        .unwrap();
+        .ok_or_else(|| {
+            DError::from(disintegrate::DecisionError::Domain(
+                EntityError::EventNotFound("EntityCreated".to_string()),
+            ))
+        })?;
 
     let response_message = format!(
         "Entity created with ID: {}, definition used {} version {} for entity type {} ",

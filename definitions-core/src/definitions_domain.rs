@@ -176,6 +176,8 @@ pub enum DefError {
     DigestMismatch(String, DefId),
     #[error("Invalid UUID: {0} for value {1}")]
     InvalidUUID(String, String),
+    #[error("Event type {0} not found")]
+    EventNotFound(String),
 }
 
 // start of mutations

@@ -30,6 +30,8 @@ pub enum EntityError {
     JsonSchemaError(String, String),
     #[error("Cannot delete entity which is in `{0}")]
     DeleteNotAllowed(EntityRecordStatus),
+    #[error("Event type {0} not found")]
+    EventNotFound(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Display)]

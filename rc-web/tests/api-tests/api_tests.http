@@ -141,8 +141,54 @@ Content-Type: application/json
   }
 }
 
+##### Start of Student1
+
+### Create Schema Student1
+POST {{host}}/api/v1/schema/create_def
+Content-Type: application/json
+
+< ./Student1_Schema.json
+
+### Validate Student1
+POST {{host}}/api/v1/schema/validate_def
+Content-Type: application/json
+
+{
+  "id": "80c7a337-83b2-9182-dac8-bff24e47cec1"
+}
 
 
+### Activate Student1
+POST {{host}}/api/v1/schema/activate_def
+Content-Type: application/json
+
+{
+  "id": "80c7a337-83b2-9182-dac8-bff24e47cec1"
+}
+
+
+### Hello Entity return Hello world!
+GET {{host}}/api/v1/entity/hello
+
+### Create Entity Student1
+POST {{host}}/api/v1/entity/Student1
+Content-Type: application/json
+
+{
+  "Student1": {
+    "identityDetails": {
+      "fullName": "John1",
+      "gender": "Male"
+    },
+    "contactDetails": {
+      "email": "abc@abc.com",
+      "address": "line1"
+    }
+  }
+}
+
+
+#### End of Student1
 
 ### Get Definitions by record_status
 GET {{host}}/api/v1/schema?record_status=Active

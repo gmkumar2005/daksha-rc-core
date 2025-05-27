@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used, clippy::panic)]
+
 use actix_web::http::header::ContentType;
 use actix_web::http::StatusCode;
 use actix_web::{error, HttpResponse};
