@@ -53,3 +53,4 @@ tokio-postgres = { workspace = true }
 default = ["std"] # Example, can be empty
 std = []
 integration_tests = []
+shuttle = []

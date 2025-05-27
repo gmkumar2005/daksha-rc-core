@@ -61,6 +61,7 @@ async fn activate_def(
     web_cmd: web::Json<ValidateDefRequest>,
 ) -> Result<HttpResponse, DError> {
     let identifier = validate_id(&web_cmd)?;
+    debug!("Activating def with id: {}", identifier);
     let validate_def_cmd = ActivateDefinitionCmd {
         id: identifier,
         activated_at: Utc::now(),
@@ -108,9 +109,9 @@ async fn validate_def(
     web_cmd: web::Json<ValidateDefRequest>,
 ) -> Result<HttpResponse, DError> {
     let identifier = validate_id(&web_cmd)?;
-
+    debug!("Validating def with id: {}", identifier);
     let validate_def_cmd = ValidateDefinitionCmd {
-        id: identifier.clone(),
+        id: identifier,
         validated_at: Utc::now(),
         validated_by: "test_validated_by".to_string(),
     };
@@ -127,7 +128,11 @@ async fn validate_def(
             } => Some((validation_result, id)),
             _ => None,
         })
-        .unwrap();
+        .ok_or_else(|| {
+            DError::from(disintegrate::DecisionError::Domain(
+                DefError::EventNotFound("DefValidated".to_string()),
+            ))
+        })?;
     debug!(
         "Validation result of def Definition ID: {} is: {}",
         validated_defid, validation_result
@@ -137,7 +142,7 @@ async fn validate_def(
         "Validation result for Definition with ID {}: is {}.",
         validated_defid, validation_result
     );
-
+    debug!("Validation result from domain is : {}", validation_result);
     if validation_result != "Success" {
         return Err(DError::from(disintegrate::DecisionError::Domain(
             DefError::DefinitionNotValid,
@@ -187,7 +192,11 @@ async fn create_def(
             DomainEvent::DefCreated { title, id, .. } => Some((title, id)),
             _ => None,
         })
-        .unwrap();
+        .ok_or_else(|| {
+            DError::from(disintegrate::DecisionError::Domain(
+                DefError::EventNotFound("DefCreated".to_string()),
+            ))
+        })?;
     debug!(
         "Created def with id: {} and title: {}",
         created_defid, created_title

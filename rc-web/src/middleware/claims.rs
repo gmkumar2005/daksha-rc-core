@@ -133,20 +133,19 @@ impl FromRequest for Claims {
                 .context("AUTH0_AUDIENCE was not found")
                 .map_err(|e| ClientError::NotFound(format!("Invalid JWKS format: {:?}", e)))?;
             // Fetch JWKS (JSON Web Key Set)
-            let jwks: JwkSet = reqwest::get(
-                Uri::builder()
-                    .scheme("https")
-                    .authority(domain.as_str())
-                    .path_and_query("/.well-known/jwks.json")
-                    .build()
-                    .unwrap()
-                    .to_string(),
-            )
-            .await
-            .map_err(|e| ClientError::NotFound(format!("Failed to fetch JWKS: {:?}", e)))?
-            .json()
-            .await
-            .map_err(|e| ClientError::NotFound(format!("Invalid JWKS format: {:?}", e)))?;
+            let jwks_uri = Uri::builder()
+                .scheme("https")
+                .authority(domain.as_str())
+                .path_and_query("/.well-known/jwks.json")
+                .build()
+                .map_err(|e| ClientError::NotFound(format!("Failed to build JWKS URI: {e}")))?;
+
+            let jwks: JwkSet = reqwest::get(jwks_uri.to_string())
+                .await
+                .map_err(|e| ClientError::NotFound(format!("Failed to fetch JWKS: {:?}", e)))?
+                .json()
+                .await
+                .map_err(|e| ClientError::NotFound(format!("Invalid JWKS format: {:?}", e)))?;
 
             let jwk = jwks
                 .find(&kid)
