@@ -16,7 +16,7 @@
     </build-profile>
     <build-profile instance="dr">
         <variables>
-            <noindex-content>true</noindex-content>
+            <noindex-content>false</noindex-content>
             <header-logo>Daksha-RC-Logo.png</header-logo>
             <product-web-url>https://daksha-rc.github.io/daksha-rc-core/overview.html</product-web-url>
         </variables>

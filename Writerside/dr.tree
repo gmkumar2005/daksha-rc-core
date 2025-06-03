@@ -20,5 +20,6 @@
         </toc-element>
     </toc-element>
     <toc-element topic="Minimum-Viable-Product-MVP-Document.md"/>
+    <toc-element topic="Quickstart.md"/>
     <toc-element topic="Glossary.md"/>
 </instance-profile>
