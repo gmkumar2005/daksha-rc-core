@@ -55,23 +55,26 @@ impl error::ResponseError for DError {
 
     fn error_response(&self) -> HttpResponse {
         HttpResponse::build(self.status_code())
-            .insert_header(ContentType::html())
+            .insert_header(ContentType::json())
             .body(self.to_string())
     }
 }
 
-pub const DEFINITIONS: &str = "Definitions";
-pub const COMMANDS: &str = "Commands";
-pub const QUERY: &str = "Query";
-pub const HEALTH: &str = "Health";
-pub const ENTITY: &str = "Entity";
+pub const DEFINITIONS: &str = "1. Definitions";
+pub const COMMANDS: &str = "3. Commands";
+pub const QUERY: &str = "4. Query";
+pub const HEALTH: &str = "5. Health";
+pub const ENTITY: &str = "2. Entity";
 pub const API_PREFIX: &str = "/api/v1";
 
-#[cfg(feature = "shuttle")]
-const BASE_URL: &str = "https://daksha-ox98.shuttle.app";
-
-#[cfg(not(feature = "shuttle"))]
-const BASE_URL: &str = "http://localhost:8000";
+pub fn base_url() -> &'static str {
+    let is_remote = std::env::var("SHUTTLE_PUBLIC_URL").is_ok();
+    if is_remote {
+        "https://daksha-ox98.shuttle.app"
+    } else {
+        "http://localhost:8000"
+    }
+}
 
 #[derive(Serialize)]
 pub struct ErrorMessage {
@@ -79,5 +82,11 @@ pub struct ErrorMessage {
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_description: Option<String>,
+    pub message: String,
+}
+
+#[derive(Serialize)]
+pub struct SuccessResponse {
+    pub id: String,
     pub message: String,
 }

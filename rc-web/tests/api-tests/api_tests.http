@@ -209,6 +209,9 @@ Content-Type: application/json
 ### Get Definitions by id Student
 GET {{host}}/api/v1/schema/1bd23c91-3379-b65b-11cc-64984050e35c
 
+### Get Definitions by id Student should return not found
+GET {{host}}/api/v1/schema/1bd23c91-3379-b65b-11cc-64984050e35d
+
 ### Get Definitions by id test_title_11
 GET {{host}}/api/v1/schema/87603da8-1778-0450-b5a6-42d26c3adc7e
 

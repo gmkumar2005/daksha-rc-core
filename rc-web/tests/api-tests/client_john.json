@@ -1,0 +1,27 @@
+{
+  "name": "John Smith",
+  "organization": "Tech Innovations Ltd",
+  "industry": "Software Development",
+  "requirements": "Need consultation for cloud migration and microservices architecture",
+  "location": {
+    "city": "San Francisco",
+    "state": "California",
+    "country": "USA"
+  },
+  "contactInformation": {
+    "email": "john.smith@techinnovations.com",
+    "phone": "+1-555-123-4567"
+  },
+  "verifiedCredentials": [
+    {
+      "credentialId": "CERT-2023-001",
+      "issuer": "ISO 27001",
+      "issueDate": "2023-01-15"
+    },
+    {
+      "credentialId": "CERT-2023-002",
+      "issuer": "CMMI Level 5",
+      "issueDate": "2023-03-20"
+    }
+  ]
+}

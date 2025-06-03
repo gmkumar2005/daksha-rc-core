@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "Teacher": {
+      "$ref": "#/definitions/Teacher"
+    }
+  },
+  "required": [
+    "Teacher"
+  ],
+  "title": "Teacher",
+  "definitions": {
+    "Teacher": {
+      "$id": "#/properties/Teacher",
+      "type": "object",
+      "title": "The Teacher Schema",
+      "required": [
+      ],
+      "properties": {
+        "personalDetails": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string"
+            }
+          }
+        },
+        "identityDetails": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

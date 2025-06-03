@@ -1,0 +1,37 @@
+{
+  "name": "Dr. Sarah Johnson",
+  "expertise": [
+    "Cloud Architecture",
+    "System Design",
+    "DevOps",
+    "Microservices"
+  ],
+  "certifications": [
+    {
+      "credentialId": "AWS-SAP-123456",
+      "issuer": "Amazon Web Services",
+      "issueDate": "2023-06-15"
+    },
+    {
+      "credentialId": "GCP-APD-789012",
+      "issuer": "Google Cloud",
+      "issueDate": "2023-03-20"
+    }
+  ],
+  "experienceYears": 12,
+  "portfolio": [
+    "https://github.com/sarahjohnson",
+    "https://linkedin.com/in/sarahjohnson",
+    "https://consulting-cases.example.com/cloud-migration-study"
+  ],
+  "availability": "Limited",
+  "location": {
+    "city": "Seattle",
+    "state": "Washington",
+    "country": "USA"
+  },
+  "contactInformation": {
+    "email": "sarah.johnson@consulting.example.com",
+    "phone": "+1-206-555-0123"
+  }
+}

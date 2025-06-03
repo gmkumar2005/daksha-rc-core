@@ -1,13 +1,19 @@
-use crate::{DError, DecisionMaker};
-use crate::{API_PREFIX, BASE_URL, COMMANDS, ENTITY};
+use crate::routes::{
+    ErrorResponse, CLIENT_JOHN_EXAMPLE, CONSULTANT_SARAH_EXAMPLE, STUDENT_JOHN_EXAMPLE,
+    TEACHER_SMITH_EXAMPLE,
+};
+use crate::{base_url, DError, DecisionMaker, SuccessResponse};
+use crate::{API_PREFIX, COMMANDS, ENTITY};
 use actix_web::web::Data;
 use actix_web::{get, post, web, HttpResponse, Responder, Scope};
 use definitions_core::definitions_domain::DomainEvent;
 use definitions_core::registry_domain::{CreateEntityCmd, EntityError};
 use disintegrate::PersistedEvent;
 use disintegrate_postgres::PgEventId;
+use serde_json::Value;
 use std::ops::Deref;
 use uuid::Uuid;
+
 pub fn routes() -> Scope {
     web::scope("")
         // .service(handlers::admin)
@@ -15,20 +21,34 @@ pub fn routes() -> Scope {
         .service(hello)
 }
 
+/// Respond with "Hello world!"
 #[get("/hello")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
+/// Create an entity for a given entity type
 #[utoipa::path(
     post,
     path = "/api/v1/entity/{entity_type}",
     tags= [ENTITY, COMMANDS],
+    request_body(
+        content = String,
+        content_type = "application/json",
+        examples(
+            ("Teacher_smith" = (value = json!(serde_json::from_str::<Value>(TEACHER_SMITH_EXAMPLE).unwrap()), description = "Teacher in Education domain")),
+            ("Student_john" = (value = json!(serde_json::from_str::<Value>(STUDENT_JOHN_EXAMPLE).unwrap()), description = "Student in Education domain")),
+            ("Consultant_sarah" = (value = json!(serde_json::from_str::<Value>(CONSULTANT_SARAH_EXAMPLE).unwrap()), description = "Consultant in Remote working domain")),
+            ("Client_john" = (value = json!(serde_json::from_str::<Value>(CLIENT_JOHN_EXAMPLE).unwrap()), description = "Client in Remote working domain")),
+        )
+    ),
     params(
-        ("entity_id" = String, Path, description = "Entity type", example = "Student")
+        ("entity_type" = String, Path, description = "Entity type", example = "Student")
     ),
     responses(
         (status = 200, description = "Entity created", body = String),
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 409, description = "Entity Already Exists", body = String),
     )
 )]
 #[post("/{entity_type}")]
@@ -74,7 +94,13 @@ async fn create_entity(
     );
 
     Ok(HttpResponse::Ok()
-        .append_header(("Location", format!("{BASE_URL}{API_PREFIX}/entity/{}", id)))
+        .append_header((
+            "Location",
+            format!("{}{API_PREFIX}/entity/{}", base_url(), id),
+        ))
         .append_header(("message", response_message))
-        .finish())
+        .json(SuccessResponse {
+            id: id.to_string(),
+            message: format!("Entity created for Entity type: {}", entity_type),
+        }))
 }

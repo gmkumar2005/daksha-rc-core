@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "title": "Consultant",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Full name of the consultant"
+    },
+    "expertise": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Areas of specialization or domain expertise"
+    },
+    "certifications": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Credential"
+      },
+      "description": "Verified professional certifications"
+    },
+    "experienceYears": {
+      "type": "integer",
+      "description": "Total years of experience"
+    },
+    "portfolio": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      },
+      "description": "Links to past work, case studies, or testimonials"
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "Available",
+        "Unavailable",
+        "Limited"
+      ],
+      "description": "Current availability status for new engagements"
+    },
+    "location": {
+      "$ref": "#/definitions/Location"
+    },
+    "contactInformation": {
+      "$ref": "#/definitions/Contact"
+    }
+  },
+  "required": [
+    "name",
+    "expertise",
+    "contactInformation"
+  ],
+  "definitions": {
+    "Location": {
+      "type": "object",
+      "properties": {
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "city",
+        "country"
+      ]
+    },
+    "Contact": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "email"
+      ]
+    },
+    "Credential": {
+      "type": "object",
+      "properties": {
+        "credentialId": {
+          "type": "string"
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "issueDate": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "required": [
+        "credentialId",
+        "issuer"
+      ]
+    }
+  }
+}

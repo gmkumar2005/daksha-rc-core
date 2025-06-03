@@ -1,0 +1,11 @@
+{
+  "Teacher": {
+    "personalDetails": {
+      "email": "teacher.smith@school.edu"
+    },
+    "identityDetails": {
+      "id": "TCHR-2023-001",
+      "value": "123456789"
+    }
+  }
+}

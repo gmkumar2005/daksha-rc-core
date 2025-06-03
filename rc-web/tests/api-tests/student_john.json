@@ -1,0 +1,18 @@
+{
+  "Student": {
+    "identityDetails": {
+      "fullName": "John Smith",
+      "gender": "Male",
+      "dob": "2000-05-15",
+      "identityHolder": {
+        "type": "AADHAR",
+        "value": "1234-5678-9012"
+      }
+    },
+    "contactDetails": {
+      "email": "john.smith@example.com",
+      "mobile": "+91-9876543210",
+      "address": "123 Education Street, Knowledge City, Learning State - 100001"
+    }
+  }
+}
