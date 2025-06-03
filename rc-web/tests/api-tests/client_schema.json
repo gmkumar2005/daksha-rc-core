@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "title": "Client",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Full name of the client"
+    },
+    "organization": {
+      "type": "string",
+      "description": "Associated business or entity"
+    },
+    "industry": {
+      "type": "string",
+      "description": "Industry sector of the client"
+    },
+    "requirements": {
+      "type": "string",
+      "description": "Project needs or consultation requirements"
+    },
+    "location": {
+      "$ref": "#/definitions/Location"
+    },
+    "contactInformation": {
+      "$ref": "#/definitions/Contact"
+    },
+    "verifiedCredentials": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Credential"
+      }
+    }
+  },
+  "required": [
+    "name",
+    "organization",
+    "requirements"
+  ],
+  "definitions": {
+    "Location": {
+      "type": "object",
+      "properties": {
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "city",
+        "country"
+      ]
+    },
+    "Contact": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "email"
+      ]
+    },
+    "Credential": {
+      "type": "object",
+      "properties": {
+        "credentialId": {
+          "type": "string"
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "issueDate": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "required": [
+        "credentialId",
+        "issuer"
+      ]
+    }
+  }
+}

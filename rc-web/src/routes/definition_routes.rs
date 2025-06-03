@@ -1,6 +1,11 @@
 use crate::models::ValidateDefRequest;
 // use rc_web::{DError, DecisionMaker};
-use crate::{DError, DecisionMaker, API_PREFIX, BASE_URL, COMMANDS, DEFINITIONS, QUERY};
+use crate::routes::{
+    ErrorResponse, CLIENT_EXAMPLE, CONSULTANT_EXAMPLE, STUDENT_EXAMPLE, TEACHER_EXAMPLE,
+};
+use crate::{
+    base_url, DError, DecisionMaker, SuccessResponse, API_PREFIX, COMMANDS, DEFINITIONS, QUERY,
+};
 use actix_web::web::{Data, Json, Query};
 use actix_web::{get, post, web, HttpResponse, Responder, Scope};
 use chrono::{DateTime, Utc};
@@ -12,6 +17,7 @@ use disintegrate::PersistedEvent;
 use disintegrate_postgres::PgEventId;
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sqlx::{FromRow, PgPool};
 use std::ops::Deref;
 use std::str::FromStr;
@@ -53,7 +59,16 @@ pub fn routes() -> Scope {
     tags= [DEFINITIONS, COMMANDS],
     responses(
         (status = 200, description = "Activation successful", body = String)
-    )
+    ),
+     request_body(
+        content_type = "application/json",
+        examples(
+            ("Teacher" = (value = json!({"id": "e757aa6e-d39a-2db7-6345-473ddd8aadb2"}), description = "Teacher in Education domain")),
+            ("Student" = (value = json!({"id": "1bd23c91-3379-b65b-11cc-64984050e35c"}), description = "Student in Education domain")),
+            ("Consultant" = (value = json!({"id": "8568a0b3-8900-e4d2-6e72-e3ad5792288e"}), description = "Consultant in Remote working domain")),
+            ("Client" = (value = json!({"id": "fa0f1791-8ddc-5934-fc00-2aff27a84ddf"}), description = "Client in Remote working domain")),
+        )
+    ),
 )]
 #[post("/activate_def")]
 async fn activate_def(
@@ -62,14 +77,14 @@ async fn activate_def(
 ) -> Result<HttpResponse, DError> {
     let identifier = validate_id(&web_cmd)?;
     debug!("Activating def with id: {}", identifier);
-    let validate_def_cmd = ActivateDefinitionCmd {
+    let activate_def_command = ActivateDefinitionCmd {
         id: identifier,
         activated_at: Utc::now(),
         activated_by: "test_activated_by".to_string(),
     };
 
     let _exec_results: Vec<PersistedEvent<PgEventId, DomainEvent>> =
-        decision_maker.make(validate_def_cmd).await?;
+        decision_maker.make(activate_def_command).await?;
 
     let response_message = format!(
         "Activation successful for Definition with ID: {}",
@@ -79,10 +94,13 @@ async fn activate_def(
     Ok(HttpResponse::Ok()
         .append_header((
             "Location",
-            format!("{BASE_URL}{API_PREFIX}/schema/{}", web_cmd.id.as_str()),
+            format!("{}{API_PREFIX}/schema/{}", base_url(), web_cmd.id.as_str()),
         ))
-        .append_header(("message", response_message))
-        .finish())
+        .append_header(("message", response_message.clone()))
+        .json(SuccessResponse {
+            id: web_cmd.id.clone(),
+            message: response_message,
+        }))
 }
 
 fn validate_id(web_cmd: &Json<ValidateDefRequest>) -> Result<Uuid, DError> {
@@ -142,7 +160,7 @@ async fn validate_def(
         "Validation result for Definition with ID {}: is {}.",
         validated_defid, validation_result
     );
-    debug!("Validation result from domain is : {}", validation_result);
+    debug!("{}", response_message.clone());
     if validation_result != "Success" {
         return Err(DError::from(disintegrate::DecisionError::Domain(
             DefError::DefinitionNotValid,
@@ -152,17 +170,30 @@ async fn validate_def(
     Ok(HttpResponse::Ok()
         .append_header((
             "Location",
-            format!("{BASE_URL}{API_PREFIX}/schema/{}", validated_defid),
+            format!("{}{API_PREFIX}/schema/{}", base_url(), validated_defid),
         ))
-        .append_header(("message", response_message))
-        .finish())
+        .append_header(("message", response_message.clone()))
+        .json(SuccessResponse {
+            id: web_cmd.id.clone(),
+            message: response_message,
+        }))
 }
-/// Create a definition
 
+/// Create a definition
 #[utoipa::path(
     post,
     path = "/api/v1/schema/create_def",
     tags= [DEFINITIONS, COMMANDS],
+     request_body(
+        content = String,
+        content_type = "application/json",
+        examples(
+            ("Teacher" = (value = json!(serde_json::from_str::<Value>(TEACHER_EXAMPLE).unwrap()), description = "Teacher in Education domain")),
+            ("Student" = (value = json!(serde_json::from_str::<Value>(STUDENT_EXAMPLE).unwrap()), description = "Student in Education domain")),
+            ("Consultant" = (value = json!(serde_json::from_str::<Value>(CONSULTANT_EXAMPLE).unwrap()), description = "Consultant in Remote working domain")),
+            ("Client" = (value = json!(serde_json::from_str::<Value>(CLIENT_EXAMPLE).unwrap()), description = "Client in Remote working domain")),
+        )
+    ),
     responses(
         (status = 200, description = "Definition created", body = String),
         (status = 400, description = "Invalid Schema", body = String),
@@ -197,21 +228,22 @@ async fn create_def(
                 DefError::EventNotFound("DefCreated".to_string()),
             ))
         })?;
-    debug!(
-        "Created def with id: {} and title: {}",
-        created_defid, created_title
-    );
+
     let response_message = format!(
-        "SchemaDef created with id: {} for title:  {}",
+        "Definition created with Id: {} for Title:  {}",
         created_defid, created_title
     );
+    debug!("{}", response_message.clone());
     Ok(HttpResponse::Created()
         .append_header((
             "Location",
-            format!("{BASE_URL}{API_PREFIX}/schema/{}", created_defid),
+            format!("{}{API_PREFIX}/schema/{}", base_url(), created_defid),
         ))
-        .append_header(("message", response_message))
-        .finish())
+        .append_header(("message", response_message.clone()))
+        .json(SuccessResponse {
+            id: created_defid.to_string(),
+            message: response_message,
+        }))
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -243,7 +275,8 @@ pub struct DefinitionQuery {
         DefinitionQuery
     ),
     responses(
-        (status = 200, body = DefinitionsResponse)
+        (status = 200, body = DefinitionsResponse),
+        (status = 404, description = "Definition not found", body = ErrorResponse)
     )
 )]
 #[get("")]
@@ -284,8 +317,12 @@ async fn get_definitions(db_pool: Data<PgPool>, query: Query<DefinitionQuery>) -
     match query_builder.fetch_all(db_pool.get_ref()).await {
         Ok(definitions) => HttpResponse::Ok().json(definitions),
         Err(e) => {
-            eprintln!("Database query failed: {}", e);
-            HttpResponse::InternalServerError().body("Failed to fetch definitions")
+            debug!("Database query failed: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                error: Some("Failed to fetch definitions".into()),
+                error_description: Some(format!("Error {} while fetching", e)),
+                message: format!("Error {} while fetching", e),
+            })
         }
     }
 }
@@ -296,10 +333,11 @@ async fn get_definitions(db_pool: Data<PgPool>, query: Query<DefinitionQuery>) -
     path = "/api/v1/schema/{id}",
     tags= [DEFINITIONS, QUERY],
     params(
-        ("id" = Uuid, Path, description = "ID of the definition to fetch",example = "4b736e56-8c99-c1c0-bd55-16175ec63f76")
+        ("id" = Uuid, Path, description = "ID of the definition to fetch",example = "1bd23c91-3379-b65b-11cc-64984050e35c")
     ),
     responses(
-        (status = 200, body = DefinitionsResponse)
+     (status = 200, body = DefinitionsResponse),
+     (status = 404, description = "Definition not found", body = ErrorResponse)
     )
 )]
 #[get("/{id}")]
@@ -318,10 +356,18 @@ async fn get_definitions_by_id(db_pool: Data<PgPool>, path: web::Path<Uuid>) -> 
     .await
     {
         Ok(Some(definition)) => HttpResponse::Ok().json(definition),
-        Ok(None) => HttpResponse::NotFound().body(format!("No definition found for id {}", id)),
+        Ok(None) => HttpResponse::NotFound().json(ErrorResponse {
+            error: Some("definition_not_found".into()),
+            error_description: Some(format!("Definition not found for id {}", id)),
+            message: format!("Definition not found for id {}", id),
+        }),
         Err(e) => {
             error!("Database query failed: {}", e);
-            HttpResponse::NotFound().body("Failed to fetch definition")
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                error: Some("Failed to fetch definition or invalid id".into()),
+                error_description: Some(format!("Error {} while fetching id {}", e, id)),
+                message: format!("Error {} while fetching id {}", e, id),
+            })
         }
     }
 }

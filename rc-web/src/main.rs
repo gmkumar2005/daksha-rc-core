@@ -29,23 +29,24 @@ use utoipa_swagger_ui::SwaggerUi;
         description = "Rest endpoints for the RC Web API",
     ),
     paths(
+        rc_web::routes::definition_routes::create_def,
+        rc_web::routes::definition_routes::activate_def,
+        rc_web::routes::definition_routes::get_definitions,
+        rc_web::routes::definition_routes::get_definitions_by_id,
+        rc_web::routes::entity_routes::create_entity,
         rc_web::routes::health_check::hello,
         rc_web::routes::health_check::echo,
         rc_web::routes::health_check::healthz,
         rc_web::routes::health_check::readyz,
-        rc_web::routes::definition_routes::activate_def,
-        rc_web::routes::definition_routes::get_definitions,
-        rc_web::routes::definition_routes::get_definitions_by_id,
-        rc_web::routes::definition_routes::validate_def,
-        rc_web::routes::definition_routes::create_def,
-        rc_web::routes::entity_routes::create_entity,
     ),
     tags(
     (name = DEFINITIONS, description = "Manage Definitions and Schemas"),
-    (name = QUERY, description = "Order API endpoints"),
-    (name = HEALTH, description = "Health API endpoints and Debug"),
     (name = ENTITY, description = "Manage Entities and Entity LifeCycle"),
     (name = COMMANDS, description = "Write side commands which makes updates to the state"),
+    (name = QUERY, description = "Order API endpoints"),
+    (name = HEALTH, description = "Health API endpoints and Debug"),
+
+
     )
 )]
 pub struct ApiDoc;

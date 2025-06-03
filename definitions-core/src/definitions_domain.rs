@@ -404,7 +404,7 @@ impl Decision for ActivateDefinitionCmd {
 
     fn process(&self, state: &Self::StateQuery) -> Result<Vec<Self::Event>, Self::Error> {
         if !state_machine(&state.record_status, RegistryDefAction::Activate) {
-            return Ok(vec![]);
+            return Err(DefError::ActivateNotAllowed(state.record_status.clone()));
         }
         Ok(vec![DomainEvent::DefActivated {
             id: self.id,
@@ -497,7 +497,10 @@ pub fn state_machine(current_status: &DefRecordStatus, action: RegistryDefAction
             matches!(current_status, DefRecordStatus::Active)
         }
         RegistryDefAction::Activate => {
-            matches!(current_status, DefRecordStatus::Valid)
+            matches!(
+                current_status,
+                DefRecordStatus::Valid | DefRecordStatus::Draft
+            )
         }
 
         _ => false,
