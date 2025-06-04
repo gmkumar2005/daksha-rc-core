@@ -1,9 +1,9 @@
 use crate::ErrorMessage;
 use actix_web::{
     dev::Payload,
-    error::{ErrorInternalServerError, ResponseError},
-    http::{StatusCode, Uri},
-    web::Data,
+    error::ResponseError,
+    http::{StatusCode, Uri}
+    ,
     Error, FromRequest, HttpRequest, HttpResponse,
 };
 use actix_web_httpauth::extractors::bearer::BearerAuth;
@@ -16,8 +16,7 @@ use jsonwebtoken::{
     Algorithm, DecodingKey, Validation,
 };
 use serde::Deserialize;
-use shuttle_runtime::SecretStore;
-use std::{collections::HashSet, future::Future, pin::Pin};
+use std::{collections::HashSet, env, future::Future, pin::Pin};
 
 // Enum to represent different types of client errors
 #[derive(Debug, Display)]
@@ -98,24 +97,6 @@ impl FromRequest for Claims {
     type Future = Pin<Box<dyn Future<Output = Result<Self, Self::Error>>>>;
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        //  let config = req.app_data::<web::Data<JwtConfig>>();
-        // let auth_config = match req.app_data::<Data<BTreeMap<String, String>>>() {
-        //     Some(config) => config.clone(),
-        //     None => {
-        //         return Box::pin(async {
-        //             Err(ErrorInternalServerError("Missing Secrets configuration"))
-        //         });
-        //     }
-        // };
-
-        let auth_config = match req.app_data::<Data<SecretStore>>() {
-            Some(config) => config.clone(),
-            None => {
-                return Box::pin(async {
-                    Err(ErrorInternalServerError("Missing Secrets configuration"))
-                });
-            }
-        };
         let auth_extractor = BearerAuth::extract(req);
         Box::pin(async move {
             let credentials = auth_extractor.await.map_err(ClientError::Authentication)?;
@@ -124,14 +105,13 @@ impl FromRequest for Claims {
             let kid = header.kid.ok_or_else(|| {
                 ClientError::NotFound("kid not found in token header".to_string())
             })?;
-            let domain = auth_config
-                .get("AUTH0_DOMAIN")
+            let domain = env::var("AUTH0_DOMAIN")
                 .context("AUTH0_DOMAIN was not found")
                 .map_err(|e| ClientError::NotFound(format!("Invalid JWKS format: {:?}", e)))?;
-            let audience = auth_config
-                .get("AUTH0_AUDIENCE")
+            let audience = env::var("AUTH0_AUDIENCE")
                 .context("AUTH0_AUDIENCE was not found")
                 .map_err(|e| ClientError::NotFound(format!("Invalid JWKS format: {:?}", e)))?;
+
             // Fetch JWKS (JSON Web Key Set)
             let jwks_uri = Uri::builder()
                 .scheme("https")

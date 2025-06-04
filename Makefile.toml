@@ -5,10 +5,7 @@ default_to_workspace = false
 [tasks.db-dev]
 description = "database: run the local database for development"
 category = "Database"
-dependencies = [
-    "install-dotenvx",
-    "docker-postgres-run"
-]
+dependencies = ["install-dotenvx", "docker-postgres-run"]
 
 [tasks.clean]
 description = "clean: remove the target directory"
@@ -56,7 +53,11 @@ disabled = true
 description = "database: prepare the queries for the offline mode"
 category = "Database"
 install_crate = "sqlx-cli"
-install_crate_args = ["--no-default-features", "--features", "native-tls,postgres"]
+install_crate_args = [
+    "--no-default-features",
+    "--features",
+    "native-tls,postgres",
+]
 command = "dotenvx"
 args = ["run", "--", "cargo", "sqlx", "prepare", "--workspace", "--", "--tests"]
 dependencies = ["install-dotenvx"]
@@ -65,7 +66,11 @@ dependencies = ["install-dotenvx"]
 description = "database: run the database migrations"
 category = "Database"
 install_crate = "sqlx-cli"
-install_crate_args = ["--no-default-features", "--features", "native-tls,postgres"]
+install_crate_args = [
+    "--no-default-features",
+    "--features",
+    "native-tls,postgres",
+]
 command = "dotenvx"
 args = ["run", "--", "sqlx", "migrate", "run"]
 dependencies = ["install-dotenvx"]
@@ -78,16 +83,26 @@ dependencies = [
     "docker-postgres-run",
     "db-migrate",
     "db-prepare",
-    "docker-postgres-stop"
+    "docker-postgres-stop",
 ]
 
 [tasks.docker-postgres-run]
 command = "dotenvx"
-args = ["run", "--", "docker-compose", "-f", "rc-web/docker-compose.yml", "up", "-d"]
+args = [
+    "run",
+    "--",
+    "docker-compose",
+    "-f",
+    "rc-web/docker-compose.yml",
+    "up",
+    "postgres",
+    "pgadmin",
+    "-d",
+]
 category = "Database"
 dependencies = ["install-dotenvx"]
 
-[tasks.docker-postgres-stop]
+[tasks.stop]
 command = "docker-compose"
 category = "Database"
 args = ["-f", "rc-web/docker-compose.yml", "down"]
@@ -97,6 +112,12 @@ description = "Install dotenvx"
 category = "Setup"
 install_crate = "dotenvx"
 
+[tasks.build-image]
+description = "build-image: build Docker image for rc-web"
+category = "Docker"
+command = "docker"
+args = ["build", "-t", "rc-web:latest", "-f", "rc-web/Dockerfile", "."]
+
 [tasks.run]
 description = "run: run the web application"
 category = "Run"
@@ -105,3 +126,32 @@ env = { "RUST_LOG" = "rc_web=debug" }
 args = ["run", "--", "cargo", "run", "--bin", "rc-web"]
 dependencies = ["db-dev"]
 #run --package rc-web --bin rc-web
+[tasks.build-image-clean]
+description = "build-image-clean: build Docker image without cache"
+category = "Docker"
+command = "docker"
+args = [
+    "build",
+    "--no-cache",
+    "-t",
+    "rc-web:latest",
+    "-f",
+    "rc-web/Dockerfile",
+    ".",
+]
+
+[tasks.run-container]
+description = "run-container: run rc-web container"
+category = "App"
+command = "dotenvx"
+args = [
+    "run",
+    "--",
+    "docker-compose",
+    "-f",
+    "rc-web/docker-compose.yml",
+    "up",
+    "rc-web",
+    "-d",
+]
+dependencies = ["db-dev"]
