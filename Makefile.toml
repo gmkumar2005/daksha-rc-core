@@ -112,6 +112,35 @@ description = "Install dotenvx"
 category = "Setup"
 install_crate = "dotenvx"
 
+[tasks.install-kubectl]
+description = "Install kubectl if not present"
+category = "Setup"
+windows = { script = [
+    'where kubectl >nul 2>nul && echo kubectl already installed && exit /b 0',
+    'set "KUBECTL_VERSION=v1.30.2"',
+    'curl -LO https://dl.k8s.io/release/%KUBECTL_VERSION%/bin/windows/amd64/kubectl.exe',
+    'move /Y kubectl.exe C:\\Windows\\System32\\kubectl.exe'
+] }
+linux = { script = [
+    'if command -v kubectl >/dev/null 2>&1; then echo "kubectl already installed"; exit 0; fi',
+    'KUBECTL_VERSION=v1.30.2',
+    'curl -LO https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl',
+    'chmod +x kubectl',
+    'sudo mv kubectl /usr/local/bin/'
+] }
+mac = { script = [
+    'if command -v kubectl >/dev/null 2>&1; then echo "kubectl already installed"; exit 0; fi',
+    'KUBECTL_VERSION=v1.30.2',
+    'ARCH=$(uname -m)',
+    'if [ "$ARCH" = "arm64" ]; then',
+    '  curl -LO https://dl.k8s.io/release/$KUBECTL_VERSION/bin/darwin/arm64/kubectl',
+    'else',
+    '  curl -LO https://dl.k8s.io/release/$KUBECTL_VERSION/bin/darwin/amd64/kubectl',
+    'fi',
+    'chmod +x kubectl',
+    'sudo mv kubectl /usr/local/bin/'
+] }
+
 [tasks.build-image]
 description = "build-image: build Docker image for rc-web"
 category = "Docker"
