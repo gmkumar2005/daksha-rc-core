@@ -107,3 +107,14 @@ kubectl port-forward service/dev-rc-app 8000:8000 &
 curl http://localhost:50000/healthz
 
 ```
+
+## Mirrord commands
+
+```shell
+
+mirrord exec cargo run  --target pod/dev-rc-app-ffc4969db-4zjcv
+
+RUST_LOG=debug mirrord exec cargo run --target pod/dev-rc-app-ffc4969db-4zjcv
+
+RUST_LOG=rc_web=debug mirrord exec cargo run --target pod/dev-rc-app-ffc4969db-4zjcv
+```

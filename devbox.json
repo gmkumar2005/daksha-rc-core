@@ -9,7 +9,8 @@
     "kind":       "0.27.0",
     "kubectl":    "1.33.1",
     "sqlx-cli":   "0.8.6",
-    "linkerd":    "2.14.9"
+    "linkerd":    "2.14.9",
+    "mirrord":    "3.142.2"
   },
   "shell": {
     "init_hook": [

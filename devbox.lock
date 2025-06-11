@@ -337,6 +337,54 @@
         }
       }
     },
+    "mirrord@3.142.2": {
+      "last_modified": "2025-05-26T17:43:11Z",
+      "resolved": "github:NixOS/nixpkgs/bdc995d3e97cec29eacc8fbe87e66edfea26b861#mirrord",
+      "source": "devbox-search",
+      "version": "3.142.2",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/br60c6myyh3d9ng0z6c4fzwj9ddfxzx2-mirrord-3.142.2",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/br60c6myyh3d9ng0z6c4fzwj9ddfxzx2-mirrord-3.142.2"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/9aq251fmk01im0i3apcklzsyd8jpjdpb-mirrord-3.142.2",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/9aq251fmk01im0i3apcklzsyd8jpjdpb-mirrord-3.142.2"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/a6zi4vjh60n723yghm88n08gpnrd87r6-mirrord-3.142.2",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/a6zi4vjh60n723yghm88n08gpnrd87r6-mirrord-3.142.2"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/y3mh7m2ag12pa6vnb8vwrgkkw5qxf1n5-mirrord-3.142.2",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/y3mh7m2ag12pa6vnb8vwrgkkw5qxf1n5-mirrord-3.142.2"
+        }
+      }
+    },
     "rustc@latest": {
       "last_modified": "2025-05-16T20:19:48Z",
       "plugin_version": "0.0.1",

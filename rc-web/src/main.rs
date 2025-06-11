@@ -1,5 +1,5 @@
-use actix_web::{web, App};
 use actix_web::web::Data;
+use actix_web::{web, App};
 use anyhow::Context;
 use definitions_core::definitions_domain::*;
 use disintegrate::NoSnapshot;
@@ -71,7 +71,18 @@ impl utoipa::Modify for SecurityAddon {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
-    let database_url = env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
+    // let database_url = env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
+    let database_url_raw = env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
+    let database_url = if database_url_raw.contains("sslmode=") {
+        database_url_raw
+    } else {
+        let sep = if database_url_raw.contains('?') {
+            "&"
+        } else {
+            "?"
+        };
+        format!("{database_url_raw}{sep}sslmode=disable")
+    };
     let connect_options = database_url.parse::<PgConnectOptions>()?;
     let shared_pool = PgPool::connect_with(connect_options)
         .await
@@ -90,7 +101,10 @@ async fn main() -> anyhow::Result<()> {
     let event_store = PgEventStore::new(shared_pool.clone(), serde).await?;
 
     let shared_pool_for_web = Arc::new(shared_pool.clone());
-    let decision_maker = Arc::new(disintegrate_postgres::decision_maker(event_store.clone(), NoSnapshot));
+    let decision_maker = Arc::new(disintegrate_postgres::decision_maker(
+        event_store.clone(),
+        NoSnapshot,
+    ));
     let api = Arc::new(ApiDoc::openapi());
     let client_origin_url = Arc::new(client_origin_url);
 
@@ -123,13 +137,14 @@ async fn main() -> anyhow::Result<()> {
         let decision_maker = Arc::clone(&decision_maker);
         let api = Arc::clone(&api);
         let client_origin_url = Arc::clone(&client_origin_url);
-        
+
         move || {
             App::new()
                 .app_data(Data::new((*decision_maker).clone()))
                 .app_data(Data::new((*shared_pool_for_web).clone()))
                 .service(
-                    SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", (*api).clone()),
+                    SwaggerUi::new("/swagger-ui/{_:.*}")
+                        .url("/api-docs/openapi.json", (*api).clone()),
                 )
                 .service(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc"))
                 .service(Scalar::with_url("/scalar", (*api).clone()))
