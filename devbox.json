@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.14.2/.schema/devbox.schema.json",
+  "packages": {
+    "rustc":      "latest",
+    "cargo":      "1.86.0",
+    "rustfmt":    "1.86.0",
+    "clippy":     "1.86.0",
+    "cargo-make": "0.37.24",
+    "kind":       "0.27.0",
+    "kubectl":    "1.33.1",
+    "sqlx-cli":   "0.8.6",
+    "linkerd":    "2.14.9"
+  },
+  "shell": {
+    "init_hook": [
+      "echo 'Welcome to devbox!' > /dev/null"
+    ],
+    "scripts": {
+      "test": [
+        "echo \"Error: no test specified\" && exit 1"
+      ]
+    }
+  }
+}
