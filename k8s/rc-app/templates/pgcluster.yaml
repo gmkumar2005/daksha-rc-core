@@ -1,0 +1,18 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "rc-app.fullname" . }}-database
+  labels:
+    {{- include "rc-app.labels" . | nindent 4 }}
+  annotations:
+    owner: daksha
+    description: "Primary CNPG Postgres cluster"
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.5
+  instances: 1
+  storage:
+    size: 1Gi
+  bootstrap:
+    initdb:
+      database: daksha_rc
+      owner: daksha_rc
