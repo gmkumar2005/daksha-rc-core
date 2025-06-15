@@ -2,7 +2,7 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: traefik-dashboard
-  namespace: default
+  namespace: traefik-system
 spec:
   entryPoints:
     - websecure
@@ -19,7 +19,7 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: traefik-dashboard-redirect
-  namespace: default
+  namespace: traefik-system
 spec:
   entryPoints:
     - web
@@ -31,12 +31,13 @@ spec:
           kind: TraefikService
       middlewares:
         - name: redirect-to-https
+          namespace: traefik-system
 ---
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: redirect-to-https
-  namespace: default
+  namespace: traefik-system
 spec:
   redirectScheme:
     scheme: https

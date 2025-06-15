@@ -175,3 +175,37 @@ curl -k https://whoami.127.0.0.1.nip.io/
 kubectl get pods -n default -o wide | grep traefik
 
 ```
+
+## Install treafik and cnpg with KIND
+
+```shell
+KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster --config kind-config.yaml
+helm repo add traefik https://helm.traefik.io/traefik
+helm repo update
+helm install traefik-crds traefik/traefik-crds
+helm upgrade --install traefik traefik/traefik -f k8s/traefik-values.yaml
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=traefik --timeout=60s
+kubectl apply -f k8s/manual/traefik-dashboard-ingressroute.yaml
+
+
+kubectl apply -f k8s/manual/whoami.yaml
+kubectl apply -n httpbin -f k8s/manual/httpbin.yaml
+
+curl -k https://httpbin.127.0.0.1.nip.io/get
+curl -k https://whoami.127.0.0.1.nip.io/
+
+```
+## Install cnpg
+```shell
+helm upgrade --install cnpg \
+  --namespace cnpg-system \
+  --create-namespace \
+  cnpg/cloudnative-pg
+
+kubectl wait --for=condition=Available deployment/cnpg-cloudnative-pg -n cnpg-system --timeout=120s
+
+helm install dev rc-app
+kubectl wait --for=condition=Available deployment/dev-rc-app -n default --timeout=120s
+curl -k https://rc.127.0.0.1.nip.io/healthz
+
+```
