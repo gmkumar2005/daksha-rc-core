@@ -2,13 +2,6 @@
 [config]
 default_to_workspace = false
 
-[tasks.db-dev]
-description = "database: run the local database for development"
-category = "Database"
-dependencies = [
-    "install-dotenvx",
-    "docker-postgres-run"
-]
 
 [tasks.clean]
 description = "clean: remove the target directory"
@@ -52,56 +45,130 @@ command = "cargo"
 args = ["tarpaulin", "--out", "html", "--", "--test-threads", "2"]
 disabled = true
 
-[tasks.db-prepare]
-description = "database: prepare the queries for the offline mode"
-category = "Database"
-install_crate = "sqlx-cli"
-install_crate_args = ["--no-default-features", "--features", "native-tls,postgres"]
-command = "dotenvx"
-args = ["run", "--", "cargo", "sqlx", "prepare", "--workspace", "--", "--tests"]
-dependencies = ["install-dotenvx"]
 
-[tasks.db-migrate]
-description = "database: run the database migrations"
-category = "Database"
-install_crate = "sqlx-cli"
-install_crate_args = ["--no-default-features", "--features", "native-tls,postgres"]
-command = "dotenvx"
-args = ["run", "--", "sqlx", "migrate", "run"]
-dependencies = ["install-dotenvx"]
-
-[tasks.db-update-offline]
-description = "database: update the file for the query offline mode"
-category = "Database"
-dependencies = [
-    "install-dotenvx",
-    "docker-postgres-run",
-    "db-migrate",
-    "db-prepare",
-    "docker-postgres-stop"
-]
-
-[tasks.docker-postgres-run]
-command = "dotenvx"
-args = ["run", "--", "docker-compose", "-f", "rc-web/docker-compose.yml", "up", "-d"]
-category = "Database"
-dependencies = ["install-dotenvx"]
-
-[tasks.docker-postgres-stop]
-command = "docker-compose"
-category = "Database"
-args = ["-f", "rc-web/docker-compose.yml", "down"]
-
-[tasks.install-dotenvx]
-description = "Install dotenvx"
+[tasks.install-kubectl]
+description = "Install kubectl if not present"
 category = "Setup"
-install_crate = "dotenvx"
+linux.script_runner = "bash"
+linux.script = "scripts/install-kubectl-linux.sh"
+linux.env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+mac.script_runner = "bash"
+mac.script = "scripts/install-kubectl-mac.sh"
+mac.env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 
-[tasks.run]
-description = "run: run the web application"
-category = "Run"
-command = "dotenvx"
-env = { "RUST_LOG" = "rc_web=debug" }
-args = ["run", "--", "cargo", "run", "--bin", "rc-web"]
-dependencies = ["db-dev"]
-#run --package rc-web --bin rc-web
+[tasks.setup-kind-cluster]
+description = "Create Kind cluster and install Traefik ingress controller"
+category = "Kubernetes"
+script_runner = "bash"
+script = "scripts/setup-kind-cluster.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+dependencies = ["install-kubectl"]
+
+[tasks.deploy-demo-apps]
+description = "Deploy httpbin and whoami demo applications to Kind cluster"
+category = "Kubernetes"
+script_runner = "bash"
+script = "scripts/deploy-demo-apps.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+[tasks.kind-demo]
+description = "Complete Kind cluster setup with Traefik and demo apps deployment"
+category = "Kubernetes"
+dependencies = ["setup-kind-cluster", "deploy-demo-apps"]
+
+[tasks.install-cnpg]
+description = "Install CloudNativePG (CNPG) CRDs and wait for availability"
+category = "Database"
+script_runner = "bash"
+script = "scripts/install-cnpg.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+[tasks.deploy-rc-app]
+description = "Deploy rc-app using Helm with health and readiness checks"
+category = "Application"
+script_runner = "bash"
+script = "scripts/deploy-rc-app.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+dependencies = ["install-cnpg"]
+
+[tasks.full-demo]
+description = "Complete demo environment: Kind cluster, Traefik, CNPG, demo apps, and rc-app"
+category = "Demo"
+dependencies = ["kind-demo", "deploy-rc-app"]
+
+# Git Tag Management
+# This task retrieves the latest Git tag for use in Docker image tagging
+[tasks.get-git-tag]
+description = "get-git-tag: get the latest Git tag"
+category = "Git"
+script_runner = "bash"
+script = "scripts/get-git-tag.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+# Docker Image Building with Git Tag Integration
+# This task builds Docker images for rc-web using the latest Git tag
+# Features:
+# - Uses latest Git tag as primary version tag
+# - Creates additional tags for commit SHA and 'latest'
+# - Adds OCI-compliant labels with metadata
+# - Includes error handling and visual feedback
+[tasks.clean-build-cache]
+description = "clean-build-cache: clean container build cache to free disk space"
+category = "Docker"
+script_runner = "bash"
+script = "scripts/clean-build-cache.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+[tasks.build-image]
+description = "build-image: build Docker image for rc-web with latest Git tag"
+category = "Docker"
+script_runner = "bash"
+script = "scripts/build-image.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+# Docker Image Publishing with Git Tag Integration
+# This task pushes the built Docker images to the container registry
+# Features:
+# - Validates local images exist before pushing
+# - Pushes all tagged versions (git tag, commit SHA, latest)
+# - Provides detailed feedback and error handling
+# - Requires 'build-image' task to be run first
+[tasks.push-image]
+description = "push-image: push Docker images with Git tags to registry"
+category = "Docker"
+script_runner = "bash"
+script = "scripts/push-image.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+# Combined Build and Push Workflow
+# This composite task runs both build-image and push-image in sequence
+# Useful for CI/CD pipelines and one-command deployments
+[tasks.build-image-clean]
+description = "build-image-clean: build Docker image with aggressive cleanup for low disk space"
+category = "Docker"
+dependencies = ["clean-build-cache"]
+run_task = "build-image"
+
+[tasks.build-and-push]
+description = "build-and-push: build and push Docker images with Git tags"
+category = "Docker"
+dependencies = ["build-image", "push-image"]
+
+[tasks.build-and-push-clean]
+description = "build-and-push-clean: build and push with cleanup for low disk space environments"
+category = "Docker"
+dependencies = ["clean-build-cache", "build-image", "push-image"]
+
+[tasks.check-disk-space]
+description = "check-disk-space: comprehensive disk space monitoring for host and Podman VM"
+category = "System"
+script_runner = "bash"
+script = "scripts/check-disk-space.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+[tasks.debug]
+description = "debug: start rc-web in debug mode using mirrord with dynamic pod detection"
+category = "Debug"
+script_runner = "bash"
+script = "scripts/debug-mirrord.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }

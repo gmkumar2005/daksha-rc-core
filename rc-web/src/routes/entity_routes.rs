@@ -36,10 +36,10 @@ async fn hello() -> impl Responder {
         content = String,
         content_type = "application/json",
         examples(
-            ("Teacher_smith" = (value = json!(serde_json::from_str::<Value>(TEACHER_SMITH_EXAMPLE).unwrap()), description = "Teacher in Education domain")),
-            ("Student_john" = (value = json!(serde_json::from_str::<Value>(STUDENT_JOHN_EXAMPLE).unwrap()), description = "Student in Education domain")),
-            ("Consultant_sarah" = (value = json!(serde_json::from_str::<Value>(CONSULTANT_SARAH_EXAMPLE).unwrap()), description = "Consultant in Remote working domain")),
-            ("Client_john" = (value = json!(serde_json::from_str::<Value>(CLIENT_JOHN_EXAMPLE).unwrap()), description = "Client in Remote working domain")),
+            ("Teacher_smith" = (value = json!(serde_json::from_str::<Value>(TEACHER_SMITH_EXAMPLE).expect("Failed to parse TEACHER_SMITH_EXAMPLE JSON")), description = "Teacher in Education domain")),
+            ("Student_john" = (value = json!(serde_json::from_str::<Value>(STUDENT_JOHN_EXAMPLE).expect("Failed to parse STUDENT_JOHN_EXAMPLE JSON")), description = "Student in Education domain")),
+            ("Consultant_sarah" = (value = json!(serde_json::from_str::<Value>(CONSULTANT_SARAH_EXAMPLE).expect("Failed to parse CONSULTANT_SARAH_EXAMPLE JSON")), description = "Consultant in Remote working domain")),
+            ("Client_john" = (value = json!(serde_json::from_str::<Value>(CLIENT_JOHN_EXAMPLE).expect("Failed to parse CLIENT_JOHN_EXAMPLE JSON")), description = "Client in Remote working domain")),
         )
     ),
     params(

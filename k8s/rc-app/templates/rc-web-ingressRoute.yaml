@@ -1,0 +1,92 @@
+{{/*
+  Traefik IngressRoute for the rc-web application
+  This template creates the main IngressRoute based on TLS configuration
+*/}}
+{{- if .Values.ingress.enabled -}}
+{{- if .Values.ingress.tls.enabled }}
+{{/* HTTPS IngressRoute with TLS enabled */}}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "rc-app.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "rc-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "ingress"
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`{{ .Values.ingress.host }}`){{- if ne .Values.ingress.path "/" }} && PathPrefix(`{{ .Values.ingress.path }}`){{- end }}
+      kind: Rule
+      services:
+        - name: {{ include "rc-app.fullname" . }}
+          port: {{ .Values.service.port }}
+  tls:
+    secretName: {{ .Values.ingress.tls.secretName }}
+{{- else }}
+{{/* HTTP IngressRoute without TLS */}}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "rc-app.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "rc-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "ingress"
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`{{ .Values.ingress.host }}`){{- if ne .Values.ingress.path "/" }} && PathPrefix(`{{ .Values.ingress.path }}`){{- end }}
+      kind: Rule
+      services:
+        - name: {{ include "rc-app.fullname" . }}
+          port: {{ .Values.service.port }}
+{{- end }}
+---
+{{- if .Values.ingress.tls.enabled }}
+{{/* HTTP to HTTPS Redirect IngressRoute - only created when TLS is enabled */}}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "rc-app.fullname" . }}-redirect
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "rc-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "ingress-redirect"
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`{{ .Values.ingress.host }}`){{- if ne .Values.ingress.path "/" }} && PathPrefix(`{{ .Values.ingress.path }}`){{- end }}
+      kind: Rule
+      services:
+        - name: {{ include "rc-app.fullname" . }}
+          port: {{ .Values.service.port }}
+      middlewares:
+        - name: {{ include "rc-app.fullname" . }}-redirect-to-https
+---
+{{/* HTTPS Redirect Middleware - handles HTTP to HTTPS redirection */}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "rc-app.fullname" . }}-redirect-to-https
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "rc-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "middleware"
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+{{- end }}
+{{- end }}

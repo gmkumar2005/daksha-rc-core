@@ -27,9 +27,6 @@ postgres = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-shuttle-actix-web = { workspace = true }
-shuttle-runtime = { workspace = true }
-shuttle-shared-db = { workspace = true }
 sqlx = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -53,4 +50,3 @@ tokio-postgres = { workspace = true }
 default = ["std"] # Example, can be empty
 std = []
 integration_tests = []
-shuttle = []

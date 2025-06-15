@@ -1,18 +1,18 @@
-use actix_web::web;
-use actix_web::web::{Data, ServiceConfig};
+use actix_web::web::Data;
+use actix_web::{web, App};
 use anyhow::Context;
 use definitions_core::definitions_domain::*;
 use disintegrate::NoSnapshot;
 use disintegrate_postgres::{PgEventListener, PgEventListenerConfig, PgEventStore};
-use log::{debug, error};
+use log::error;
 use rc_web::projections::definitions_read_model;
 use rc_web::projections::definitions_read_model::ReadModelProjection;
 use rc_web::routes::{api_routes, health_check};
 use rc_web::{middleware, COMMANDS, DEFINITIONS, ENTITY, HEALTH, QUERY};
-use shuttle_actix_web::ShuttleActixWeb;
-use shuttle_runtime::SecretStore;
+use sqlx::postgres::PgConnectOptions;
 use sqlx::PgPool;
 use std::env;
+use std::sync::Arc;
 use std::time::Duration;
 use utoipa::openapi::security::{HttpAuthScheme, SecurityScheme};
 use utoipa::OpenApi;
@@ -68,52 +68,45 @@ impl utoipa::Modify for SecurityAddon {
     }
 }
 
-#[shuttle_runtime::main]
-async fn main(
-    #[shuttle_shared_db::Postgres] shared_pool: PgPool,
-    #[shuttle_runtime::Secrets] secrets: SecretStore,
-) -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
-    if cfg!(feature = "shuttle") {
-        debug!("Shuttle feature is enabled!");
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    env_logger::init();
+    // let database_url = env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
+    let database_url_raw = env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
+    let database_url = if database_url_raw.contains("sslmode=") {
+        database_url_raw
     } else {
-        debug!("Running locally.");
-    }
-    let is_remote = std::env::var("SHUTTLE_PUBLIC_URL").is_ok();
-    if is_remote {
-        debug!("Shuttle SHUTTLE_ENV is enabled!");
-    } else {
-        debug!("Running SHUTTLE_ENV locally.");
-    }
-    let client_origin_url = secrets
-        .get("CLIENT_ORIGIN_URL")
-        .context("CLIENT_ORIGIN_URL was not found")?;
-    let serde = disintegrate::serde::json::Json::<DomainEvent>::default();
-    let event_store = PgEventStore::new(shared_pool.clone(), serde)
-        .await
-        .map_err(|e| shuttle_runtime::Error::from(anyhow::Error::new(e)))?;
-
-    let shared_pool_for_web = shared_pool.clone();
-
-    let decision_maker = disintegrate_postgres::decision_maker(event_store.clone(), NoSnapshot);
-    let api = ApiDoc::openapi();
-    let config = move |cfg: &mut ServiceConfig| {
-        cfg.app_data(Data::new(decision_maker.clone()))
-            .app_data(Data::new(shared_pool_for_web.clone()))
-            .app_data(Data::new(secrets.clone()))
-            .service(
-                SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", api.clone()),
-            )
-            .service(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc"))
-            .service(Scalar::with_url("/scalar", api))
-            .service(api_routes::routes())
-            .service(
-                web::scope("")
-                    .service(health_check::routes())
-                    .wrap(middleware::security_headers::security_headers())
-                    .wrap(middleware::logger::logger())
-                    .wrap(middleware::cors::cors(&client_origin_url)),
-            );
+        let sep = if database_url_raw.contains('?') {
+            "&"
+        } else {
+            "?"
+        };
+        format!("{database_url_raw}{sep}sslmode=disable")
     };
+    let connect_options = database_url.parse::<PgConnectOptions>()?;
+    let shared_pool = PgPool::connect_with(connect_options)
+        .await
+        .context("Failed to connect to the database")?;
+
+    let client_origin_url =
+        env::var("CLIENT_ORIGIN_URL").context("CLIENT_ORIGIN_URL was not found")?;
+
+    let bind_address = env::var("BIND_ADDRESS").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let bind_port = env::var("PORT")
+        .unwrap_or_else(|_| "8000".to_string())
+        .parse::<u16>()
+        .context("PORT must be a valid number")?;
+
+    let serde = disintegrate::serde::json::Json::<DomainEvent>::default();
+    let event_store = PgEventStore::new(shared_pool.clone(), serde).await?;
+
+    let shared_pool_for_web = Arc::new(shared_pool.clone());
+    let decision_maker = Arc::new(disintegrate_postgres::decision_maker(
+        event_store.clone(),
+        NoSnapshot,
+    ));
+    let api = Arc::new(ApiDoc::openapi());
+    let client_origin_url = Arc::new(client_origin_url);
 
     let listener_event_store = event_store.clone();
     let listener_pool = shared_pool.clone();
@@ -139,5 +132,33 @@ async fn main(
         }
     });
 
-    Ok(config.into())
+    Ok(actix_web::HttpServer::new({
+        let shared_pool_for_web = Arc::clone(&shared_pool_for_web);
+        let decision_maker = Arc::clone(&decision_maker);
+        let api = Arc::clone(&api);
+        let client_origin_url = Arc::clone(&client_origin_url);
+
+        move || {
+            App::new()
+                .app_data(Data::new((*decision_maker).clone()))
+                .app_data(Data::new((*shared_pool_for_web).clone()))
+                .service(
+                    SwaggerUi::new("/swagger-ui/{_:.*}")
+                        .url("/api-docs/openapi.json", (*api).clone()),
+                )
+                .service(RapiDoc::new("/api-docs/openapi.json").path("/rapidoc"))
+                .service(Scalar::with_url("/scalar", (*api).clone()))
+                .service(api_routes::routes())
+                .service(
+                    web::scope("")
+                        .service(health_check::routes())
+                        .wrap(middleware::security_headers::security_headers())
+                        .wrap(middleware::logger::logger())
+                        .wrap(middleware::cors::cors(&client_origin_url)),
+                )
+        }
+    })
+    .bind((bind_address.as_str(), bind_port))?
+    .run()
+    .await?)
 }

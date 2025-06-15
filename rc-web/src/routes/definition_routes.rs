@@ -180,6 +180,7 @@ async fn validate_def(
 }
 
 /// Create a definition
+
 #[utoipa::path(
     post,
     path = "/api/v1/schema/create_def",
@@ -188,10 +189,10 @@ async fn validate_def(
         content = String,
         content_type = "application/json",
         examples(
-            ("Teacher" = (value = json!(serde_json::from_str::<Value>(TEACHER_EXAMPLE).unwrap()), description = "Teacher in Education domain")),
-            ("Student" = (value = json!(serde_json::from_str::<Value>(STUDENT_EXAMPLE).unwrap()), description = "Student in Education domain")),
-            ("Consultant" = (value = json!(serde_json::from_str::<Value>(CONSULTANT_EXAMPLE).unwrap()), description = "Consultant in Remote working domain")),
-            ("Client" = (value = json!(serde_json::from_str::<Value>(CLIENT_EXAMPLE).unwrap()), description = "Client in Remote working domain")),
+            ("Teacher" = (value = json!(serde_json::from_str::<Value>(TEACHER_EXAMPLE).expect("Failed to parse TEACHER_EXAMPLE JSON")), description = "Teacher in Education domain")),
+            ("Student" = (value = json!(serde_json::from_str::<Value>(STUDENT_EXAMPLE).expect("Failed to parse STUDENT_EXAMPLE JSON")), description = "Student in Education domain")),
+            ("Consultant" = (value = json!(serde_json::from_str::<Value>(CONSULTANT_EXAMPLE).expect("Failed to parse CONSULTANT_EXAMPLE JSON")), description = "Consultant in Remote working domain")),
+            ("Client" = (value = json!(serde_json::from_str::<Value>(CLIENT_EXAMPLE).expect("Failed to parse CLIENT_EXAMPLE JSON")), description = "Client in Remote working domain")),
         )
     ),
     responses(

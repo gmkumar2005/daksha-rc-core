@@ -57,15 +57,3 @@ jobs:
       - name: Run Integration Tests
         run: cargo test --features integration_tests
         continue-on-error: true
-
-  deploy:
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    container:
-      image: rust:1.86.0 # Works with both GitHub and act locally
-    steps:
-      - uses: shuttle-hq/deploy-action@v2
-        with:
-          shuttle-api-key: ${{ secrets.SHUTTLE_API_KEY }}
-          project-id: proj_01JTKGBPHP73GMNSNEJYQNVD4J
-          cargo-shuttle-version: "0.54.0"

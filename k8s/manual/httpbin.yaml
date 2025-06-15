@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: httpbin
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: httpbin
+  namespace: httpbin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: httpbin
+  template:
+    metadata:
+      labels:
+        app: httpbin
+    spec:
+      containers:
+        - name: httpbin
+          image: kennethreitz/httpbin:latest
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httpbin
+  namespace: httpbin
+spec:
+  type: ClusterIP
+  selector:
+    app: httpbin
+  ports:
+    - port: 8000
+      targetPort: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: httpbin
+  namespace: httpbin
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`httpbin.127.0.0.1.nip.io`)
+      kind: Rule
+      services:
+        - name: httpbin
+          port: 8000
+  tls:
+    secretName: wildcard-tls
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: httpbin-redirect
+  namespace: httpbin
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`httpbin.127.0.0.1.nip.io`)
+      kind: Rule
+      services:
+        - name: httpbin
+          port: 8000
+      middlewares:
+        - name: redirect-to-https
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-to-https
+  namespace: httpbin
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true

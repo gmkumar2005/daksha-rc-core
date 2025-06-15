@@ -1,0 +1,66 @@
+# Rust artifacts
+target/
+Cargo.lock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Test files
+tests/
+test-*
+
+# Local development
+.env.local
+.env.development
+.env.test
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Node modules (if any)
+node_modules/
+
+# Coverage reports
+coverage/
+*.profraw
+
+# Build artifacts that shouldn't be copied
+**/*.rs.bk
+**/*.orig
+
+# SQLx offline data (will be regenerated)
+.sqlx/
+
+# Local configuration
+config/local*
+
+# Backup files
+*.bak
+*.backup

@@ -1,0 +1,29 @@
+ports:
+  web:
+    exposedPort: 80
+    nodePort: 30080
+  websecure:
+    exposedPort: 443
+    nodePort: 30443
+  traefik:
+    port: 8080
+    expose:
+      default: true
+    nodePort: 30090
+
+service:
+  type: NodePort
+
+api:
+  dashboard: true
+  insecure: true
+
+ingressroute:
+  dashboard:
+    enabled: false
+
+additionalArguments:
+  - "--log.level=INFO"
+  - "--api.insecure=true"
+  - "--api.dashboard=true"
+  - "--entrypoints.websecure.http.tls=true"

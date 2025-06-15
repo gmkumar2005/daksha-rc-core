@@ -31,3 +31,6 @@ Secrets*.toml
 .shuttle
 .secrets
 event.json
+.lh
+.DS_Store
+.builds
