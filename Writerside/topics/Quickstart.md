@@ -1,37 +1,42 @@
-# Quickstart Guide: Deploy daksha-rc-core with cargo make
+# Developer Guide
 
 ## Overview
 
-This guide provides a step-by-step walkthrough to deploy the complete **daksha-rc-core** ecosystem using `cargo make` commands. You'll set up a local Kubernetes cluster with Traefik ingress, deploy demo applications, install CloudNativePG, and finally deploy the rc-app with full health monitoring.
+This guide provides a step-by-step walkthrough to deploy the complete **daksha-rc-core** ecosystem using `cargo make`
+commands. You'll set up a local Kubernetes cluster with Traefik ingress, deploy demo applications, install
+CloudNativePG, and finally deploy the rc-app with full health monitoring.
 
 ## Prerequisites
 
 Before starting, ensure you have the following installed:
 
 ### Required Tools
+
 - **Rust toolchain** (version 1.86.0 or later)
-  - [Install Rust](https://www.rust-lang.org/tools/install)
+    - [Install Rust](https://www.rust-lang.org/tools/install)
 - **Git** for version control
-  - [Install Git](https://git-scm.com/downloads)
+    - [Install Git](https://git-scm.com/downloads)
 - **Kind** (Kubernetes in Docker)
-  - [Install Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
+    - [Install Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
 - **Helm** (Kubernetes package manager)
-  - [Install Helm](https://helm.sh/docs/intro/install/)
+    - [Install Helm](https://helm.sh/docs/intro/install/)
 - **Container Engine**: Docker or Podman
-  - [Install Docker](https://docs.docker.com/get-docker/) or [Install Podman](https://podman.io/getting-started/installation)
+    - [Install Docker](https://docs.docker.com/get-docker/)
+      or [Install Podman](https://podman.io/getting-started/installation)
 
 - **cargo-make** - Rust task runner and build tool
-  - [Installation Guide](https://github.com/sagiegurari/cargo-make#installation)
-  - [Documentation](https://sagiegurari.github.io/cargo-make/)
+    - [Installation Guide](https://github.com/sagiegurari/cargo-make#installation)
+    - [Documentation](https://sagiegurari.github.io/cargo-make/)
 - **kubectl** - Kubernetes command-line tool
-  - [Installation Guide](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
-  - [Documentation](https://kubernetes.io/docs/reference/kubectl/)
+    - [Installation Guide](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+    - [Documentation](https://kubernetes.io/docs/reference/kubectl/)
 
-### Optional Tools (for debugging)
+### Tools for debugging
+
 - **mirrord** - Local development with Kubernetes environment
-  - [Installation Guide](https://mirrord.dev/docs/overview/quick-start/)
-  - [Documentation](https://mirrord.dev/docs/)
-  - Required for: `cargo make debug`
+    - [Installation Guide](https://mirrord.dev/docs/overview/quick-start/)
+    - [Documentation](https://mirrord.dev/docs/)
+    - Required for: `cargo make debug`
 
 ## Quick Setup Commands
 
@@ -65,6 +70,7 @@ cargo make install-kubectl
 ```
 
 **Expected output:**
+
 - ✅ kubectl installation for your platform (Linux/macOS)
 - ✅ Verification that kubectl is working
 
@@ -75,6 +81,7 @@ cargo make setup-kind-cluster
 ```
 
 **What this does:**
+
 - 🏗️ Creates a Kind Kubernetes cluster
 - 🚀 Installs Traefik ingress controller in `traefik-system` namespace
 - 🔐 Generates wildcard TLS certificates for `*.127.0.0.1.nip.io`
@@ -82,6 +89,7 @@ cargo make setup-kind-cluster
 - ⏳ Waits for all components to be ready
 
 **Expected output:**
+
 ```
 ✅ Kind cluster with Traefik setup complete!
 
@@ -99,6 +107,7 @@ cargo make deploy-demo-apps
 ```
 
 **What this does:**
+
 - 🤖 Deploys whoami application in `whoami` namespace
 - 🌐 Deploys httpbin application in `httpbin` namespace
 - 🔐 Copies TLS certificates to application namespaces
@@ -106,6 +115,7 @@ cargo make deploy-demo-apps
 - 🧪 Tests application endpoints
 
 **Expected output:**
+
 ```
 ✅ Demo applications deployment complete!
 
@@ -122,12 +132,14 @@ cargo make install-cnpg
 ```
 
 **What this does:**
+
 - 📦 Adds CloudNativePG Helm repository
 - 🗄️ Installs CNPG operator in `cnpg-system` namespace
 - ⏳ Waits for operator to be ready (120s timeout)
 - 📊 Shows CNPG status and version
 
 **Expected output:**
+
 ```
 ✅ CloudNativePG (CNPG) is ready!
 
@@ -142,6 +154,7 @@ cargo make deploy-rc-app
 ```
 
 **What this does:**
+
 - ✅ Validates CNPG is installed and ready
 - 🚀 Deploys rc-app using Helm chart from `k8s/rc-app`
 - ⏳ Waits for deployment to be available (120s timeout)
@@ -149,6 +162,7 @@ cargo make deploy-rc-app
 - 📊 Shows deployment status and resource information
 
 **Expected output:**
+
 ```
 ✅ rc-app deployment and health checks complete!
 
@@ -168,6 +182,7 @@ cargo make full-demo
 ```
 
 This single command runs all the above steps in sequence:
+
 1. `setup-kind-cluster`
 2. `deploy-demo-apps`
 3. `install-cnpg`
@@ -220,6 +235,7 @@ watch -n 2 "curl -k -s https://rc.127.0.0.1.nip.io/healthz"
 After successful deployment, you'll have:
 
 ### Namespaces
+
 - **`traefik-system`** - Traefik ingress controller and dashboard
 - **`cnpg-system`** - CloudNativePG operator for PostgreSQL
 - **`whoami`** - Demo application showing request details
@@ -227,14 +243,16 @@ After successful deployment, you'll have:
 - **`default`** - Main rc-app application
 
 ### Applications
-| Application | URL | Purpose |
-|-------------|-----|---------|
-| **RC-App** | https://rc.127.0.0.1.nip.io | Main application with health endpoints |
-| **Traefik Dashboard** | https://dashboard.127.0.0.1.nip.io | Ingress controller management |
-| **whoami** | https://whoami.127.0.0.1.nip.io | Request echo service |
-| **httpbin** | https://httpbin.127.0.0.1.nip.io | HTTP testing utilities |
+
+| Application           | URL                                | Purpose                                |
+|-----------------------|------------------------------------|----------------------------------------|
+| **RC-App**            | https://rc.127.0.0.1.nip.io        | Main application with health endpoints |
+| **Traefik Dashboard** | https://dashboard.127.0.0.1.nip.io | Ingress controller management          |
+| **whoami**            | https://whoami.127.0.0.1.nip.io    | Request echo service                   |
+| **httpbin**           | https://httpbin.127.0.0.1.nip.io   | HTTP testing utilities                 |
 
 ### Health Endpoints
+
 - **RC-App Health**: https://rc.127.0.0.1.nip.io/healthz
 - **RC-App Readiness**: https://rc.127.0.0.1.nip.io/readyz
 
@@ -243,6 +261,7 @@ After successful deployment, you'll have:
 ### Common Issues
 
 #### 1. Kind Cluster Creation Fails
+
 ```bash
 # Check if kind is installed
 kind version
@@ -252,6 +271,7 @@ docker info  # or: podman info
 ```
 
 #### 2. Traefik Not Ready
+
 ```bash
 # Check Traefik pods
 kubectl get pods -n traefik-system
@@ -261,6 +281,7 @@ kubectl logs -n traefik-system -l app.kubernetes.io/name=traefik
 ```
 
 #### 3. Applications Not Accessible
+
 ```bash
 # Check IngressRoutes
 kubectl get ingressroute -A
@@ -273,6 +294,7 @@ kubectl get secrets -A | grep tls
 ```
 
 #### 4. RC-App Health Check Fails
+
 ```bash
 # Check rc-app pod status
 kubectl get pods -l app.kubernetes.io/instance=dev
@@ -285,6 +307,7 @@ kubectl get svc,ingressroute -l app.kubernetes.io/instance=dev
 ```
 
 #### 5. Debug Session Issues
+
 ```bash
 # Ensure mirrord is installed
 mirrord --version
@@ -339,7 +362,8 @@ cargo make push-image
 
 ### Debugging with mirrord
 
-For advanced debugging and development, you can use `mirrord` to run your local application while connecting to the Kubernetes cluster environment:
+For advanced debugging and development, you can use `mirrord` to run your local application while connecting to the
+Kubernetes cluster environment:
 
 ```bash
 # Start debug session with mirrord
@@ -347,17 +371,20 @@ cargo make debug
 ```
 
 **What this does:**
+
 - 🔍 Automatically discovers the rc-app pod in the cluster
 - ✅ Validates the deployment has exactly one replica
 - 🔗 Uses mirrord to mirror traffic from the Kubernetes pod to your local application
 - 🐛 Runs the application locally with debug logging (`RUST_LOG=rc_web=debug`)
 
 **Prerequisites for debugging:**
+
 - **mirrord** must be installed: [Installation Guide](https://mirrord.dev/docs/overview/quick-start/)
 - RC-app must be deployed: `cargo make deploy-rc-app`
 - Deployment should have exactly 1 replica (default configuration)
 
 **Example debug session:**
+
 ```bash
 $ cargo make debug
 🔍 Starting debug session with mirrord
@@ -378,12 +405,15 @@ Command: RUST_LOG=rc_web=debug mirrord exec --target pod/dev-rc-app-ffc4969db-4z
 ```
 
 **Benefits of mirrord debugging:**
-- **Environment parity**: Your local app runs with the same environment variables, secrets, and network access as the cluster
+
+- **Environment parity**: Your local app runs with the same environment variables, secrets, and network access as the
+  cluster
 - **Real traffic**: Test with actual Kubernetes traffic patterns
 - **Database access**: Connect to the same PostgreSQL database as the cluster
 - **Service discovery**: Access other services in the cluster seamlessly
 
 **Troubleshooting debug issues:**
+
 ```bash
 # Check if deployment exists
 kubectl get deployment dev-rc-app
@@ -433,4 +463,5 @@ kind delete cluster
 
 ---
 
-🎉 **Congratulations!** You now have a fully functional daksha-rc-core deployment with monitoring, ingress, and database capabilities.
+🎉 **Congratulations!** You now have a fully functional daksha-rc-core deployment with monitoring, ingress, and database
+capabilities.
