@@ -27,6 +27,12 @@ Before starting, ensure you have the following installed:
   - [Installation Guide](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
   - [Documentation](https://kubernetes.io/docs/reference/kubectl/)
 
+### Optional Tools (for debugging)
+- **mirrord** - Local development with Kubernetes environment
+  - [Installation Guide](https://mirrord.dev/docs/overview/quick-start/)
+  - [Documentation](https://mirrord.dev/docs/)
+  - Required for: `cargo make debug`
+
 ## Quick Setup Commands
 
 For the impatient, run these commands in sequence:
@@ -38,6 +44,9 @@ cd daksha-rc-core
 
 # Complete deployment (one command does it all)
 cargo make full-demo
+
+# Start debugging (after deployment)
+cargo make debug
 ```
 
 ## Step-by-Step Deployment
@@ -275,6 +284,21 @@ kubectl logs -l app.kubernetes.io/instance=dev
 kubectl get svc,ingressroute -l app.kubernetes.io/instance=dev
 ```
 
+#### 5. Debug Session Issues
+```bash
+# Ensure mirrord is installed
+mirrord --version
+
+# Check if deployment has single replica
+kubectl get deployment dev-rc-app -o jsonpath='{.spec.replicas}'
+
+# Scale to single replica if needed
+kubectl scale deployment dev-rc-app --replicas=1
+
+# Verify pod is running
+kubectl get pods -l app.kubernetes.io/instance=dev
+```
+
 ### Recovery Commands
 
 ```bash
@@ -289,6 +313,10 @@ cargo make deploy-rc-app
 # Check disk space (if builds fail)
 cargo make check-disk-space
 cargo make clean-build-cache
+
+# Reset debugging environment
+kubectl scale deployment dev-rc-app --replicas=1
+cargo make debug
 ```
 
 ## Development Workflow
@@ -307,6 +335,67 @@ cargo make build-image
 
 # Push images (if registry configured)
 cargo make push-image
+```
+
+### Debugging with mirrord
+
+For advanced debugging and development, you can use `mirrord` to run your local application while connecting to the Kubernetes cluster environment:
+
+```bash
+# Start debug session with mirrord
+cargo make debug
+```
+
+**What this does:**
+- 🔍 Automatically discovers the rc-app pod in the cluster
+- ✅ Validates the deployment has exactly one replica
+- 🔗 Uses mirrord to mirror traffic from the Kubernetes pod to your local application
+- 🐛 Runs the application locally with debug logging (`RUST_LOG=rc_web=debug`)
+
+**Prerequisites for debugging:**
+- **mirrord** must be installed: [Installation Guide](https://mirrord.dev/docs/overview/quick-start/)
+- RC-app must be deployed: `cargo make deploy-rc-app`
+- Deployment should have exactly 1 replica (default configuration)
+
+**Example debug session:**
+```bash
+$ cargo make debug
+🔍 Starting debug session with mirrord
+==========================================
+🔍 Checking for rc-app deployment...
+✅ Found deployment: dev-rc-app
+🔍 Verifying deployment has single pod...
+✅ Deployment has 1 replica
+⏳ Waiting for deployment to be ready...
+✅ Deployment is ready
+🔍 Getting pod name...
+✅ Found pod: dev-rc-app-ffc4969db-4zjcv
+✅ Pod is running
+🚀 Starting debug session...
+Command: RUST_LOG=rc_web=debug mirrord exec --target pod/dev-rc-app-ffc4969db-4zjcv cargo run
+
+# Your local application now runs with cluster environment
+```
+
+**Benefits of mirrord debugging:**
+- **Environment parity**: Your local app runs with the same environment variables, secrets, and network access as the cluster
+- **Real traffic**: Test with actual Kubernetes traffic patterns
+- **Database access**: Connect to the same PostgreSQL database as the cluster
+- **Service discovery**: Access other services in the cluster seamlessly
+
+**Troubleshooting debug issues:**
+```bash
+# Check if deployment exists
+kubectl get deployment dev-rc-app
+
+# Scale to single replica if needed
+kubectl scale deployment dev-rc-app --replicas=1
+
+# Check pod status
+kubectl get pods -l app.kubernetes.io/instance=dev
+
+# View pod logs
+kubectl logs -l app.kubernetes.io/instance=dev -f
 ```
 
 ### Managing the Demo Environment
@@ -328,11 +417,12 @@ kind delete cluster
 
 ## Next Steps
 
-1. **Explore the API**: Visit https://rc.127.0.0.1.nip.io for API documentation
-2. **Check Logs**: Monitor application behavior with `kubectl logs`
-3. **Scale Applications**: Modify replica counts in Helm values
-4. **Add PostgreSQL**: Use CNPG to create PostgreSQL clusters
-5. **Custom Configuration**: Modify `k8s/rc-app/values.yaml` for customization
+1. **Explore the API**: Visit https://rc.127.0.0.1.nip.io/scalar for API documentation
+2. **Debug Locally**: Use `cargo make debug` for local development with cluster environment using mirrord
+3. **Check Logs**: Monitor application behavior with `kubectl logs`
+4. **Scale Applications**: Modify replica counts in Helm values
+5. **Add PostgreSQL**: Use CNPG to create PostgreSQL clusters
+6. **Custom Configuration**: Modify `k8s/rc-app/values.yaml` for customization
 
 ## Additional Resources
 
