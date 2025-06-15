@@ -7,11 +7,11 @@ replicaCount: 1
 
 # This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
-  repository: rc-web
+  repository: ghcr.io/daksha-rc/rc-web
   # This sets the pull policy for images.
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "latest"
+  tag: "0.0.10"
 
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: [ ]
@@ -103,3 +103,48 @@ auth0:
   domain: "daksha.us.auth0.com"
   audience: "simpleapi"
 clientOriginUrl: "http://localhost:8000"
+
+# Ingress configuration using Traefik IngressRoute
+# This creates a Traefik IngressRoute resource for routing external traffic to the application
+ingress:
+  # Enable/disable ingress creation
+  enabled: true
+  
+  # Ingress class name (used for annotations, not directly in Traefik IngressRoute)
+  className: "traefik"
+  
+  # Primary hostname for the application
+  # Uses nip.io for local development - automatically resolves to 127.0.0.1
+  host: "rc.127.0.0.1.nip.io"
+  
+  # Path prefix for routing (default "/" matches all paths)
+  path: "/"
+  
+  # Path matching type (Prefix, Exact, etc.)
+  pathType: "Prefix"
+  
+  # TLS/SSL configuration
+  tls:
+    # Enable HTTPS with TLS termination
+    enabled: true
+    
+    # Name of the Kubernetes secret containing TLS certificate
+    # The secret should contain 'tls.crt' and 'tls.key' files
+    secretName: "wildcard-tls"
+  
+  # Additional annotations to apply to IngressRoute resources
+  # Example: rate limiting, authentication, etc.
+  annotations: {}
+    # traefik.ingress.kubernetes.io/rate-limit: "100"
+    # traefik.ingress.kubernetes.io/auth-type: "basic"
+  
+  # Additional hosts can be configured for multi-domain setups
+  # extraHosts:
+  #   - host: "rc-staging.127.0.0.1.nip.io"
+  #     paths:
+  #       - path: "/"
+  #         pathType: "Prefix"
+  #   - host: "rc-prod.127.0.0.1.nip.io"
+  #     paths:
+  #       - path: "/api"
+  #         pathType: "Prefix"

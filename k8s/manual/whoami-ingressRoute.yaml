@@ -1,0 +1,43 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: whoami
+  namespace: default
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`whoami.127.0.0.1.nip.io`)
+      kind: Rule
+      services:
+        - name: whoami
+          port: 80
+  tls:
+    secretName: wildcard-tls
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: whoami-redirect
+  namespace: default
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`whoami.127.0.0.1.nip.io`)
+      kind: Rule
+      services:
+        - name: whoami
+          port: 80
+      middlewares:
+        - name: redirect-to-https
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-to-https
+  namespace: default
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true

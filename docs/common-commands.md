@@ -13,9 +13,9 @@ export DOCKER_HOST="unix://$(podman machine inspect --format '{{.ConnectionInfo.
 ### Copy log files from container to host
 
 ```shell
-podman cp sunbird-rc-core-registry-1:/app/logs/app.log app.log 
+podman cp sunbird-rc-core-registry-1:/app/logs/app.log app.log
 
-``` 
+```
 
 ### Run sqlx migrations
 
@@ -60,7 +60,7 @@ helm upgrade --install cnpg \
   --namespace cnpg-system \
   --create-namespace \
   cnpg/cloudnative-pg
-  
+
 
 ```
 
@@ -73,14 +73,14 @@ helm upgrade --install cnpg \
   --namespace cnpg-system \
   --create-namespace \
   cnpg/cloudnative-pg
-  
+
 kubectl get deployment -n cnpg-system
 
-kubectl apply -f k8s/manual/pgcluster.yaml 
+kubectl apply -f k8s/manual/pgcluster.yaml
 kubectl get cluster rc-database
-// build app container image 
-kind load docker-image docker.io/library/rc-web:latest  
-kubectl apply -f k8s/manual/rc-web-deployment.yaml 
+// build app container image
+kind load docker-image docker.io/library/rc-web:latest
+kubectl apply -f k8s/manual/rc-web-deployment.yaml
 kubectl rollout status deployment/rc-web
 kubectl port-forward service/rc-web 8000:8000 &
 
@@ -89,7 +89,7 @@ kubectl port-forward service/rc-web 8000:8000 &
 ## Helm based install
 
 ```shell
-
+cd k8s
 KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster
 helm repo add cnpg https://cloudnative-pg.github.io/charts
 helm upgrade --install cnpg \
@@ -97,11 +97,17 @@ helm upgrade --install cnpg \
   --create-namespace \
   cnpg/cloudnative-pg
 
-// build app container image 
-kind load docker-image docker.io/library/rc-web:latest  
+
+kubectl wait --for=condition=Available deployment/cnpg-cloudnative-pg -n cnpg-system --timeout=120s
+
+// build app container image
+kind load docker-image docker.io/library/rc-web:latest
 helm install dev rc-app
 helm status dev
- 
+kubectl wait --for=condition=Available deployment/dev-rc-app -n default --timeout=120s
+
+curl -k https://rc.127.0.0.1.nip.io/healthz
+
 kubectl port-forward service/dev-rc-app 8000:8000 &
 
 curl http://localhost:50000/healthz
@@ -117,4 +123,55 @@ mirrord exec cargo run  --target pod/dev-rc-app-ffc4969db-4zjcv
 RUST_LOG=debug mirrord exec cargo run --target pod/dev-rc-app-ffc4969db-4zjcv
 
 RUST_LOG=rc_web=debug mirrord exec cargo run --target pod/dev-rc-app-ffc4969db-4zjcv
+```
+
+## Tag container images
+
+```shell
+
+echo github_pat | docker login ghcr.io -u gmkumar2005 --password-stdin
+ghcr.io -u gmkumar2005 --password-stdin
+
+docker tag docker.io/library/rc-web  ghcr.io/daksha-rc/rc-web:0.0.10
+
+docker push  ghcr.io/daksha-rc/rc-web:0.0.10
+
+
+```
+
+## Trafeak
+
+```shell
+KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster --config kind-config.yaml
+
+kubectl label node kind-control-plane ingress-ready=true
+
+helm repo add traefik https://helm.traefik.io/traefik
+helm repo update
+
+helm install traefik-crds traefik/traefik-crds
+<!-- helm install traefik traefik/traefik --set crds.enabled=true -->
+helm upgrade --install traefik traefik/traefik -f k8s/traefik-values.yaml
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=traefik --timeout=60s
+
+kubectl create namespace httpbin
+kubectl apply -n httpbin -f https://github.com/istio/istio/raw/master/samples/httpbin/httpbin.yaml
+
+kubectl apply -f whoami.yaml
+kubectl apply -f whoami-service.yaml
+
+kubectl apply -f httpbin-ingressroute.yaml
+kubectl apply -f whoami-ingressroute.yaml
+kubectl apply -f traefik-dashboard-ingressroute.yaml
+
+curl -k https://httpbin.127.0.0.1.nip.io/get
+curl -k https://whoami.127.0.0.1.nip.io/
+
+```
+
+## Debiug
+
+```shell
+kubectl get pods -n default -o wide | grep traefik
+
 ```

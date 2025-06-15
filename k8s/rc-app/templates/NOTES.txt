@@ -1,4 +1,61 @@
-1. Get the application URL by running these commands:
+🚀 {{ include "rc-app.fullname" . }} has been deployed successfully!
 
+1. Application URL:
+{{- if .Values.ingress.enabled }}
+  {{- if .Values.ingress.tls.enabled }}
+   🔒 HTTPS: https://{{ .Values.ingress.host }}
+  {{- else }}
+   🌐 HTTP:  http://{{ .Values.ingress.host }}
+  {{- end }}
 
+2. Health Check Commands:
+  {{- if .Values.ingress.tls.enabled }}
+   ❤️  Health:    curl -k https://{{ .Values.ingress.host }}/healthz
+   ✅ Readiness: curl -k https://{{ .Values.ingress.host }}/readyz
+  {{- else }}
+   ❤️  Health:    curl http://{{ .Values.ingress.host }}/healthz
+   ✅ Readiness: curl http://{{ .Values.ingress.host }}/readyz
+  {{- end }}
 
+3. IngressRoute Status:
+   📋 List:      kubectl get ingressroute {{ include "rc-app.fullname" . }} -n {{ .Release.Namespace }}
+   🔍 Details:   kubectl describe ingressroute {{ include "rc-app.fullname" . }} -n {{ .Release.Namespace }}
+
+{{- else if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "rc-app.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+  
+  # Health check endpoints
+  ❤️  Health:    curl http://$NODE_IP:$NODE_PORT/healthz
+  ✅ Readiness: curl http://$NODE_IP:$NODE_PORT/readyz
+
+{{- else if contains "LoadBalancer" .Values.service.type }}
+     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+           You can watch its status by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "rc-app.fullname" . }}'
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "rc-app.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.service.port }}
+  
+  # Health check endpoints
+  ❤️  Health:    curl http://$SERVICE_IP:{{ .Values.service.port }}/healthz
+  ✅ Readiness: curl http://$SERVICE_IP:{{ .Values.service.port }}/readyz
+
+{{- else if contains "ClusterIP" .Values.service.type }}
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "rc-app.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:$CONTAINER_PORT
+  
+  # In another terminal, check health endpoints
+  ❤️  Health:    curl http://127.0.0.1:8080/healthz
+  ✅ Readiness: curl http://127.0.0.1:8080/readyz
+{{- end }}
+
+4. Debugging Commands:
+   🔍 Pods:      kubectl get pods -l "app.kubernetes.io/name={{ include "rc-app.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -n {{ .Release.Namespace }}
+   🔍 Service:   kubectl get svc {{ include "rc-app.fullname" . }} -n {{ .Release.Namespace }}
+   📝 Logs:      kubectl logs -l "app.kubernetes.io/name={{ include "rc-app.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -n {{ .Release.Namespace }}
+
+{{- if .Values.ingress.tls.enabled }}
+💡 Note: Using self-signed certificates. Use -k flag with curl or accept browser warnings.
+{{- end }}
