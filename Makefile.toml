@@ -165,3 +165,10 @@ category = "System"
 script_runner = "bash"
 script = "scripts/check-disk-space.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+[tasks.debug]
+description = "debug: start rc-web in debug mode using mirrord with dynamic pod detection"
+category = "Debug"
+script_runner = "bash"
+script = "scripts/debug-mirrord.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }

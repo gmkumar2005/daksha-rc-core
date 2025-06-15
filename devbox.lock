@@ -289,54 +289,6 @@
         }
       }
     },
-    "linkerd@2.14.9": {
-      "last_modified": "2025-05-16T20:19:48Z",
-      "resolved": "github:NixOS/nixpkgs/12a55407652e04dcf2309436eb06fef0d3713ef3#linkerd",
-      "source": "devbox-search",
-      "version": "2.14.9",
-      "systems": {
-        "aarch64-darwin": {
-          "outputs": [
-            {
-              "name": "out",
-              "path": "/nix/store/86y5dzsyq5rv4cifa9vbksmasy11249c-linkerd-stable-2.14.9",
-              "default": true
-            }
-          ],
-          "store_path": "/nix/store/86y5dzsyq5rv4cifa9vbksmasy11249c-linkerd-stable-2.14.9"
-        },
-        "aarch64-linux": {
-          "outputs": [
-            {
-              "name": "out",
-              "path": "/nix/store/b781vajb77axzdpls7dxaacp2281qz83-linkerd-stable-2.14.9",
-              "default": true
-            }
-          ],
-          "store_path": "/nix/store/b781vajb77axzdpls7dxaacp2281qz83-linkerd-stable-2.14.9"
-        },
-        "x86_64-darwin": {
-          "outputs": [
-            {
-              "name": "out",
-              "path": "/nix/store/53ia185yz21xwjar6ykcv8fgd0m02dvx-linkerd-stable-2.14.9",
-              "default": true
-            }
-          ],
-          "store_path": "/nix/store/53ia185yz21xwjar6ykcv8fgd0m02dvx-linkerd-stable-2.14.9"
-        },
-        "x86_64-linux": {
-          "outputs": [
-            {
-              "name": "out",
-              "path": "/nix/store/k4bqy7hxhcxzk88j7z263bhh4naf64fn-linkerd-stable-2.14.9",
-              "default": true
-            }
-          ],
-          "store_path": "/nix/store/k4bqy7hxhcxzk88j7z263bhh4naf64fn-linkerd-stable-2.14.9"
-        }
-      }
-    },
     "mirrord@3.142.2": {
       "last_modified": "2025-05-26T17:43:11Z",
       "resolved": "github:NixOS/nixpkgs/bdc995d3e97cec29eacc8fbe87e66edfea26b861#mirrord",
