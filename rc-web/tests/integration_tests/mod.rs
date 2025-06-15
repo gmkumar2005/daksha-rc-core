@@ -1,10 +1,11 @@
-use definitions_core::definitions_domain::{generate_id_from_title, CreateDefinitionCmd, ValidateDefinitionCmd, UpdateDefinitionCmd, DomainEvent};
 use chrono::{DateTime, Utc};
+use definitions_core::definitions_domain::{
+    generate_id_from_title, CreateDefinitionCmd, DomainEvent, UpdateDefinitionCmd,
+    ValidateDefinitionCmd,
+};
 
 #[cfg(feature = "integration_tests")]
 mod simple_contaner_based_test;
-#[cfg(feature = "integration_tests")]
-mod definitions_domain_integration_tests;
 
 pub fn create_def_cmd_1() -> CreateDefinitionCmd {
     CreateDefinitionCmd {
@@ -161,7 +162,8 @@ pub fn get_def_created_invalid_json() -> DomainEvent {
                 }
             }
         }
-        "###.to_string(),
+        "###
+        .to_string(),
     }
 }
 
@@ -201,7 +203,8 @@ pub fn get_def_created_empty_title() -> DomainEvent {
                 }
             }
         }
-        "###.to_string(),
+        "###
+        .to_string(),
     }
 }
 
