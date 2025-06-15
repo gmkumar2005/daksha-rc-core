@@ -29,7 +29,7 @@ blake3 = "1.8.2"
 chrono = { version = "0.4.41", features = ["serde"] }
 config = "0.15.11"
 ctor = "0.4.2"
-derive_more = "2.0.1"
+derive_more = { version = "2.0", features = ["full"] }
 disintegrate = { version = "2.0.0", features = ["macros", "serde-json"] }
 disintegrate-postgres = { version = "2.0.1", features = ["listener"] }
 env_logger = "0.11.8"

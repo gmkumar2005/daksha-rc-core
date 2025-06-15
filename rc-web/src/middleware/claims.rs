@@ -2,8 +2,7 @@ use crate::ErrorMessage;
 use actix_web::{
     dev::Payload,
     error::ResponseError,
-    http::{StatusCode, Uri}
-    ,
+    http::{StatusCode, Uri},
     Error, FromRequest, HttpRequest, HttpResponse,
 };
 use actix_web_httpauth::extractors::bearer::BearerAuth;
