@@ -366,6 +366,57 @@ Type 'exit' to leave the pod terminal.
 postgres@dev-rc-app-database-1:/$
 ```
 
+### Database Reset Script (`database_reset.sql`)
+
+For resetting the database to a clean state during development and testing:
+
+```bash
+# Connect to database and run the reset script
+./scripts/connect-postgres.sh dev
+# Then in the psql session:
+\i /path/to/rc-web/tests/api-tests/database_reset.sql
+```
+
+**What this script does:**
+- 🗑️ Drops all application tables: `definition`, `definitions`, `event`, `event_listener`, `event_sequence`
+- 🔧 Removes custom functions: `event_store_begin_epoch()`, `event_store_current_epoch()`, `notify_event_listener()`
+- 📊 Drops sequences: `event_sequence_event_id_seq`
+- 🧹 Completely cleans the database schema for fresh starts
+
+**Script contents:**
+```sql
+drop table definition;
+drop table definitions;
+drop table event;
+drop table event_listener;
+drop table event_sequence;
+drop function event_store_begin_epoch ();
+drop function event_store_current_epoch ();
+drop function notify_event_listener ();
+drop sequence event_sequence_event_id_seq;
+```
+
+**When to use:**
+- 🧪 Before running integration tests
+- 🔄 When switching between different development branches
+- 🐛 When debugging database-related issues
+- 🆕 When you need a completely fresh database state
+
+**Alternative execution methods:**
+```bash
+# Method 1: Direct execution via psql
+psql "postgresql://app:password@localhost:5432/app" -f rc-web/tests/api-tests/database_reset.sql
+
+# Method 2: Using port forwarding and external psql
+./scripts/portforward-postgres.sh dev &
+psql "postgresql://app:password@localhost:5432/app" -f rc-web/tests/api-tests/database_reset.sql
+
+# Method 3: Copy script to pod and execute
+kubectl cp rc-web/tests/api-tests/database_reset.sql dev-rc-app-database-1:/tmp/reset.sql
+./scripts/shell-postgres.sh dev
+# Then in pod: psql -f /tmp/reset.sql
+```
+
 ### Use Cases
 
 **Use `connect-postgres.sh` when:**
@@ -386,6 +437,13 @@ postgres@dev-rc-app-database-1:/$
 - Debugging PostgreSQL server configuration
 - Inspecting pod filesystem and logs
 - Performing manual database operations within the pod
+
+**Use `database_reset.sql` when:**
+- Starting integration tests that require a clean database
+- Switching between development branches with different schemas
+- Debugging database-related issues by resetting to a known state
+- Clearing test data after development sessions
+- Preparing for fresh application deployments
 
 ### Connection URLs
 

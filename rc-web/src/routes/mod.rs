@@ -7,6 +7,293 @@ pub mod entity_routes;
 pub mod health_check;
 pub mod user;
 
+pub const INSURANCE_EXAMPLE: &str = r###"{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "Insurance": {
+      "$ref": "#/definitions/Insurance"
+    }
+  },
+  "required": [
+    "Insurance"
+  ],
+  "title":"Insurance",
+  "definitions": {
+    "Insurance": {
+      "$id": "#/properties/Insurance",
+      "type": "object",
+      "title": "Insurance",
+      "required": [
+        "policyNumber",
+        "policyName",
+        "policyExpiresOn",
+        "policyIssuedOn",
+        "fullName",
+        "dob"
+      ],
+      "properties": {
+        "policyNumber": {
+          "type": "string"
+        },
+        "policyName": {
+          "type": "string"
+        },
+        "policyExpiresOn": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "policyIssuedOn": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "benefits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fullName": {
+          "type": "object",
+          "properties": {
+            "firstName": {
+            "type": "string",
+            "format": "firstName"
+            }
+          },
+          "title": "Full Name"
+        },
+        "dob": {
+          "type": "string",
+          "format": "date"
+        },
+        "gender": {
+          "type": "string",
+          "enum": [
+            "Male",
+            "Female",
+            "Other"
+          ]
+        },
+        "mobile": {
+          "type": "string",
+          "title": "Mobile number"
+        },
+        "email": {
+          "type": "string",
+          "title": "Email ID"
+        }
+      }
+    }
+  },
+  "_osConfig": {
+    "credentialTemplate": {
+      "@context": [
+        "https://www.w3.org/2018/credentials/v1",
+        {
+          "@context": {
+            "@version": 1.1,
+            "@protected": true,
+            "id": "@id",
+            "type": "@type",
+            "schema": "https://schema.org/",
+            "InsuranceCredential": {
+              "@id": "did:InsuranceCredential",
+              "@context": {
+                "@version": 1.1,
+                "@protected": true,
+                "id": "@id",
+                "type": "@type",
+                "dob": "schema:birthDate",
+                "email": "schema:email",
+                "gender": "schema:gender",
+                "mobile": "schema:telephone",
+                "benefits": "schema:benefits",
+                "fullName": "schema:name",
+                "policyName": "schema:Text",
+                "policyNumber": "schema:Text"
+              }
+            }
+          }
+        },
+        {
+          "HealthInsuranceCredential": {
+            "@id": "InsuranceCredential"
+          },
+          "LifeInsuranceCredential": {
+            "@id": "HealthInsuranceCredential"
+          }
+        }
+      ],
+      "type": [
+        "VerifiableCredential",
+        "LifeInsuranceCredential"
+      ],
+      "issuer": "Registry",
+      "issuanceDate": "{{policyIssuedOn}}",
+      "expirationDate": "{{policyExpiresOn}}",
+      "credentialSubject": {
+        "id": "did:{{osid}}",
+        "dob": "{{dob}}",
+        "type": "InsuranceCredential",
+        "email": "{{email}}",
+        "gender": "{{gender}}",
+        "mobile": "{{mobile}}",
+        "benefits": "{{benefits}}",
+        "fullName": "{{fullName}}",
+        "policyName": "{{policyName}}",
+        "policyNumber": "{{policyNumber}}"
+      }
+    },
+    "certificateTemplates": {
+      "first": "minio://Insurance/1-68619c95-3f40-45b8-b6ba-56eba055dc11/email/documents/3165a481-8078-447c-8cc0-f310869cb40d-Insurancetemplate.html"
+    },
+    "osComment": [],
+    "privateFields": [],
+    "systemFields": [
+      "_osSignedData",
+      "_osCredentialId",
+      "_osAttestedData"
+    ],
+    "indexFields": [],
+    "uniqueIndexFields": [],
+    "roles": ["Official"],
+    "inviteRoles": ["Official"],
+    "attestationPolicies": [
+      {
+        "name": "cropApprovalPolicy",
+        "attestationProperties": {
+          "policyExpiresOn": "$.policyExpiresOn",
+          "policyNumber": "$.policyNumber",
+          "policyName": "$.policyNumber",
+          "fullName": "$.fullName"
+        },
+        "type": "MANUAL",
+        "attestorPlugin": "did:internal:ClaimPluginActor?entity=Official",
+        "conditions": "(ATTESTOR#$.Gender#.equalsIgnoreCase('male'))",
+        "credentialTemplate": {
+          "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            {
+              "@context": {
+                "@version": 1.1,
+                "@protected": true,
+                "id": "@id",
+                "type": "@type",
+                "schema": "https://schema.org/",
+                "InsuranceCredential": {
+                  "@id": "did:InsuranceCredential",
+                  "@context": {
+                    "@version": 1.1,
+                    "@protected": true,
+                    "id": "@id",
+                    "type": "@type",
+                    "policyExpiresOn": "schema:expires",
+                    "policyName": "schema:Text",
+                    "policyNumber": "schema:Text"
+                  }
+                }
+              }
+            }
+          ],
+          "type": [
+            "VerifiableCredential",
+            "InsuranceCredential"
+          ],
+          "issuer": "Registry",
+          "expirationDate": "{{policyExpiresOn}}",
+          "credentialSubject": {
+            "id": "did:{{policyName}}:{{policyNumber}}",
+            "type": "InsuranceCredential",
+            "policyName": "{{policyName}}",
+            "policyNumber": "{{policyNumber}}",
+            "policyExpiresOn": "{{policyExpiresOn}}"
+          }
+        }
+      }
+    ],
+    "ownershipAttributes": [
+      {
+        "userId": "$.email",
+        "email": "$.email",
+        "mobile": "$.mobile"
+      }
+    ]
+  }
+}"###;
+
+pub const INSURANCE_OFFICIAL_EXAMPLE: &str = r###"{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "Official": {
+      "$ref": "#/definitions/Official"
+    }
+  },
+  "required": [
+    "Official"
+  ],
+  "title": "Official",
+  "definitions": {
+    "Official": {
+      "$id": "#/properties/Official",
+      "type": "object",
+      "title": "The Official Schema",
+      "required": [
+        "Name",
+        "Phone",
+        "email",
+        "State",
+        "Category"
+      ],
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Gender": {
+          "type": "string"
+        },
+        "Phone": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "State": {
+          "type": "string"
+        },
+        "Category": {
+          "type": "string"
+        },
+        "Designation": {
+          "type": "string"
+        },
+        "Department": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "_osConfig": {
+    "systemFields": [
+      "osCreatedAt",
+      "osUpdatedAt",
+      "osCreatedBy",
+      "osUpdatedBy"
+    ],
+    "roles": ["admin"],
+    "inviteRoles": ["admin"],
+    "ownershipAttributes": [
+      {
+        "email": "/email",
+        "mobile": "/Phone",
+        "userId": "/Phone"
+      }
+    ]
+  }
+}
+"###;
+
 pub const STUDENT_EXAMPLE: &str = r###"{
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
@@ -21,7 +308,6 @@ pub const STUDENT_EXAMPLE: &str = r###"{
   "title": "Student",
   "definitions": {
     "Student": {
-      "$id": "#/properties/Student",
       "type": "object",
       "title": "The Student Schema",
       "required": [],
@@ -33,12 +319,10 @@ pub const STUDENT_EXAMPLE: &str = r###"{
           "required": [],
           "properties": {
             "fullName": {
-              "$id": "#/properties/fullName",
               "type": "string",
               "title": "Full name"
             },
             "gender": {
-              "$id": "#/properties/gender",
               "type": "string",
               "enum": [
                 "Male",
@@ -48,7 +332,6 @@ pub const STUDENT_EXAMPLE: &str = r###"{
               "title": "Gender"
             },
             "dob": {
-              "$id": "#/properties/dob",
               "type": "string",
               "format": "date",
               "title": "DOB"
@@ -57,7 +340,6 @@ pub const STUDENT_EXAMPLE: &str = r###"{
               "type": "object",
               "properties": {
                 "type": {
-                  "$id": "#/properties/type",
                   "type": "string",
                   "$comment": "Nationality",
                   "title": "ID Type",
@@ -69,7 +351,6 @@ pub const STUDENT_EXAMPLE: &str = r###"{
                   ]
                 },
                 "value": {
-                  "$id": "#/properties/value",
                   "type": "string",
                   "$comment": "Nationality",
                   "title": "ID Value"
@@ -85,17 +366,14 @@ pub const STUDENT_EXAMPLE: &str = r###"{
           "required": [],
           "properties": {
             "email": {
-              "$id": "#/properties/email",
               "type": "string",
               "title": "Email"
             },
             "mobile": {
-              "$id": "#/properties/mobile",
               "type": "string",
               "title": "Mobile"
             },
             "address": {
-              "$id": "#/properties/address",
               "type": "string",
               "title": "Address"
             }
@@ -103,6 +381,85 @@ pub const STUDENT_EXAMPLE: &str = r###"{
         }
       }
     }
+  },
+  "_osConfig": {
+    "osComment": [
+      "This section contains the OpenSABER specific configuration information",
+      "privateFields: Optional; list of field names to be encrypted and stored in database",
+      "signedFields: Optional; list of field names that must be pre-signed",
+      "indexFields: Optional; list of field names used for creating index. Enclose within braces to indicate it is a composite index. In this definition, (serialNum, studentCode) is a composite index and studentName is a single column index.",
+      "uniqueIndexFields: Optional; list of field names used for creating unique index. Field names must be different from index field name",
+      "systemFields: Optional; list of fields names used for system standard information like created, updated timestamps and userid"
+    ],
+    "privateFields": [
+      "$.identityDetails.dob",
+      "$.identityDetails.identityType",
+      "$.identityDetails.identityValue"
+    ],
+    "internalFields": [
+      "$.contactDetails.email",
+      "$.contactDetails.mobile",
+      "$.contactDetails.address"
+    ],
+    "signedFields": [],
+    "indexFields": [
+      "studentName"
+    ],
+    "uniqueIndexFields": [
+      "identityValue"
+    ],
+    "systemFields": [
+      "_osCreatedAt",
+      "_osUpdatedAt",
+      "_osCreatedBy",
+      "_osUpdatedBy",
+      "_osAttestedData",
+      "_osClaimId",
+      "_osState"
+    ],
+    "attestationAttributes": [
+      "educationDetails",
+      "nationalIdentifier"
+    ],
+    "attestationPolicies": [
+      {
+        "name": "attestationEducationDetails",
+        "properties": [
+          "educationDetails/[]"
+        ],
+        "paths": [
+          "$.educationDetails[?(@.osid == 'PROPERTY_ID')]['instituteName', 'program', 'graduationYear', 'marks']",
+          "$.identityDetails['fullName']"
+        ],
+        "type": "MANUAL",
+        "attestorEntity": "Teacher",
+        "attestorPlugin": "did:internal:Claim?entity=Teacher",
+        "conditions": "(ATTESTOR#$.experience.[*].instituteOSID#.contains(REQUESTER#$.instituteOSID#) && ATTESTOR#$.experience[?(@.instituteOSID == REQUESTER#$.instituteOSID#)]['_osState']#.contains('PUBLISHED'))"
+      }
+    ],
+    "autoAttestationPolicies": [
+      {
+        "parentProperty": "identityDetails",
+        "property": "identityHolder",
+        "nodeRef": "$.identityDetails.identityHolder",
+        "valuePath": "$.identityDetails.identityHolder.value",
+        "typePath": "$.identityDetails.identityHolder.type"
+      }
+    ],
+    "subjectJsonPath": "mobile",
+    "ownershipAttributes": [
+      {
+        "email": "/contactDetails/email",
+        "mobile": "/contactDetails/mobile",
+        "userId": "/contactDetails/mobile"
+      }
+    ],
+    "inviteRoles": [
+      "anonymous"
+    ],
+    "roles": [
+      "anonymous"
+    ]
   }
 }"###;
 pub const TEACHER_EXAMPLE: &str = r###"{

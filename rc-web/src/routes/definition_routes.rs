@@ -1,7 +1,8 @@
 use crate::models::ValidateDefRequest;
 // use rc_web::{DError, DecisionMaker};
 use crate::routes::{
-    ErrorResponse, CLIENT_EXAMPLE, CONSULTANT_EXAMPLE, STUDENT_EXAMPLE, TEACHER_EXAMPLE,
+    ErrorResponse, CLIENT_EXAMPLE, CONSULTANT_EXAMPLE, INSURANCE_EXAMPLE,
+    INSURANCE_OFFICIAL_EXAMPLE, STUDENT_EXAMPLE, TEACHER_EXAMPLE,
 };
 use crate::{
     base_url, DError, DecisionMaker, SuccessResponse, API_PREFIX, COMMANDS, DEFINITIONS, QUERY,
@@ -29,7 +30,7 @@ pub struct DefinitionsResponse {
     /// Unique identifier
     pub id: String,
     /// Title or name
-    pub title: String,
+    pub title: Option<String>,
     /// The schema as a JSON string
     pub json_schema_string: String,
     /// Record status (e.g. Active, Inactive)
@@ -40,6 +41,26 @@ pub struct DefinitionsResponse {
     pub created_by: String,
     /// Who activated the entry (if any)
     pub activated_by: Option<String>,
+    /// When the entry was activated (if any)
+    pub activated_at: Option<DateTime<Utc>>,
+    /// Index fields from the schema
+    pub index_fields: Option<String>,
+    /// Private fields from the schema (comma-separated)
+    pub private_fields: Option<String>,
+    /// Unique index fields from the schema
+    pub unique_index_fields: Option<String>,
+    /// System fields from the schema (comma-separated)
+    pub system_fields: Option<String>,
+    /// Attestation attributes from the schema (comma-separated)
+    pub attestation_attributes: Option<String>,
+    /// Invite roles from the schema (comma-separated)
+    pub invite_roles: Option<String>,
+    /// Roles from the schema (comma-separated)
+    pub roles: Option<String>,
+    /// Whether the schema has attestation policies
+    pub has_attestation_policies: Option<bool>,
+    /// Last updated timestamp
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 pub fn routes() -> Scope {
@@ -193,6 +214,8 @@ async fn validate_def(
             ("Student" = (value = json!(serde_json::from_str::<Value>(STUDENT_EXAMPLE).expect("Failed to parse STUDENT_EXAMPLE JSON")), description = "Student in Education domain")),
             ("Consultant" = (value = json!(serde_json::from_str::<Value>(CONSULTANT_EXAMPLE).expect("Failed to parse CONSULTANT_EXAMPLE JSON")), description = "Consultant in Remote working domain")),
             ("Client" = (value = json!(serde_json::from_str::<Value>(CLIENT_EXAMPLE).expect("Failed to parse CLIENT_EXAMPLE JSON")), description = "Client in Remote working domain")),
+            ("Insurance" = (value = json!(serde_json::from_str::<Value>(INSURANCE_EXAMPLE).expect("Failed to parse INSURANCE_EXAMPLE JSON")), description = "Insurance Policy detaills")),
+            ("Official" = (value = json!(serde_json::from_str::<Value>(INSURANCE_OFFICIAL_EXAMPLE).expect("Failed to parse INSURANCE_EXAMPLE JSON")), description = "Insurance Official detaills")),
         )
     ),
     responses(
@@ -250,12 +273,22 @@ async fn create_def(
 #[derive(Debug, Serialize, FromRow)]
 struct Definition {
     id: Uuid,
-    title: String,
+    title: Option<String>,
     json_schema_string: serde_json::Value,
+    index_fields: Option<String>,
+    private_fields: Option<String>,
+    unique_index_fields: Option<String>,
+    system_fields: Option<String>,
+    attestation_attributes: Option<String>,
+    invite_roles: Option<String>,
+    roles: Option<String>,
+    has_attestation_policies: Option<bool>,
     record_status: String,
     created_at: chrono::DateTime<Utc>,
     created_by: String,
     activated_by: Option<String>,
+    activated_at: Option<chrono::DateTime<Utc>>,
+    updated_at: Option<chrono::DateTime<Utc>>,
 }
 
 #[derive(Debug, Deserialize, IntoParams, Default)]
@@ -284,8 +317,8 @@ pub struct DefinitionQuery {
 async fn get_definitions(db_pool: Data<PgPool>, query: Query<DefinitionQuery>) -> impl Responder {
     let mut sql = String::from(
         r#"
-        SELECT id, title, json_schema_string, record_status, created_at, created_by, activated_by
-        FROM definition
+        SELECT id, title, json_schema_string, index_fields, private_fields, unique_index_fields, system_fields, attestation_attributes, invite_roles, roles, has_attestation_policies, record_status, created_at, created_by, activated_by, activated_at, updated_at
+        FROM definitions
         "#,
     );
 
@@ -347,8 +380,8 @@ async fn get_definitions_by_id(db_pool: Data<PgPool>, path: web::Path<Uuid>) -> 
     debug!("querying id: {}", id);
     match sqlx::query_as::<_, Definition>(
         r#"
-        SELECT id, title, json_schema_string, record_status, created_at, created_by, activated_by
-        FROM definition
+        SELECT id, title, json_schema_string, index_fields, private_fields, unique_index_fields, system_fields, attestation_attributes, invite_roles, roles, has_attestation_policies, record_status, created_at, created_by, activated_by, activated_at, updated_at
+        FROM definitions
         WHERE id = $1
         "#,
     )
@@ -356,12 +389,7 @@ async fn get_definitions_by_id(db_pool: Data<PgPool>, path: web::Path<Uuid>) -> 
     .fetch_optional(db_pool.get_ref())
     .await
     {
-        Ok(Some(definition)) => HttpResponse::Ok().json(definition),
-        Ok(None) => HttpResponse::NotFound().json(ErrorResponse {
-            error: Some("definition_not_found".into()),
-            error_description: Some(format!("Definition not found for id {}", id)),
-            message: format!("Definition not found for id {}", id),
-        }),
+        Ok(definitions) => HttpResponse::Ok().json(definitions),
         Err(e) => {
             error!("Database query failed: {}", e);
             HttpResponse::InternalServerError().json(ErrorResponse {
