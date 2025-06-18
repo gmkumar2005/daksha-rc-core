@@ -83,6 +83,7 @@ impl EventListener<i64, DomainEvent> for ReadModelProjection {
                 json_schema_string,
                 ..
             } => {
+                //TODO create projection table to hold entity data created using this schema
                 debug!(
                     "DomainEvent::DefActivated id {:#?} activated_by is {}",
                     id,

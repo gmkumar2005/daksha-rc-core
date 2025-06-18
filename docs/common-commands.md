@@ -209,3 +209,17 @@ kubectl wait --for=condition=Available deployment/dev-rc-app -n default --timeou
 curl -k https://rc.127.0.0.1.nip.io/healthz
 
 ```
+### Connecting to postgres on k8s
+```shell
+
+Service name dev-rc-app-database-rw
+Secrets name dev-rc-app-database-app
+kubectl get secret dev-rc-app-database-app -n default -o jsonpath="{.data.username}" | base64 --decode && echo
+kubectl get secret dev-rc-app-database-app -n default -o jsonpath="{.data.password}" | base64 --decode && echo
+kubectl get secret dev-rc-app-database-app -n default -o jsonpath="{.data.dbname}" | base64 --decode && echo
+kubectl port-forward svc/dev-rc-app-database-app -n default 5432:5432
+
+PGPASSWORD=<password> psql -h localhost -p 5432 -U <username> -d <dbname>
+
+
+```

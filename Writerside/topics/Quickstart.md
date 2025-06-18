@@ -230,6 +230,177 @@ kubectl logs -l app.kubernetes.io/instance=dev -f
 watch -n 2 "curl -k -s https://rc.127.0.0.1.nip.io/healthz"
 ```
 
+## Database Connection Scripts
+
+The project includes three PostgreSQL connection scripts for different use cases:
+
+### Direct Database Connection (`connect-postgres.sh`)
+
+For direct database access with an interactive psql session:
+
+```bash
+# Connect to PostgreSQL database
+./scripts/connect-postgres.sh dev
+```
+
+**What this script does:**
+- ✅ Checks CNPG operator status
+- 🔍 Finds PostgreSQL pod using label `cnpg.io/podRole=instance`
+- 🔐 Extracts credentials from Kubernetes secret `dev-rc-app-database-app`
+- 🚀 Establishes port forwarding to the PostgreSQL pod
+- 💻 Launches interactive psql session
+- 🧹 Automatically cleans up port forwarding on exit
+
+**Example output:**
+```
+Connecting to PostgreSQL for release: dev
+Using secret: dev-rc-app-database-app
+Checking CNPG operator status...
+Found PostgreSQL pod: dev-rc-app-database-1 in namespace: default
+Database: app
+Username: app
+
+Connection URLs:
+----------------------------------------
+Regular PostgreSQL URL:
+postgresql://app:password123@localhost:5432/app
+
+JDBC URL:
+jdbc:postgresql://localhost:5432/app?user=app&password=password123
+
+Connection Details:
+Host: localhost
+Port: 5432
+Database: app
+Username: app
+Password: [hidden - available in environment]
+----------------------------------------
+
+Connecting to PostgreSQL database...
+You can now run SQL commands. Type \q to exit.
+```
+
+### Persistent Port Forwarding (`portforward-postgres.sh`)
+
+For maintaining a persistent database connection without launching psql:
+
+```bash
+# Start persistent port forwarding (default port 5432)
+./scripts/portforward-postgres.sh dev
+
+# Or use a custom local port
+./scripts/portforward-postgres.sh dev 15432
+```
+
+**What this script does:**
+- 🔄 Maintains persistent port forwarding connection
+- 📊 Monitors connection health every 10 seconds
+- 🔧 Automatically recovers from connection failures
+- 📋 Displays connection URLs for external tools
+- ⏳ Runs until manually stopped with Ctrl+C
+
+**Example output:**
+```
+=========================================
+PERSISTENT PORT FORWARDING ACTIVE
+=========================================
+Connection URLs:
+----------------------------------------
+Regular PostgreSQL URL:
+postgresql://app:password123@localhost:5432/app
+
+JDBC URL:
+jdbc:postgresql://localhost:5432/app?user=app&password=password123
+
+Connection Details:
+Host: localhost
+Port: 5432
+Database: app
+Username: app
+Password: [available in connection URLs above]
+----------------------------------------
+Port forwarding PID: 12345
+=========================================
+
+Press Ctrl+C to stop port forwarding
+
+Monitoring port forwarding... (checking every 10s)
+```
+
+### Pod Terminal Access (`shell-postgres.sh`)
+
+For direct access to the PostgreSQL pod terminal with an interactive shell:
+
+```bash
+# Connect to PostgreSQL pod terminal
+./scripts/shell-postgres.sh dev
+```
+
+**What this script does:**
+- ✅ Checks CNPG operator status
+- 🔍 Finds PostgreSQL pod using label `cnpg.io/podRole=instance`
+- 🖥️ Connects directly to the pod terminal with interactive bash
+- 🔧 Provides access to all PostgreSQL tools within the pod
+- 🧹 No port forwarding or secrets required
+
+**Example output:**
+```
+=========================================
+CONNECTING TO POSTGRESQL POD TERMINAL
+=========================================
+Pod: dev-rc-app-database-1
+Namespace: default
+Shell: Interactive bash session
+=========================================
+
+You are now connected to the PostgreSQL pod terminal.
+Available commands:
+  - psql: Connect to PostgreSQL directly
+  - pg_dump: Backup database
+  - pg_restore: Restore database
+  - Standard Linux commands (ls, cat, tail, etc.)
+
+Type 'exit' to leave the pod terminal.
+----------------------------------------
+
+postgres@dev-rc-app-database-1:/$
+```
+
+### Use Cases
+
+**Use `connect-postgres.sh` when:**
+- You need direct SQL access for debugging
+- Running database migrations or admin tasks
+- Exploring database schema and data
+- One-time database operations
+
+**Use `portforward-postgres.sh` when:**
+- Connecting external database tools (pgAdmin, DBeaver, etc.)
+- Running applications that need database access
+- Long-running database connections
+- Development with persistent database connectivity
+
+**Use `shell-postgres.sh` when:**
+- You need direct access to the PostgreSQL server environment
+- Running database administration tasks (pg_dump, pg_restore)
+- Debugging PostgreSQL server configuration
+- Inspecting pod filesystem and logs
+- Performing manual database operations within the pod
+
+### Connection URLs
+
+Both scripts provide connection URLs in multiple formats:
+
+- **Regular PostgreSQL URL**: `postgresql://username:password@localhost:5432/database`
+- **JDBC URL**: `jdbc:postgresql://localhost:5432/database?user=username&password=password`
+- **Individual connection details** for manual configuration
+
+These URLs can be used with:
+- Database management tools (pgAdmin, DBeaver, TablePlus)
+- Application configuration files
+- Development environments
+- CI/CD pipelines for database operations
+
 ## Application Architecture
 
 After successful deployment, you'll have:
@@ -449,10 +620,13 @@ kind delete cluster
 
 1. **Explore the API**: Visit https://rc.127.0.0.1.nip.io/scalar for API documentation
 2. **Debug Locally**: Use `cargo make debug` for local development with cluster environment using mirrord
-3. **Check Logs**: Monitor application behavior with `kubectl logs`
-4. **Scale Applications**: Modify replica counts in Helm values
-5. **Add PostgreSQL**: Use CNPG to create PostgreSQL clusters
-6. **Custom Configuration**: Modify `k8s/rc-app/values.yaml` for customization
+3. **Database Access**: Use `./scripts/connect-postgres.sh dev` for direct database access
+4. **Persistent Database Connection**: Use `./scripts/portforward-postgres.sh dev` for external database tools
+5. **Pod Terminal Access**: Use `./scripts/shell-postgres.sh dev` for direct pod shell access
+5. **Check Logs**: Monitor application behavior with `kubectl logs`
+6. **Scale Applications**: Modify replica counts in Helm values
+7. **Add PostgreSQL**: Use CNPG to create PostgreSQL clusters
+8. **Custom Configuration**: Modify `k8s/rc-app/values.yaml` for customization
 
 ## Additional Resources
 
