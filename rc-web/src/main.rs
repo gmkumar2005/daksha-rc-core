@@ -38,6 +38,8 @@ use utoipa_swagger_ui::SwaggerUi;
         rc_web::routes::health_check::echo,
         rc_web::routes::health_check::healthz,
         rc_web::routes::health_check::readyz,
+        rc_web::routes::entity_routes::get_entities,
+        rc_web::routes::entity_routes::get_entity_by_id
     ),
     tags(
     (name = DEFINITIONS, description = "Manage Definitions and Schemas"),
