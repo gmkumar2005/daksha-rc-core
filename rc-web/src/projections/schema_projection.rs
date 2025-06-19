@@ -571,16 +571,11 @@ fn find_matching_columns(
     for attribute in flattened_attributes {
         let attribute_lower = attribute.attribute_name.to_lowercase();
 
-        // Direct match
-        if attribute_lower == pattern_lower {
-            matching_columns.push(attribute.attribute_name.clone());
-        }
-        // Pattern matches the end of the attribute name (for nested fields)
-        else if attribute_lower.ends_with(&format!("_{}", pattern_lower)) {
-            matching_columns.push(attribute.attribute_name.clone());
-        }
-        // Pattern matches any part of the attribute name
-        else if attribute_lower.contains(&pattern_lower) {
+        // Check for direct match, suffix match, or contains match
+        if attribute_lower == pattern_lower
+            || attribute_lower.ends_with(&format!("_{}", pattern_lower))
+            || attribute_lower.contains(&pattern_lower)
+        {
             matching_columns.push(attribute.attribute_name.clone());
         }
     }

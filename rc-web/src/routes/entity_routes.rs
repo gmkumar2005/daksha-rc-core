@@ -22,7 +22,7 @@ use uuid::Uuid;
 /// Helper function to check if error is "table does not exist"
 fn is_table_not_found_error(err: &sqlx::Error) -> bool {
     match err {
-        sqlx::Error::Database(db_err) => db_err.code().map_or(false, |code| code == "42P01"),
+        sqlx::Error::Database(db_err) => db_err.code().is_some_and(|code| code == "42P01"),
         _ => false,
     }
 }
@@ -240,10 +240,8 @@ fn sanitize_sql_value(value: &str) -> Option<String> {
         .replace('\\', "\\\\") // Escape backslashes first
         .replace('\'', "''") // Escape single quotes (SQL standard)
         .replace('"', "\"\"") // Escape double quotes
-        .replace('\0', "") // Remove null bytes
-        .replace('\r', "") // Remove carriage returns
-        .replace('\n', " ") // Replace newlines with spaces
-        .replace('\t', " "); // Replace tabs with spaces
+        .replace(['\0', '\r'], "") // Remove null bytes and carriage returns
+        .replace(['\n', '\t'], " "); // Replace newlines and tabs with spaces
 
     // Final check - ensure the escaped value isn't empty
     if escaped_value.trim().is_empty() {
@@ -274,7 +272,7 @@ fn sanitize_sql_value(value: &str) -> Option<String> {
 /// * `Err(sqlx::Error)` - Database query failed
 ///
 /// # Examples
-/// ```rust
+/// ```rust,ignore
 /// let exists = validate_entity_type(&db_pool, "Student").await?;
 /// if exists {
 ///     // Proceed with entity operations
