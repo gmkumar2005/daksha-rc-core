@@ -105,27 +105,23 @@ pub struct FlattenedAttribute {
 pub fn flatten_json_schema(schema: &Value) -> Result<Vec<FlattenedAttribute>, String> {
     let mut attributes = Vec::new();
 
-    // Check if schema has definitions and handle 4-level processing
+    // First, check if schema has definitions to determine max depth
+    // If definitions exist, allow depth of 5, otherwise limit to 3
     let has_definitions = schema.get("definitions").is_some();
-    let max_depth = if has_definitions { 4 } else { 3 };
+    let max_depth = if has_definitions { 5 } else { 3 };
 
-    // Start processing from properties or definitions
-    if let Some(definitions) = schema.get("definitions") {
-        if let Some(definitions_obj) = definitions.as_object() {
-            for (def_key, def_value) in definitions_obj {
-                if let Some(properties) = def_value.get("properties") {
-                    process_properties(
-                        properties,
-                        &def_key.to_lowercase(),
-                        &mut attributes,
-                        1,
-                        max_depth,
-                    )?;
-                }
-            }
-        }
-    } else if let Some(properties) = schema.get("properties") {
-        process_properties(properties, "", &mut attributes, 1, max_depth)?;
+    // Always start navigation from 'properties', not 'definitions'
+    // Attributes under 'properties' will be flattened
+    // Navigation to 'definitions' only happens when $ref is encountered
+    if let Some(properties) = schema.get("properties") {
+        process_properties(
+            properties,
+            "",
+            &mut attributes,
+            1,
+            max_depth,
+            schema, // Pass full schema for $ref resolution to definitions
+        )?;
     }
 
     Ok(attributes)
@@ -139,12 +135,14 @@ pub fn flatten_json_schema(schema: &Value) -> Result<Vec<FlattenedAttribute>, St
 /// * `attributes` - Mutable vector to collect flattened attributes
 /// * `current_depth` - Current nesting depth
 /// * `max_depth` - Maximum allowed depth
+/// * `root_schema` - The root schema for resolving $ref references
 fn process_properties(
     properties: &Value,
     prefix: &str,
     attributes: &mut Vec<FlattenedAttribute>,
     current_depth: usize,
     max_depth: usize,
+    root_schema: &Value,
 ) -> Result<(), String> {
     if let Some(props_obj) = properties.as_object() {
         for (key, value) in props_obj {
@@ -155,7 +153,25 @@ fn process_properties(
                 format!("{}_{}", prefix, lowercased_key)
             };
 
-            if let Some(prop_type) = value.get("type").and_then(|t| t.as_str()) {
+            // Priority 1: Check for $ref - Navigate to definitions only when $ref is encountered
+            if let Some(ref_value) = value.get("$ref").and_then(|r| r.as_str()) {
+                // Navigate to definitions to resolve the reference
+                if let Some(resolved_value) = resolve_ref(ref_value, root_schema) {
+                    // Continue flattening the resolved definition's properties
+                    if let Some(nested_props) = resolved_value.get("properties") {
+                        process_properties(
+                            nested_props,
+                            &current_name,
+                            attributes,
+                            current_depth + 1,
+                            max_depth,
+                            root_schema,
+                        )?;
+                    }
+                }
+            }
+            // Priority 2: Process properties directly (no $ref) - flatten attributes under properties
+            else if let Some(prop_type) = value.get("type").and_then(|t| t.as_str()) {
                 match prop_type {
                     "object" => {
                         if current_depth < max_depth {
@@ -167,6 +183,7 @@ fn process_properties(
                                     attributes,
                                     current_depth + 1,
                                     max_depth,
+                                    root_schema,
                                 )?;
                             } else {
                                 // Object with no properties - treat as JSONB
@@ -184,6 +201,52 @@ fn process_properties(
                             }
                         } else {
                             // At max depth, treat object as JSONB
+                            let (column_type, _) = determine_column_info(value);
+                            let pattern = create_generated_column_pattern(
+                                &current_name,
+                                prefix,
+                                &column_type,
+                            );
+                            attributes.push(FlattenedAttribute {
+                                attribute_name: current_name,
+                                column_type,
+                                generated_column_pattern: pattern,
+                            });
+                        }
+                    }
+                    "array" => {
+                        // Handle arrays - check if items have $ref to definitions
+                        if let Some(items) = value.get("items") {
+                            if let Some(ref_value) = items.get("$ref").and_then(|r| r.as_str()) {
+                                // Array with $ref items - resolve and flatten the referenced object properties
+                                if let Some(resolved_value) = resolve_ref(ref_value, root_schema) {
+                                    if let Some(nested_props) = resolved_value.get("properties") {
+                                        process_properties(
+                                            nested_props,
+                                            &current_name,
+                                            attributes,
+                                            current_depth + 1,
+                                            max_depth,
+                                            root_schema,
+                                        )?;
+                                    }
+                                }
+                            } else {
+                                // Array without $ref items - treat as JSONB
+                                let (column_type, _) = determine_column_info(value);
+                                let pattern = create_generated_column_pattern(
+                                    &current_name,
+                                    prefix,
+                                    &column_type,
+                                );
+                                attributes.push(FlattenedAttribute {
+                                    attribute_name: current_name,
+                                    column_type,
+                                    generated_column_pattern: pattern,
+                                });
+                            }
+                        } else {
+                            // Array with no items definition - treat as JSONB
                             let (column_type, _) = determine_column_info(value);
                             let pattern = create_generated_column_pattern(
                                 &current_name,
@@ -240,12 +303,12 @@ fn determine_column_info(property: &Value) -> (String, bool) {
     let format = property.get("format").and_then(|f| f.as_str());
 
     let column_type = match (property_type, format) {
-        ("string", Some("date")) => "TEXT".to_string(), // Use TEXT for immutable generated columns
-        ("string", Some("date-time")) => "TEXT".to_string(), // Use TEXT for immutable generated columns
+        ("string", Some("date")) => "TIMESTAMPTZ".to_string(),
+        ("string", Some("date-time")) => "TIMESTAMPTZ".to_string(),
         ("string", _) => "TEXT".to_string(),
-        ("integer", _) => "TEXT".to_string(), // Use TEXT for immutable generated columns
-        ("number", _) => "TEXT".to_string(),  // Use TEXT for immutable generated columns
-        ("boolean", _) => "TEXT".to_string(), // Use TEXT for immutable generated columns
+        ("integer", _) => "INTEGER".to_string(),
+        ("number", _) => "NUMERIC".to_string(),
+        ("boolean", _) => "BOOLEAN".to_string(),
         ("array", _) => "JSONB".to_string(),
         ("object", _) => "JSONB".to_string(),
         _ => "TEXT".to_string(), // Default fallback
@@ -299,7 +362,26 @@ fn create_generated_column_pattern(
 
     // Avoid type casting in generated columns to ensure immutability
     // PostgreSQL generated columns must use immutable expressions
+    // Type casting operations like ::INTEGER or ::TIMESTAMPTZ are not immutable
     base_pattern
+}
+
+/// Resolves a $ref reference to its corresponding definition
+///
+/// # Arguments
+/// * `ref_path` - The reference path (e.g., "#/definitions/Student")
+/// * `root_schema` - The root schema containing definitions
+///
+/// # Returns
+/// * `Option<&Value>` - The resolved definition or None if not found
+fn resolve_ref<'a>(ref_path: &str, root_schema: &'a Value) -> Option<&'a Value> {
+    // Handle JSON Pointer format: "#/definitions/DefinitionName"
+    if ref_path.starts_with("#/definitions/") {
+        let def_name = ref_path.strip_prefix("#/definitions/")?;
+        root_schema.get("definitions")?.get(def_name)
+    } else {
+        None
+    }
 }
 
 /// Generates a CREATE TABLE statement from a JSON schema using flattened attributes
@@ -347,9 +429,17 @@ pub fn generate_create_table_statement(schema: &Value) -> Result<String, String>
     // Add flattened columns as generated columns
     for attribute in flattened_attributes {
         create_table_sql.push_str(",\n");
+
+        // Convert primitive types to TEXT for PostgreSQL immutability
+        // Generated columns must use immutable expressions, type casting is not immutable
+        let db_column_type = match attribute.column_type.as_str() {
+            "INTEGER" | "NUMERIC" | "BOOLEAN" | "DATE" | "TIMESTAMPTZ" => "TEXT",
+            _ => &attribute.column_type, // Keep TEXT and JSONB as-is
+        };
+
         create_table_sql.push_str(&format!(
             "    {} {} GENERATED ALWAYS AS ({}) STORED",
-            attribute.attribute_name, attribute.column_type, attribute.generated_column_pattern
+            attribute.attribute_name, db_column_type, attribute.generated_column_pattern
         ));
     }
 
@@ -519,10 +609,7 @@ mod tests {
             .find(|attr| attr.attribute_name == "age")
             .unwrap();
         assert_eq!(age_attr.column_type, "INTEGER");
-        assert_eq!(
-            age_attr.generated_column_pattern,
-            "(entity_data ->> 'age')::INTEGER"
-        );
+        assert_eq!(age_attr.generated_column_pattern, "entity_data ->> 'age'");
     }
 
     #[test]
@@ -541,7 +628,7 @@ mod tests {
         assert!(result.contains("CREATE TABLE user_projection"));
         assert!(result.contains("entity_data JSONB NOT NULL"));
         assert!(result.contains("name TEXT GENERATED ALWAYS AS"));
-        assert!(result.contains("age INTEGER GENERATED ALWAYS AS"));
+        assert!(result.contains("age TEXT GENERATED ALWAYS AS"));
         assert!(result.ends_with(");"));
     }
 

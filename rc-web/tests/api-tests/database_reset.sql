@@ -17,5 +17,9 @@ drop sequence event_sequence_event_id_seq cascade;
 drop table client_projection cascade;
 drop table student_projection cascade;
 drop table students cascade;
+drop table insurance_projection cascade;
+drop table official_projection cascade;
+drop table client_projection cascade;
+
 
 \dt -- show all relations

@@ -558,7 +558,7 @@ fn test_flatten_simple_schema_without_definitions() {
 
     let expected_attributes = vec![
         ("name", "TEXT", "entity_data ->> 'name'"),
-        ("age", "INTEGER", "(entity_data ->> 'age')::INTEGER"),
+        ("age", "INTEGER", "entity_data ->> 'age'"),
         // profile object excluded because it has children
         ("profile_bio", "TEXT", "entity_data -> 'profile' ->> 'bio'"),
     ];
