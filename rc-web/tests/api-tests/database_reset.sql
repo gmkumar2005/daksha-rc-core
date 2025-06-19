@@ -20,6 +20,7 @@ drop table students cascade;
 drop table insurance_projection cascade;
 drop table official_projection cascade;
 drop table client_projection cascade;
-
+drop table consultant_projection cascade;
+drop table teacher_projection cascade;
 
 \dt -- show all relations

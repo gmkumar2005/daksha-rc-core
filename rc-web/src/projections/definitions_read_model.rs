@@ -256,14 +256,17 @@ impl EventListener<i64, DomainEvent> for ReadModelProjection {
             // Example: If entity_type is "Student", data will be inserted into "student_projection" table
             DomainEvent::EntityCreated {
                 id,
+                registry_def_id,
+                registry_def_version,
                 entity_body,
                 entity_type,
+                created_at,
                 created_by,
-                ..
+                version,
             } => {
                 debug!(
-                    "DomainEvent::EntityCreated id {:#?} entity_type '{}' created_by '{}'",
-                    id, entity_type, created_by
+                    "DomainEvent::EntityCreated id {:#?} entity_type '{}' created_by '{}' registry_def_id {:#?} version {}",
+                    id, entity_type, created_by, registry_def_id, version.get()
                 );
 
                 // Construct projection table name using lowercase entity_type
@@ -274,13 +277,20 @@ impl EventListener<i64, DomainEvent> for ReadModelProjection {
                 debug!("Inserting entity data into table '{}'", table_name);
 
                 let insert_sql = format!(
-                    "INSERT INTO {} (entity_data) VALUES ($1::jsonb)",
+                    "INSERT INTO {} (id, entity_type, created_by, created_at, registry_def_id, registry_def_version, version, entity_data) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)",
                     table_name
                 );
 
                 debug!("Executing INSERT statement: {}", insert_sql);
 
                 let result = sqlx::query(&insert_sql)
+                    .bind(id)
+                    .bind(entity_type.clone())
+                    .bind(created_by)
+                    .bind(created_at)
+                    .bind(registry_def_id)
+                    .bind(registry_def_version.get() as i32)
+                    .bind(version.get() as i32)
                     .bind(entity_body)
                     .execute(&self.pool)
                     .await;

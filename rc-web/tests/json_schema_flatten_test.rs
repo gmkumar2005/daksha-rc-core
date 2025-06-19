@@ -650,6 +650,15 @@ async fn test_generate_create_table_statement_from_student_schema() {
     // Check that the table name is correct
     assert!(result.contains("CREATE TABLE student_projection"));
 
+    // Check for new required columns
+    assert!(result.contains("id UUID PRIMARY KEY"));
+    assert!(result.contains("entity_type TEXT NOT NULL"));
+    assert!(result.contains("created_by TEXT NOT NULL"));
+    assert!(result.contains("created_at TIMESTAMPTZ NOT NULL"));
+    assert!(result.contains("registry_def_id UUID NOT NULL"));
+    assert!(result.contains("registry_def_version INTEGER NOT NULL"));
+    assert!(result.contains("version INTEGER NOT NULL"));
+
     // Check that entity_data column exists
     assert!(result.contains("entity_data JSONB NOT NULL"));
 
@@ -703,14 +712,23 @@ fn test_generate_create_table_statement_simple_schema() {
     // Check table name
     assert!(result.contains("CREATE TABLE user_projection"));
 
+    // Check for new required columns
+    assert!(result.contains("id UUID PRIMARY KEY"));
+    assert!(result.contains("entity_type TEXT NOT NULL"));
+    assert!(result.contains("created_by TEXT NOT NULL"));
+    assert!(result.contains("created_at TIMESTAMPTZ NOT NULL"));
+    assert!(result.contains("registry_def_id UUID NOT NULL"));
+    assert!(result.contains("registry_def_version INTEGER NOT NULL"));
+    assert!(result.contains("version INTEGER NOT NULL"));
+
     // Check entity_data column
     assert!(result.contains("entity_data JSONB NOT NULL"));
 
-    // Check generated columns
+    // Check generated columns (all primitive types converted to TEXT for immutability)
     assert!(result.contains("name TEXT GENERATED ALWAYS AS"));
-    assert!(result.contains("age INTEGER GENERATED ALWAYS AS"));
+    assert!(result.contains("age TEXT GENERATED ALWAYS AS"));
     assert!(result.contains("email TEXT GENERATED ALWAYS AS"));
-    assert!(result.contains("active BOOLEAN GENERATED ALWAYS AS"));
+    assert!(result.contains("active TEXT GENERATED ALWAYS AS"));
     assert!(result.contains("profile_bio TEXT GENERATED ALWAYS AS"));
     assert!(result.contains("profile_website TEXT GENERATED ALWAYS AS"));
 
@@ -771,9 +789,18 @@ fn test_generate_create_table_statement_with_definitions() {
     // Check table name
     assert!(result.contains("CREATE TABLE product_projection"));
 
-    // Check that it processes definitions
+    // Check for new required columns
+    assert!(result.contains("id UUID PRIMARY KEY"));
+    assert!(result.contains("entity_type TEXT NOT NULL"));
+    assert!(result.contains("created_by TEXT NOT NULL"));
+    assert!(result.contains("created_at TIMESTAMPTZ NOT NULL"));
+    assert!(result.contains("registry_def_id UUID NOT NULL"));
+    assert!(result.contains("registry_def_version INTEGER NOT NULL"));
+    assert!(result.contains("version INTEGER NOT NULL"));
+
+    // Check that it processes definitions (all primitive types converted to TEXT for immutability)
     assert!(result.contains("product_name TEXT GENERATED ALWAYS AS"));
-    assert!(result.contains("product_price NUMERIC GENERATED ALWAYS AS"));
+    assert!(result.contains("product_price TEXT GENERATED ALWAYS AS"));
     assert!(result.contains("product_category_name TEXT GENERATED ALWAYS AS"));
     assert!(result.contains("product_category_code TEXT GENERATED ALWAYS AS"));
 
@@ -802,6 +829,15 @@ fn test_generate_create_table_statement_various_types() {
 
     // Check table name
     assert!(result.contains("CREATE TABLE testentity_projection"));
+
+    // Check for new required columns
+    assert!(result.contains("id UUID PRIMARY KEY"));
+    assert!(result.contains("entity_type TEXT NOT NULL"));
+    assert!(result.contains("created_by TEXT NOT NULL"));
+    assert!(result.contains("created_at TIMESTAMPTZ NOT NULL"));
+    assert!(result.contains("registry_def_id UUID NOT NULL"));
+    assert!(result.contains("registry_def_version INTEGER NOT NULL"));
+    assert!(result.contains("version INTEGER NOT NULL"));
 
     // Check different column types (all primitive types are TEXT for immutability)
     assert!(result.contains("text_field TEXT GENERATED ALWAYS AS"));

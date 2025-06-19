@@ -423,6 +423,15 @@ pub fn generate_create_table_statement(schema: &Value) -> Result<String, String>
     // Start building the CREATE TABLE statement
     let mut create_table_sql = format!("CREATE TABLE {} (\n", table_name);
 
+    // Add primary key and entity metadata columns
+    create_table_sql.push_str("    id UUID PRIMARY KEY,\n");
+    create_table_sql.push_str("    entity_type TEXT NOT NULL,\n");
+    create_table_sql.push_str("    created_by TEXT NOT NULL,\n");
+    create_table_sql.push_str("    created_at TIMESTAMPTZ NOT NULL,\n");
+    create_table_sql.push_str("    registry_def_id UUID NOT NULL,\n");
+    create_table_sql.push_str("    registry_def_version INTEGER NOT NULL,\n");
+    create_table_sql.push_str("    version INTEGER NOT NULL,\n");
+
     // Add the entity_data column to store JSON data
     create_table_sql.push_str("    entity_data JSONB NOT NULL");
 
@@ -626,6 +635,15 @@ mod tests {
         let result = generate_create_table_statement(&schema).unwrap();
 
         assert!(result.contains("CREATE TABLE user_projection"));
+        // Check for new required columns
+        assert!(result.contains("id UUID PRIMARY KEY"));
+        assert!(result.contains("entity_type TEXT NOT NULL"));
+        assert!(result.contains("created_by TEXT NOT NULL"));
+        assert!(result.contains("created_at TIMESTAMPTZ NOT NULL"));
+        assert!(result.contains("registry_def_id UUID NOT NULL"));
+        assert!(result.contains("registry_def_version INTEGER NOT NULL"));
+        assert!(result.contains("version INTEGER NOT NULL"));
+        // Check for existing columns
         assert!(result.contains("entity_data JSONB NOT NULL"));
         assert!(result.contains("name TEXT GENERATED ALWAYS AS"));
         assert!(result.contains("age TEXT GENERATED ALWAYS AS"));
