@@ -133,7 +133,7 @@ fn validate_id(web_cmd: &Json<ValidateDefRequest>) -> Result<Uuid, DError> {
     })
 }
 
-/// Validate a definition
+/// Validate a schema
 #[utoipa::path(
     post,
     path = "/api/v1/schema/validate_def",
@@ -200,7 +200,7 @@ async fn validate_def(
         }))
 }
 
-/// Create a definition
+/// Create a schema definition
 
 #[utoipa::path(
     post,
@@ -300,7 +300,7 @@ pub struct DefinitionQuery {
     pub record_status: Option<String>,
 }
 
-/// Show all definitions
+/// Get schema definitions
 #[utoipa::path(
     get,
     path = "/api/v1/schema",
@@ -361,7 +361,7 @@ async fn get_definitions(db_pool: Data<PgPool>, query: Query<DefinitionQuery>) -
     }
 }
 
-/// Show definitions by ID
+/// Get schema definition by ID
 #[utoipa::path(
     get,
     path = "/api/v1/schema/{id}",

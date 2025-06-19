@@ -3,8 +3,14 @@ use definitions_core::definitions_domain::{DefRecordStatus, DomainEvent};
 use disintegrate::{query, EventListener, PersistedEvent, StreamQuery};
 use disintegrate_postgres::PgEventId;
 use log::debug;
+use serde_json;
+
 use sqlx::PgPool;
 use tokio::signal;
+
+use crate::projections::schema_projection::{
+    generate_create_table_statement, generate_index_statements,
+};
 
 pub struct ReadModelProjection {
     query: StreamQuery<PgEventId, DomainEvent>,
@@ -199,7 +205,6 @@ impl EventListener<i64, DomainEvent> for ReadModelProjection {
                 json_schema_string,
                 ..
             } => {
-                //TODO create projection table to hold entity data created using this schema
                 debug!(
                     "DomainEvent::DefActivated id {:#?} activated_by is {}",
                     id,
@@ -217,7 +222,7 @@ impl EventListener<i64, DomainEvent> for ReadModelProjection {
                         ",
                 )
                 .bind(id)
-                .bind(json_schema_string)
+                .bind(json_schema_string.clone())
                 .bind(DefRecordStatus::Active.to_string())
                 .bind(activated_by.clone())
                 .bind(activated_at)
@@ -228,9 +233,238 @@ impl EventListener<i64, DomainEvent> for ReadModelProjection {
                     debug!("Failed to update definition: {:?}", e);
                 }
                 result?;
+
+                // Create projection table and indices for the activated schema
+                debug!("Starting projection table and indices creation for activated schema");
+                if let Err(e) = self
+                    .create_projection_table_and_indices(&json_schema_string)
+                    .await
+                {
+                    debug!("Failed to create projection table and indices: {:?}", e);
+                    return Err(e);
+                }
+                debug!("Successfully completed projection table and indices creation");
+            }
+            // Handle entity creation events by inserting JSON data into projection tables
+            //
+            // When an entity is created, this handler:
+            // 1. Determines the target projection table using the naming convention: {entity_type}_projection
+            // 2. Inserts the entity_body (JSON data) into the entity_data column of that table
+            // 3. Leverages the generated columns created by DefActivated to automatically extract
+            //    and populate flattened attributes from the JSON data
+            //
+            // Example: If entity_type is "Student", data will be inserted into "student_projection" table
+            DomainEvent::EntityCreated {
+                id,
+                registry_def_id,
+                registry_def_version,
+                entity_body,
+                entity_type,
+                created_at,
+                created_by,
+                version,
+            } => {
+                debug!(
+                    "DomainEvent::EntityCreated id {:#?} entity_type '{}' created_by '{}' registry_def_id {:#?} version {}",
+                    id, entity_type, created_by, registry_def_id, version.get()
+                );
+
+                // Construct projection table name using lowercase entity_type
+                let table_name = format!("{}_projection", entity_type.to_lowercase());
+
+                // Insert JSON data into the projection table's entity_data column
+                // The generated columns will automatically extract flattened attributes
+                debug!("Inserting entity data into table '{}'", table_name);
+
+                let insert_sql = format!(
+                    "INSERT INTO {} (id, entity_type, created_by, created_at, registry_def_id, registry_def_version, version, entity_data) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)",
+                    table_name
+                );
+
+                debug!("Executing INSERT statement: {}", insert_sql);
+
+                let result = sqlx::query(&insert_sql)
+                    .bind(id)
+                    .bind(entity_type.clone())
+                    .bind(created_by)
+                    .bind(created_at)
+                    .bind(registry_def_id)
+                    .bind(registry_def_version.get() as i32)
+                    .bind(version.get() as i32)
+                    .bind(entity_body)
+                    .execute(&self.pool)
+                    .await;
+
+                if let Err(e) = &result {
+                    debug!(
+                        "Failed to insert entity data into '{}': {:?}",
+                        table_name, e
+                    );
+                }
+                result?;
+
+                debug!("Successfully inserted entity data into '{}'", table_name);
             }
             _ => {}
         }
+
+        Ok(())
+    }
+}
+
+impl ReadModelProjection {
+    /// Creates projection table and indices for a given JSON schema
+    ///
+    /// This method generates a PostgreSQL projection table with:
+    /// - An `entity_data JSONB NOT NULL` column to store the original JSON data
+    /// - Generated columns for flattened schema attributes extracted from JSON paths
+    /// - Indices based on the schema's `_osConfig` configuration
+    ///
+    /// ## Design Notes
+    ///
+    /// All primitive types (integer, number, boolean, date, datetime) are stored as TEXT
+    /// in generated columns to ensure PostgreSQL immutability requirements. Generated
+    /// columns must use immutable expressions, and type casting operations like `::INTEGER`
+    /// or `::TIMESTAMPTZ` are not considered immutable by PostgreSQL.
+    ///
+    /// Applications can handle type conversion at query time or in application logic:
+    /// ```sql
+    /// -- Query with type conversion
+    /// SELECT student_identitydetails_dob::DATE as dob_date
+    /// FROM student_projection;
+    /// ```
+    async fn create_projection_table_and_indices(
+        &self,
+        json_schema_string: &str,
+    ) -> Result<(), sqlx::Error> {
+        debug!("Creating projection table and indices for JSON schema");
+
+        // Parse the JSON schema string
+        let schema: serde_json::Value = match serde_json::from_str(json_schema_string) {
+            Ok(schema) => {
+                debug!("Successfully parsed JSON schema");
+                schema
+            }
+            Err(e) => {
+                debug!("Failed to parse JSON schema: {:?}", e);
+                return Err(sqlx::Error::Protocol(format!("Invalid JSON schema: {}", e)));
+            }
+        };
+
+        // Extract and log the schema title
+        let schema_title = schema
+            .get("title")
+            .and_then(|t| t.as_str())
+            .unwrap_or("unknown");
+        debug!("Processing schema with title: '{}'", schema_title);
+
+        // Generate CREATE TABLE statement
+        let create_table_sql = match generate_create_table_statement(&schema) {
+            Ok(sql) => {
+                debug!(
+                    "Successfully generated CREATE TABLE statement for '{}'",
+                    schema_title
+                );
+                sql
+            }
+            Err(e) => {
+                debug!(
+                    "Failed to generate CREATE TABLE statement for '{}': {}",
+                    schema_title, e
+                );
+                return Err(sqlx::Error::Protocol(format!(
+                    "Failed to generate CREATE TABLE: {}",
+                    e
+                )));
+            }
+        };
+
+        // Execute CREATE TABLE statement
+        debug!(
+            "Executing CREATE TABLE statement for '{}_projection'",
+            schema_title.to_lowercase()
+        );
+        debug!("CREATE TABLE SQL:\n{}", create_table_sql);
+        if let Err(e) = sqlx::query(&create_table_sql).execute(&self.pool).await {
+            debug!(
+                "Failed to execute CREATE TABLE statement for '{}': {:?}",
+                schema_title, e
+            );
+            return Err(e);
+        }
+        debug!(
+            "Successfully created projection table '{}_projection'",
+            schema_title.to_lowercase()
+        );
+
+        // Generate CREATE INDEX statements
+        let index_statements = match generate_index_statements(&schema) {
+            Ok(statements) => {
+                debug!(
+                    "Successfully generated {} CREATE INDEX statements for '{}'",
+                    statements.len(),
+                    schema_title
+                );
+                statements
+            }
+            Err(e) => {
+                debug!(
+                    "Failed to generate CREATE INDEX statements for '{}': {}",
+                    schema_title, e
+                );
+                return Err(sqlx::Error::Protocol(format!(
+                    "Failed to generate CREATE INDEX: {}",
+                    e
+                )));
+            }
+        };
+
+        // Execute each CREATE INDEX statement
+        let mut successful_indices = 0;
+        let mut failed_indices = 0;
+
+        debug!(
+            "CREATE INDEX SQL statements:\n{}",
+            index_statements.join("\n")
+        );
+
+        for (index_num, index_sql) in index_statements.iter().enumerate() {
+            debug!(
+                "Executing CREATE INDEX statement {} of {} for '{}'",
+                index_num + 1,
+                index_statements.len(),
+                schema_title
+            );
+            if let Err(e) = sqlx::query(index_sql).execute(&self.pool).await {
+                debug!(
+                    "Failed to execute CREATE INDEX statement for '{}': {:?}",
+                    schema_title, e
+                );
+                debug!("Failed SQL: {}", index_sql);
+                failed_indices += 1;
+                // Continue with other indices even if one fails
+                debug!("Continuing with remaining index creation despite error");
+            } else {
+                debug!(
+                    "Successfully executed CREATE INDEX statement {} for '{}'",
+                    index_num + 1,
+                    schema_title
+                );
+                successful_indices += 1;
+            }
+        }
+
+        debug!(
+            "Index creation summary for '{}': {} successful, {} failed out of {} total",
+            schema_title,
+            successful_indices,
+            failed_indices,
+            index_statements.len()
+        );
+        debug!(
+            "Successfully completed projection table and indices creation for schema '{}'",
+            schema_title
+        );
         Ok(())
     }
 }

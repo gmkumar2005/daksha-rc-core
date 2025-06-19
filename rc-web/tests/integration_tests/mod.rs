@@ -3,9 +3,21 @@ use definitions_core::definitions_domain::{
     generate_id_from_title, CreateDefinitionCmd, DomainEvent, UpdateDefinitionCmd,
     ValidateDefinitionCmd,
 };
+use sqlx::{PgPool, Transaction};
+use testcontainers::{ContainerAsync, ImageExt};
+use testcontainers_modules::postgres::Postgres;
+use testcontainers_modules::{postgres, testcontainers::runners::AsyncRunner};
+use tokio::sync::OnceCell;
+
+// Shared pool and container for tests
+static POOL: OnceCell<PgPool> = OnceCell::const_new();
+static POSTGRES_CONTAINER: OnceCell<ContainerAsync<Postgres>> = OnceCell::const_new();
 
 #[cfg(feature = "integration_tests")]
 mod simple_contaner_based_test;
+
+#[cfg(feature = "integration_tests")]
+mod read_model_projection_test;
 
 pub fn create_def_cmd_1() -> CreateDefinitionCmd {
     CreateDefinitionCmd {
@@ -216,4 +228,41 @@ pub fn get_expected_validation_failed_empty_title() -> DomainEvent {
         validation_result: "failure".to_string(),
         validation_errors: vec!["Invalid Schema: Title is empty".to_string()],
     }
+}
+
+// Database helper functions
+
+async fn initialize_container() -> ContainerAsync<Postgres> {
+    let container = postgres::Postgres::default()
+        .with_tag("17.2-bookworm")
+        .start()
+        .await
+        .unwrap();
+    container
+}
+
+async fn get_postgres_container<'a>() -> &'a ContainerAsync<Postgres> {
+    let container = POSTGRES_CONTAINER.get_or_init(initialize_container).await;
+    container
+}
+
+async fn initialize_pool() -> PgPool {
+    let container = get_postgres_container().await;
+    let host_port = container.get_host_port_ipv4(5432).await.unwrap();
+    let connection_string =
+        &format!("postgres://postgres:postgres@127.0.0.1:{host_port}/postgres",);
+    let pool = PgPool::connect(&connection_string).await.unwrap();
+    pool
+}
+
+pub async fn get_shared_pool() -> PgPool {
+    POOL.get_or_init(|| async { initialize_pool().await })
+        .await
+        .clone()
+}
+
+pub async fn begin_transaction(
+    pool: &PgPool,
+) -> anyhow::Result<Transaction<sqlx::postgres::Postgres>> {
+    Ok(pool.begin().await?)
 }
