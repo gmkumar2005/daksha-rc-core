@@ -229,3 +229,11 @@ PGPASSWORD=<password> psql -h localhost -p 5432 -U <username> -d <dbname>
 psql postgresql://daksha_rc:NYpVusIWuctlwdOh60SroevN2BFizyw4YomTKMXHZo4gAn8ou0uN5aF4lwB8IgWk@localhost:5432/daksha_rc
 
 ```
+
+### Pull image debug
+```shell
+
+ghcr.io/daksha-rc/rc-web:v.0.1.1
+ghcr.io/daksha-rc/rc-web:v0.1.1
+docker pull ghcr.io/daksha-rc/rc-web:v0.1.1
+```
