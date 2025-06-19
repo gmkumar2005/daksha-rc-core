@@ -11,13 +11,12 @@ use definitions_core::definitions_domain::DomainEvent;
 use definitions_core::registry_domain::{CreateEntityCmd, EntityError};
 use disintegrate::PersistedEvent;
 use disintegrate_postgres::PgEventId;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 #[allow(unused_imports)]
 use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool};
-use std::collections::HashMap;
 use std::ops::Deref;
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 /// Helper function to check if error is "table does not exist"
@@ -28,31 +27,235 @@ fn is_table_not_found_error(err: &sqlx::Error) -> bool {
     }
 }
 
-/// Whitelist of allowed column names for filtering
-/// This prevents SQL injection and ensures only valid columns are queried
-const ALLOWED_FILTER_COLUMNS: &[&str] = &[
-    "id",
-    "entity_data",
-    "entity_type",
-    "created_by",
-    "created_at",
-    "registry_def_id",
-    "registry_def_version",
-    "version",
-];
+/// Logs security events with consistent formatting
+fn log_security_event(event_type: &str, details: &str, user_input: &str) {
+    log::warn!(
+        "[SECURITY] {}: {} | Input: '{}'",
+        event_type,
+        details,
+        user_input
+    );
+}
 
-/// Validates and sanitizes column name for filtering
-fn validate_column_name(column_name: &str) -> Option<String> {
-    // Remove any non-alphanumeric characters except underscores
-    let sanitized = column_name.replace(|c: char| !c.is_alphanumeric() && c != '_', "");
+/// Sanitizes column names to prevent SQL injection
+///
+/// This function performs comprehensive sanitization of column names by:
+/// - Removing all non-alphanumeric characters except underscores
+/// - Preventing SQL keywords and reserved words
+/// - Limiting length to prevent buffer overflow attacks
+/// - Converting to lowercase for consistency
+///
+/// # Parameters
+/// * `column_name` - The raw column name from user input
+///
+/// # Returns
+/// * `Some(String)` - Sanitized column name if valid
+/// * `None` - If column name is invalid or potentially dangerous
+fn sanitize_column_name(column_name: &str) -> Option<String> {
+    // Remove all characters except alphanumeric and underscores
+    let sanitized = column_name
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_')
+        .collect::<String>();
 
-    // Check if the sanitized column name is in the allowed list
-    if ALLOWED_FILTER_COLUMNS.contains(&sanitized.as_str()) {
-        Some(sanitized)
-    } else {
-        log::warn!("Attempted to filter by invalid column: {}", column_name);
-        None
+    // Check if result is empty
+    if sanitized.is_empty() {
+        log_security_event(
+            "COLUMN_SANITIZATION",
+            "Empty column name after sanitization",
+            column_name,
+        );
+        return None;
     }
+
+    // Limit length to prevent buffer overflow
+    if sanitized.len() > 64 {
+        log_security_event(
+            "COLUMN_LENGTH_ATTACK",
+            &format!("Column name too long: {} chars", sanitized.len()),
+            column_name,
+        );
+        return None;
+    }
+
+    // Convert to lowercase for consistency
+    let normalized = sanitized.to_lowercase();
+
+    // Check against SQL reserved words and dangerous patterns
+    let sql_keywords = [
+        "select",
+        "insert",
+        "update",
+        "delete",
+        "drop",
+        "create",
+        "alter",
+        "truncate",
+        "union",
+        "join",
+        "where",
+        "order",
+        "group",
+        "having",
+        "limit",
+        "offset",
+        "declare",
+        "exec",
+        "execute",
+        "sp_",
+        "xp_",
+        "sys",
+        "information_schema",
+        "pg_",
+        "mysql",
+        "sqlite_",
+        "master",
+        "msdb",
+        "tempdb",
+        "model",
+    ];
+
+    if sql_keywords.contains(&normalized.as_str()) {
+        log_security_event(
+            "SQL_KEYWORD_BLOCKED",
+            &format!("Attempted to use SQL keyword '{}' as column", normalized),
+            column_name,
+        );
+        return None;
+    }
+
+    // Block patterns that start with dangerous prefixes
+    if normalized.starts_with("pg_")
+        || normalized.starts_with("sys")
+        || normalized.starts_with("sp_")
+        || normalized.starts_with("xp_")
+    {
+        log_security_event(
+            "DANGEROUS_COLUMN_PREFIX",
+            &format!("Blocked dangerous column prefix in '{}'", normalized),
+            column_name,
+        );
+        return None;
+    }
+
+    Some(normalized)
+}
+
+/// Sanitizes and formats SQL values based on their detected type
+///
+/// This function provides comprehensive value sanitization by:
+/// - Detecting value types (numeric, boolean, UUID, string)
+/// - Applying appropriate escaping and formatting for each type
+/// - Preventing SQL injection through proper quoting and escaping
+/// - Validating format for structured types (UUID, boolean)
+///
+/// # Parameters
+/// * `value` - The raw value from user input
+///
+/// # Returns
+/// * `Some(String)` - Properly formatted SQL value
+/// * `None` - If value is invalid or potentially dangerous
+fn sanitize_sql_value(value: &str) -> Option<String> {
+    // Limit value length to prevent buffer overflow
+    if value.len() > 1000 {
+        log_security_event(
+            "VALUE_LENGTH_ATTACK",
+            &format!("Value too long: {} characters", value.len()),
+            &value[..50.min(value.len())],
+        );
+        return None;
+    }
+
+    // Check for suspicious patterns that might indicate SQL injection attempts
+    let dangerous_patterns = [
+        "--",
+        "/*",
+        "*/",
+        "@@",
+        "char(",
+        "cast(",
+        "convert(",
+        "exec(",
+        "sp_",
+        "xp_",
+        "union",
+        "select",
+        "insert",
+        "update",
+        "delete",
+        "drop",
+        "create",
+        "alter",
+        "truncate",
+        "script",
+        "javascript",
+        "vbscript",
+        "onload",
+        "onerror",
+        "eval(",
+    ];
+
+    let value_lower = value.to_lowercase();
+    for pattern in &dangerous_patterns {
+        if value_lower.contains(pattern) {
+            log_security_event(
+                "SQL_INJECTION_ATTEMPT",
+                &format!("Blocked dangerous pattern '{}'", pattern),
+                value,
+            );
+            return None;
+        }
+    }
+
+    // Try to parse as numeric (integer or float)
+    if let Ok(num) = value.parse::<f64>() {
+        // Additional validation for numeric values
+        if num.is_finite() && num.abs() < 1e15 {
+            return Some(value.to_string());
+        } else {
+            log_security_event(
+                "INVALID_NUMERIC",
+                "Numeric value out of safe range or not finite",
+                value,
+            );
+            return None;
+        }
+    }
+
+    // Try to parse as boolean
+    match value.to_lowercase().as_str() {
+        "true" => return Some("true".to_string()),
+        "false" => return Some("false".to_string()),
+        _ => {}
+    }
+
+    // Try to parse as UUID
+    if uuid::Uuid::parse_str(value).is_ok() {
+        // UUIDs are safe and don't need escaping beyond quoting
+        return Some(format!("'{}'", value));
+    }
+
+    // Handle as string value with comprehensive escaping
+    let escaped_value = value
+        .replace('\\', "\\\\") // Escape backslashes first
+        .replace('\'', "''") // Escape single quotes (SQL standard)
+        .replace('"', "\"\"") // Escape double quotes
+        .replace('\0', "") // Remove null bytes
+        .replace('\r', "") // Remove carriage returns
+        .replace('\n', " ") // Replace newlines with spaces
+        .replace('\t', " "); // Replace tabs with spaces
+
+    // Final check - ensure the escaped value isn't empty
+    if escaped_value.trim().is_empty() {
+        log_security_event(
+            "VALUE_SANITIZATION",
+            "Empty value after sanitization",
+            value,
+        );
+        return None;
+    }
+
+    Some(format!("'{}'", escaped_value))
 }
 
 /// Validates that an entity type exists in the definitions table
@@ -93,32 +296,6 @@ async fn validate_entity_type(db_pool: &PgPool, entity_type: &str) -> Result<boo
         .await?;
 
     Ok(result > 0)
-}
-
-/// Query parameters for filtering entities
-///
-/// Supports filtering by standard entity columns and custom attributes.
-/// All filters are applied using AND conditions.
-#[derive(Debug, Deserialize, IntoParams, Default)]
-#[into_params(parameter_in = Query)]
-pub struct EntityQuery {
-    /// Filter by entity_type (exact match)
-    #[param(example = "Student")]
-    pub entity_type: Option<String>,
-    /// Filter by created_by (exact match)
-    #[param(example = "demo")]
-    pub created_by: Option<String>,
-    /// Filter by registry_def_id (exact match)
-    #[param(example = "123e4567-e89b-12d3-a456-426614174000")]
-    pub registry_def_id: Option<String>,
-    /// Filter by registry_def_version (exact match)
-    #[param(example = "1")]
-    pub registry_def_version: Option<i32>,
-    /// Additional filters as key-value pairs mapping to column names.
-    /// Column names are sanitized to prevent SQL injection.
-    /// Example: ?name=John&age=25&grade=A
-    #[serde(flatten)]
-    pub additional_filters: HashMap<String, String>,
 }
 
 /// Entity record from projection table
@@ -240,39 +417,38 @@ async fn create_entity(
 /// Multiple filters are combined using AND conditions.
 ///
 /// # Filtering
-///
-/// **Standard Filters:**
-/// - `entity_type` - Filter by entity type (exact match)
-/// - `created_by` - Filter by creator (exact match)
-/// - `registry_def_id` - Filter by registry definition ID (exact match)
-/// - `registry_def_version` - Filter by definition version (exact match)
-///
-/// **Custom Filters:**
-/// Any additional query parameters are treated as column filters.
-/// Only whitelisted column names are allowed for security.
+/// Accepts arbitrary name=value pairs as query parameters. All filters are combined using AND conditions.
+/// Values are automatically detected as numeric, boolean, UUID, or string types and handled appropriately.
+/// Column names are sanitized by removing non-alphanumeric characters except underscores.
 ///
 /// # Examples
 /// - `/api/v1/entity/Student` - Get all students
-/// - `/api/v1/entity/Student?created_by=demo` - Get students created by 'demo'
-/// - `/api/v1/entity/Student?registry_def_version=1` - Get students using definition version 1
-/// - `/api/v1/entity/Student?created_by=demo&registry_def_version=1` - Multiple standard filters
-/// - `/api/v1/entity/Teacher?entity_type=Teacher&created_by=admin` - Filter teachers by creator
-/// - `/api/v1/entity/Student?id=123e4567-e89b-12d3-a456-426614174000` - Get student by ID (alternative to ID endpoint)
+/// - `/api/v1/entity/Student?created_by=demo` - Get students created by 'demo' (string filter)
+/// - `/api/v1/entity/Student?registry_def_version=1` - Get students using definition version 1 (numeric filter)
+/// - `/api/v1/entity/Student?age=20` - Filter by age (numeric filter)
+/// - `/api/v1/entity/Student?grade_point=3.5` - Filter by GPA (decimal filter)
+/// - `/api/v1/entity/Student?active=true` - Filter by active status (boolean filter)
+/// - `/api/v1/entity/Student?registry_def_id=123e4567-e89b-12d3-a456-426614174000` - Filter by UUID
+/// - `/api/v1/entity/Student?created_by=demo&registry_def_version=1&active=true` - Multiple filters with different types
+/// - `/api/v1/entity/Student?name=John O'Connor` - String with special characters (automatically escaped)
 ///
 /// # Security
 /// - Entity types are validated against the definitions table
-/// - Column names are validated against a whitelist to prevent SQL injection
-/// - Invalid column names are logged and ignored
+/// - Column names are comprehensively sanitized and validated against SQL keywords
+/// - Values are sanitized based on type detection with multiple layers of protection
+/// - SQL injection patterns are detected and blocked
+/// - String values are properly escaped with multiple escape mechanisms
+/// - Input length limits prevent buffer overflow attacks
 #[utoipa::path(
     get,
     path = "/api/v1/entity/{entity_type}",
     tags= [ENTITY, QUERY],
     summary = "Get entities by type with filtering",
-    description = "Retrieves entities from the projection table for a given entity type with optional filtering capabilities.",
+    description = "Retrieves entities from the projection table for a given entity type with optional filtering capabilities. Accepts arbitrary query parameters as filters (e.g., ?created_by=demo&name=John&age=20). All filters are combined using AND conditions.",
     params(
-        ("entity_type" = String, Path, description = "The type of entity to retrieve (e.g., Student, Teacher, Client)", example = "Student"),
-        EntityQuery
+        ("entity_type" = String, Path, description = "The type of entity to retrieve (e.g., Student, Teacher, Client)", example = "Student")
     ),
+
     responses(
         (status = 200,
          description = "Successfully retrieved entities",
@@ -349,7 +525,7 @@ async fn create_entity(
 async fn get_entities(
     db_pool: Data<PgPool>,
     entity_type: web::Path<String>,
-    query: web::Query<EntityQuery>,
+    query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, DError> {
     let entity_type_str = entity_type.into_inner();
 
@@ -385,46 +561,40 @@ async fn get_entities(
     );
 
     let mut conditions = vec![];
-    let mut bind_values: Vec<String> = vec![];
 
-    // Add filters based on query parameters
-    if let Some(entity_type_filter) = &query.entity_type {
-        conditions.push(format!("entity_type = ${}", bind_values.len() + 1));
-        bind_values.push(entity_type_filter.clone());
-    }
+    // Add filters from query parameters with comprehensive sanitization
+    let mut blocked_filters = 0;
+    let mut applied_filters = 0;
 
-    if let Some(created_by) = &query.created_by {
-        conditions.push(format!("created_by = ${}", bind_values.len() + 1));
-        bind_values.push(created_by.clone());
-    }
-
-    if let Some(registry_def_id) = &query.registry_def_id {
-        conditions.push(format!("registry_def_id = ${}", bind_values.len() + 1));
-        bind_values.push(registry_def_id.clone());
-    }
-
-    if let Some(registry_def_version) = &query.registry_def_version {
-        conditions.push(format!("registry_def_version = ${}", bind_values.len() + 1));
-        bind_values.push(registry_def_version.to_string());
-    }
-
-    // Add additional filters from the flattened HashMap
-    for (key, value) in &query.additional_filters {
-        // Validate and sanitize column name to prevent SQL injection
-        if let Some(validated_column) = validate_column_name(key) {
-            // Skip if this column was already processed in the standard filters
-            if ![
-                "entity_type",
-                "created_by",
-                "registry_def_id",
-                "registry_def_version",
-            ]
-            .contains(&validated_column.as_str())
-            {
-                conditions.push(format!("{} = ${}", validated_column, bind_values.len() + 1));
-                bind_values.push(value.clone());
+    for (key, value) in query.iter() {
+        // Sanitize column name
+        if let Some(sanitized_column) = sanitize_column_name(key) {
+            // Sanitize value
+            if let Some(sanitized_value) = sanitize_sql_value(value) {
+                conditions.push(format!("{} = {}", sanitized_column, sanitized_value));
+                applied_filters += 1;
+                log::debug!("Applied filter: {} = {}", sanitized_column, sanitized_value);
+            } else {
+                blocked_filters += 1;
+                log_security_event(
+                    "VALUE_REJECTED",
+                    &format!("Invalid value for column '{}'", key),
+                    value,
+                );
             }
+        } else {
+            blocked_filters += 1;
+            log_security_event("COLUMN_REJECTED", "Invalid column name", key);
         }
+    }
+
+    // Log summary of filter processing
+    if blocked_filters > 0 {
+        log::warn!(
+            "[SECURITY] Filter summary: {} applied, {} blocked",
+            applied_filters,
+            blocked_filters
+        );
     }
 
     // Add WHERE clause if there are conditions
@@ -436,16 +606,27 @@ async fn get_entities(
     // Add ORDER BY clause for consistent results
     sql.push_str(" ORDER BY created_at DESC, id ASC");
 
-    // Build the query with parameter binding
-    let mut query_builder = sqlx::query_as::<_, Entity>(&sql);
-    for value in &bind_values {
-        query_builder = query_builder.bind(value);
-    }
+    log::debug!("Executing SQL query: {}", sql);
 
-    match query_builder.fetch_all(db_pool.get_ref()).await {
-        Ok(entities) => Ok(HttpResponse::Ok().json(entities)),
+    match sqlx::query_as::<_, Entity>(&sql)
+        .fetch_all(db_pool.get_ref())
+        .await
+    {
+        Ok(entities) => {
+            log::info!(
+                "Successfully retrieved {} entities of type '{}' with {} filters",
+                entities.len(),
+                entity_type_str,
+                applied_filters
+            );
+            Ok(HttpResponse::Ok().json(entities))
+        }
         Err(e) => {
-            log::error!("Database error: {}", e);
+            log::error!(
+                "Database error for entity type '{}': {}",
+                entity_type_str,
+                e
+            );
             if is_table_not_found_error(&e) {
                 // Table doesn't exist - return 404
                 Ok(HttpResponse::NotFound().json(ErrorResponse {
@@ -454,6 +635,15 @@ async fn get_entities(
                     message: format!("Entity type '{}' not found. The projection table may not have been created yet.", entity_type_str),
                 }))
             } else {
+                // Log potential SQL injection attempt if query fails suspiciously
+                if e.to_string().contains("syntax error") || e.to_string().contains("invalid") {
+                    log_security_event(
+                        "SUSPICIOUS_QUERY_FAILURE",
+                        &format!("Query failed with syntax/validation error: {}", e),
+                        &sql,
+                    );
+                }
+
                 // Other database errors - return 500
                 Ok(HttpResponse::InternalServerError().json(ErrorResponse {
                     error: Some("DATABASE_ERROR".to_string()),
