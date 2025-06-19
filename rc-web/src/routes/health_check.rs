@@ -15,6 +15,9 @@ pub fn routes() -> Scope {
         .service(readyz)
 }
 /// Simple hello
+///
+///
+/// Returns a greeting message. `Hello, World!`
 #[utoipa::path(
     get,
     path = "/hello",
@@ -30,7 +33,10 @@ async fn hello() -> impl Responder {
         .body("Hello world!")
 }
 
-/// Simple endpoint to test if the server is running
+/// Echo
+///
+///
+/// Needs authentication
 #[utoipa::path(
     path = "/echo",
      request_body(
@@ -77,7 +83,9 @@ async fn healthz() -> impl Responder {
         .body("healthy")
 }
 
-/// Readiness probe with DB check
+/// Readiness probe
+///
+/// Checks DB connection
 #[utoipa::path(
     get,
     path = "/readyz",

@@ -332,7 +332,9 @@ async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
-/// Create an entity for a given entity type
+/// Create an entity
+///
+/// Creates an entity for a given entity type.
 #[utoipa::path(
     post,
     path = "/api/v1/entity/{entity_type}",
@@ -410,7 +412,7 @@ async fn create_entity(
         }))
 }
 
-/// Get entities by entity type with optional filtering
+/// Get entities
 ///
 /// This endpoint retrieves entities from the projection table for a given entity type.
 /// You can filter results using query parameters that map to column names.
@@ -429,6 +431,7 @@ async fn create_entity(
 /// - `/api/v1/entity/Student?grade_point=3.5` - Filter by GPA (decimal filter)
 /// - `/api/v1/entity/Student?active=true` - Filter by active status (boolean filter)
 /// - `/api/v1/entity/Student?registry_def_id=123e4567-e89b-12d3-a456-426614174000` - Filter by UUID
+/// - `/api/v1/entity/Student?created_by=demo&registry_def_version=1&location_city=Seattle'` - Mixed types with special characters (sanitized automatically)
 /// - `/api/v1/entity/Student?created_by=demo&registry_def_version=1&active=true` - Multiple filters with different types
 /// - `/api/v1/entity/Student?name=John O'Connor` - String with special characters (automatically escaped)
 ///
@@ -443,12 +446,9 @@ async fn create_entity(
     get,
     path = "/api/v1/entity/{entity_type}",
     tags= [ENTITY, QUERY],
-    summary = "Get entities by type with filtering",
-    description = "Retrieves entities from the projection table for a given entity type with optional filtering capabilities. Accepts arbitrary query parameters as filters (e.g., ?created_by=demo&name=John&age=20). All filters are combined using AND conditions.",
     params(
-        ("entity_type" = String, Path, description = "The type of entity to retrieve (e.g., Student, Teacher, Client)", example = "Student")
+        ("entity_type" = String, Path, description = "The type of entity to retrieve (e.g., Student, Teacher, Client)", example = "Consultant")
     ),
-
     responses(
         (status = 200,
          description = "Successfully retrieved entities",
@@ -474,6 +474,38 @@ async fn create_entity(
                          "created_by": "demo",
                          "created_at": "2024-01-15T10:30:00Z",
                          "registry_def_id": "def-123e4567-e89b-12d3-a456-426614174000",
+                         "registry_def_version": 1
+                     }
+                 ])
+             )),
+             ("filtered_results" = (
+                 summary = "Filtered results example",
+                 description = "Example response for query: ?created_by=demo&registry_def_version=1&location_city=Seattle' (note: trailing quote is automatically sanitized)",
+                 value = json!([
+                     {
+                         "id": "456e7890-e12b-34d5-a678-901234567890",
+                         "entity_data": {
+                             "name": "Alice Johnson",
+                             "location_city": "Seattle",
+                             "department": "Engineering"
+                         },
+                         "entity_type": "Consultant",
+                         "created_by": "demo",
+                         "created_at": "2024-01-15T08:45:00Z",
+                         "registry_def_id": "def-789abcde-f012-3456-7890-123456789abc",
+                         "registry_def_version": 1
+                     },
+                     {
+                         "id": "789abcde-f012-3456-7890-123456789abc",
+                         "entity_data": {
+                             "name": "Bob Wilson",
+                             "location_city": "Seattle",
+                             "specialization": "Data Analytics"
+                         },
+                         "entity_type": "Consultant",
+                         "created_by": "demo",
+                         "created_at": "2024-01-15T09:30:00Z",
+                         "registry_def_id": "def-789abcde-f012-3456-7890-123456789abc",
                          "registry_def_version": 1
                      }
                  ])
@@ -655,7 +687,7 @@ async fn get_entities(
     }
 }
 
-/// Get entity by ID for a given entity type
+/// Get entity
 ///
 /// This endpoint retrieves a specific entity by its ID from the projection table
 /// for a given entity type. The entity ID must be a valid UUID.
