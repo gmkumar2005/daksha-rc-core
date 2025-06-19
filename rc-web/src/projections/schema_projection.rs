@@ -266,23 +266,29 @@ fn determine_column_info(property: &Value) -> (String, bool) {
 fn create_generated_column_pattern(
     attribute_name: &str,
     parent_path: &str,
-    _column_type: &str,
+    column_type: &str,
 ) -> String {
+    // Determine the final JSON operator based on column type
+    let final_operator = if column_type == "JSONB" { "->" } else { "->>" };
+
     let base_pattern = if parent_path.is_empty() {
-        format!("entity_data ->> '{}'", attribute_name)
+        format!("entity_data {} '{}'", final_operator, attribute_name)
     } else {
         // Split the attribute name to create nested JSON path
         let parts: Vec<&str> = attribute_name.split('_').collect();
         if parts.len() == 1 {
-            format!("entity_data ->> '{}'", parts[0])
+            format!("entity_data {} '{}'", final_operator, parts[0])
         } else if parts.len() == 2 {
-            format!("entity_data -> '{}' ->> '{}'", parts[0], parts[1])
+            format!(
+                "entity_data -> '{}' {} '{}'",
+                parts[0], final_operator, parts[1]
+            )
         } else {
             // For deeper nesting, create a more complex JSON path
             let mut path = "entity_data".to_string();
             for (i, part) in parts.iter().enumerate() {
                 if i == parts.len() - 1 {
-                    path = format!("{} ->> '{}'", path, part);
+                    path = format!("{} {} '{}'", path, final_operator, part);
                 } else {
                     path = format!("{} -> '{}'", path, part);
                 }
