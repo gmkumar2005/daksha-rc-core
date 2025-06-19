@@ -245,6 +245,56 @@ impl EventListener<i64, DomainEvent> for ReadModelProjection {
                 }
                 debug!("Successfully completed projection table and indices creation");
             }
+            // Handle entity creation events by inserting JSON data into projection tables
+            //
+            // When an entity is created, this handler:
+            // 1. Determines the target projection table using the naming convention: {entity_type}_projection
+            // 2. Inserts the entity_body (JSON data) into the entity_data column of that table
+            // 3. Leverages the generated columns created by DefActivated to automatically extract
+            //    and populate flattened attributes from the JSON data
+            //
+            // Example: If entity_type is "Student", data will be inserted into "student_projection" table
+            DomainEvent::EntityCreated {
+                id,
+                entity_body,
+                entity_type,
+                created_by,
+                ..
+            } => {
+                debug!(
+                    "DomainEvent::EntityCreated id {:#?} entity_type '{}' created_by '{}'",
+                    id, entity_type, created_by
+                );
+
+                // Construct projection table name using lowercase entity_type
+                let table_name = format!("{}_projection", entity_type.to_lowercase());
+
+                // Insert JSON data into the projection table's entity_data column
+                // The generated columns will automatically extract flattened attributes
+                debug!("Inserting entity data into table '{}'", table_name);
+
+                let insert_sql = format!(
+                    "INSERT INTO {} (entity_data) VALUES ($1::jsonb)",
+                    table_name
+                );
+
+                debug!("Executing INSERT statement: {}", insert_sql);
+
+                let result = sqlx::query(&insert_sql)
+                    .bind(entity_body)
+                    .execute(&self.pool)
+                    .await;
+
+                if let Err(e) = &result {
+                    debug!(
+                        "Failed to insert entity data into '{}': {:?}",
+                        table_name, e
+                    );
+                }
+                result?;
+
+                debug!("Successfully inserted entity data into '{}'", table_name);
+            }
             _ => {}
         }
 
