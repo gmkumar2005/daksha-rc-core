@@ -288,3 +288,15 @@ KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get
 
 
 ```
+
+## Multi platform build
+```shell
+
+podman build --arch amd64 -t ghcr.io/daksha-rc/rc-web:amd64 .
+podman build --arch arm64 -t ghcr.io/daksha-rc/rc-web:arm64 .
+podman manifest create ghcr.io/daksha-rc/rc-web:latest
+podman manifest add ghcr.io/daksha-rc/rc-web:latest containers-storage:ghcr.io/daksha-rc/rc-web:amd64
+podman manifest add ghcr.io/daksha-rc/rc-web:latest containers-storage:ghcr.io/daksha-rc/rc-web:arm64
+podman manifest inspect ghcr.io/daksha-rc/rc-web:latest
+
+```

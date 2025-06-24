@@ -110,7 +110,8 @@ env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 # Features:
 # - Uses latest Git tag as primary version tag
 # - Creates additional manifest tags for commit SHA and 'latest'
-# - Builds for linux/amd64 and linux/arm64 platforms using Podman manifests
+# - Builds for amd64 and arm64 architectures using podman build --arch
+# - Creates multi-platform manifests using podman manifest commands
 # - Adds OCI-compliant labels with metadata
 # - Includes error handling and visual feedback
 # - Uses only Podman (no Docker dependencies)
@@ -122,7 +123,7 @@ script = "scripts/clean-build-cache.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 
 [tasks.build-image]
-description = "build-image: build multi-platform container image for rc-web with latest Git tag using Podman"
+description = "build-image: build multi-arch container images (amd64/arm64) and create manifests using podman build --arch"
 category = "Container"
 script_runner = "bash"
 script = "scripts/build-image.sh"
@@ -163,69 +164,6 @@ description = "build-and-push-clean: build and push multi-platform images with c
 category = "Container"
 dependencies = ["clean-build-cache", "build-image", "push-image"]
 
-# Single-Platform Build Tasks
-# These tasks build for specific platforms when multi-platform builds are problematic
-[tasks.build-image-amd64]
-description = "build-image-amd64: build container image for linux/amd64 only using Podman"
-category = "Container"
-script_runner = "bash"
-script = "scripts/build-image.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1", "BUILD_PLATFORMS" = "linux/amd64" }
-
-[tasks.build-image-arm64]
-description = "build-image-arm64: build container image for linux/arm64 only using Podman"
-category = "Container"
-script_runner = "bash"
-script = "scripts/build-image.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1", "BUILD_PLATFORMS" = "linux/arm64" }
-
-[tasks.push-image-amd64]
-description = "push-image-amd64: push linux/amd64 container manifest to registry using Podman"
-category = "Container"
-dependencies = ["build-image-amd64"]
-run_task = "push-image"
-
-[tasks.push-image-arm64]
-description = "push-image-arm64: push linux/arm64 container manifest to registry using Podman"
-category = "Container"
-dependencies = ["build-image-arm64"]
-run_task = "push-image"
-
-[tasks.build-and-push-amd64]
-description = "build-and-push-amd64: build and push container image for linux/amd64 only"
-category = "Container"
-dependencies = ["build-image-amd64", "push-image"]
-
-[tasks.build-and-push-arm64]
-description = "build-and-push-arm64: build and push container image for linux/arm64 only"
-category = "Container"
-dependencies = ["build-image-arm64", "push-image"]
-
-# Reliable Single-Platform Build Tasks
-# These tasks use a dedicated single-platform script to avoid manifest issues
-[tasks.build-image-amd64-single]
-description = "build-image-amd64-single: build container image for linux/amd64 using single-platform script"
-category = "Container"
-script_runner = "bash"
-script = "scripts/build-image-single.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1", "BUILD_PLATFORM" = "linux/amd64" }
-
-[tasks.build-image-arm64-single]
-description = "build-image-arm64-single: build container image for linux/arm64 using single-platform script"
-category = "Container"
-script_runner = "bash"
-script = "scripts/build-image-single.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1", "BUILD_PLATFORM" = "linux/arm64" }
-
-[tasks.build-and-push-amd64-single]
-description = "build-and-push-amd64-single: build and push container image for linux/amd64 using reliable single-platform method"
-category = "Container"
-dependencies = ["build-image-amd64-single", "push-image"]
-
-[tasks.build-and-push-arm64-single]
-description = "build-and-push-arm64-single: build and push container image for linux/arm64 using reliable single-platform method"
-category = "Container"
-dependencies = ["build-image-arm64-single", "push-image"]
 
 [tasks.check-disk-space]
 description = "check-disk-space: comprehensive disk space monitoring for host and Podman VM"
