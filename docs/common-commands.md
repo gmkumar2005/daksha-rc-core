@@ -258,7 +258,7 @@ kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml w
 
 kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml apply -f k8s/manual/sit-traefik-dashboard-ingressroute.yaml
 
-helm upgrade --install cnpg \
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml helm upgrade --install cnpg \
   --namespace cnpg-system \
   --create-namespace \
   cnpg/cloudnative-pg
@@ -269,6 +269,14 @@ KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml helm upgrad
 KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl logs
 KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml k9s --readonly
 
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml  helm uninstall cnpg \
+  --namespace cnpg-system \
+  --create-namespace \
+  cnpg/cloudnative-pg
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl delete metrics-server-5b6cc55b86-j752f -n kube-system
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl delete metrics-server-5cd4986bbc-6sqd9 -n kube-system
 ```
 
 ## Multi platform builds
@@ -286,7 +294,11 @@ podman image inspect ghcr.io/daksha-rc/rc-web:v0.1.1-dev.4 --format '{{json .Arc
 
 KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.nodeInfo.architecture}{"\t"}{.status.nodeInfo.operatingSystem}{"\n"}{end}'
 
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl patch storageclass utho-block-storage -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl patch pvc sit-rc-app-database-1 -p '{"spec": {"storageClassName": "utho-block-storage"}}'
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get storageclass
 ```
 
 ## Multi platform build
@@ -299,4 +311,21 @@ podman manifest add ghcr.io/daksha-rc/rc-web:latest containers-storage:ghcr.io/d
 podman manifest add ghcr.io/daksha-rc/rc-web:latest containers-storage:ghcr.io/daksha-rc/rc-web:arm64
 podman manifest inspect ghcr.io/daksha-rc/rc-web:latest
 
+```
+
+## Debug remote k8s
+```shell
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get nodes --show-labels
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl cluster-info
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get cluster
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get nodes -o wide
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get pod sit-rc-app-5c9fcd44d5-2s72w -o jsonpath='{.spec.containers[0].image}'
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml  kubectl get pvc -l cnpg.io/cluster=sit-rc-app-database  -n default
+
+
+TAG=v0.1.9 cargo make build-image-all
+TAG=v0.1.9 cargo make push-with-tag
 ```

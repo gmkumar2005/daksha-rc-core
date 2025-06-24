@@ -105,13 +105,13 @@ script_runner = "bash"
 script = "scripts/get-git-tag.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 
-# Multi-Platform Container Image Building with Git Tag Integration
-# This task builds multi-platform container images for rc-web using Podman with the latest Git tag
+# Container Image Building with Git Tag Integration
+# This task builds container images for rc-web using Podman with the latest Git tag
 # Features:
 # - Uses latest Git tag as primary version tag
-# - Creates additional manifest tags for commit SHA and 'latest'
-# - Builds for amd64 and arm64 architectures using podman build --arch
-# - Creates multi-platform manifests using podman manifest commands
+# - Creates additional tags for commit SHA and 'latest'
+# - Builds for current platform only (use build-image-all for multi-platform)
+# - Creates platform-specific image tags (e.g., v0.1.8-amd64)
 # - Adds OCI-compliant labels with metadata
 # - Includes error handling and visual feedback
 # - Uses only Podman (no Docker dependencies)
@@ -122,31 +122,65 @@ script_runner = "bash"
 script = "scripts/clean-build-cache.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 
+# Base Image Building for Improved Caching
+# This task builds the base builder image with all build dependencies
+# Features:
+# - Creates reusable base image with Rust toolchain and build dependencies
+# - Significantly speeds up subsequent application builds
+# - Preserves base image during cleanup operations
+# - Platform-specific base images with proper tagging
+# - Only rebuilds if base image is missing or explicitly requested
+[tasks.build-base-image]
+description = "build-base-image: build reusable base builder image with all build dependencies"
+category = "Container"
+script_runner = "bash"
+script = "scripts/build-base-image.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
 [tasks.build-image]
-description = "build-image: build multi-arch container images (amd64/arm64) and create manifests using podman build --arch"
+description = "build-image: build container image for current platform only with platform-specific tags (TAG=version to override git tag)"
 category = "Container"
 script_runner = "bash"
 script = "scripts/build-image.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 
-# Multi-Platform Container Image Publishing with Git Tag Integration
-# This task pushes the built multi-platform container manifests to the container registry
+# Multi-Platform Container Image Building with Git Tag Integration
+# This task builds multi-platform container images for rc-web using Podman with the latest Git tag
 # Features:
-# - Validates local manifests exist before pushing
-# - Pushes all tagged manifests (git tag, commit SHA, latest) for both linux/amd64 and linux/arm64
+# - Uses latest Git tag as primary version tag
+# - Creates platform-specific tags (e.g., v0.1.8-amd64, v0.1.8-arm64)
+# - Creates multi-platform manifests for seamless pulling
+# - Builds for amd64 and arm64 architectures using podman build --arch
+# - Creates multi-platform manifests using podman manifest commands
+# - Adds OCI-compliant labels with metadata
+# - Includes error handling and visual feedback
+# - Uses only Podman (no Docker dependencies)
+[tasks.build-image-all]
+description = "build-image-all: build multi-arch container images (amd64/arm64) with platform-specific tags and manifests (TAG=version to override git tag)"
+category = "Container"
+script_runner = "bash"
+script = "scripts/build-image-all.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+# Container Image Publishing with Git Tag Integration
+# This task pushes the built container images and manifests to the container registry
+# Features:
+# - Validates local images/manifests exist before pushing
+# - Pushes platform-specific images (e.g., v0.1.8-amd64, v0.1.8-arm64)
+# - Pushes multi-platform manifests (git tag, commit SHA, latest)
 # - Provides detailed feedback and error handling
-# - Uses only Podman manifest push (no Docker dependencies)
-# - Requires 'build-image' task to be run first
+# - Uses only Podman push (no Docker dependencies)
+# - Requires 'build-image' or 'build-image-all' task to be run first
 [tasks.push-image]
-description = "push-image: push multi-platform container manifests with Git tags to registry using Podman"
+description = "push-image: push container images and manifests with Git tags to registry using Podman (TAG=version to override git tag)"
 category = "Container"
 script_runner = "bash"
 script = "scripts/push-image.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 
-# Combined Multi-Platform Build and Push Workflow
+# Combined Build and Push Workflow
 # This composite task runs both build-image and push-image in sequence
-# Builds and pushes multi-platform container images (linux/amd64, linux/arm64) using Podman
+# Builds and pushes container images for current platform using Podman
 # Useful for CI/CD pipelines and one-command deployments
 [tasks.build-image-clean]
 description = "build-image-clean: build multi-platform container image with aggressive cleanup for low disk space"
@@ -155,14 +189,61 @@ dependencies = ["clean-build-cache"]
 run_task = "build-image"
 
 [tasks.build-and-push]
-description = "build-and-push: build and push multi-platform container images with Git tags using Podman"
+description = "build-and-push: build and push container images for current platform with Git tags using Podman (TAG=version to override git tag)"
 category = "Container"
 dependencies = ["build-image", "push-image"]
 
+[tasks.build-and-push-all]
+description = "build-and-push-all: build and push multi-platform container images with Git tags using Podman (TAG=version to override git tag)"
+category = "Container"
+dependencies = ["build-image-all", "push-image"]
+
 [tasks.build-and-push-clean]
-description = "build-and-push-clean: build and push multi-platform images with cleanup for low disk space environments"
+description = "build-and-push-clean: build and push images for current platform with cleanup for low disk space environments (TAG=version to override git tag)"
 category = "Container"
 dependencies = ["clean-build-cache", "build-image", "push-image"]
+
+[tasks.build-and-push-all-clean]
+description = "build-and-push-all-clean: build and push multi-platform images with cleanup for low disk space environments (TAG=version to override git tag)"
+category = "Container"
+dependencies = ["clean-build-cache", "build-image-all", "push-image"]
+
+# Build Examples and Documentation
+# This task shows examples of how to use the TAG parameter with build tasks
+[tasks.build-examples]
+description = "build-examples: show examples of using TAG parameter with build tasks"
+category = "Documentation"
+script_runner = "bash"
+script = "scripts/build-examples.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+# Parameterized Tasks for Custom Tags
+# These tasks allow easy specification of custom tags via command line arguments
+
+[tasks.build-with-tag]
+description = "build-with-tag: build container image for current platform with specified tag (usage: cargo make build-with-tag --env TAG=v1.0.0)"
+category = "Container"
+run_task = "build-image"
+
+[tasks.build-all-with-tag]
+description = "build-all-with-tag: build multi-platform container images with specified tag (usage: cargo make build-all-with-tag --env TAG=v1.0.0)"
+category = "Container"
+run_task = "build-image-all"
+
+[tasks.push-with-tag]
+description = "push-with-tag: push container images with specified tag (usage: cargo make push-with-tag --env TAG=v1.0.0)"
+category = "Container"
+run_task = "push-image"
+
+[tasks.build-and-push-with-tag]
+description = "build-and-push-with-tag: build and push current platform images with specified tag (usage: cargo make build-and-push-with-tag --env TAG=v1.0.0)"
+category = "Container"
+dependencies = ["build-image", "push-image"]
+
+[tasks.build-and-push-all-with-tag]
+description = "build-and-push-all-with-tag: build and push multi-platform images with specified tag (usage: cargo make build-and-push-all-with-tag --env TAG=v1.0.0)"
+category = "Container"
+dependencies = ["build-image-all", "push-image"]
 
 
 [tasks.check-disk-space]
