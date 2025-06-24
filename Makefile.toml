@@ -105,59 +105,127 @@ script_runner = "bash"
 script = "scripts/get-git-tag.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 
-# Docker Image Building with Git Tag Integration
-# This task builds Docker images for rc-web using the latest Git tag
+# Multi-Platform Container Image Building with Git Tag Integration
+# This task builds multi-platform container images for rc-web using Podman with the latest Git tag
 # Features:
 # - Uses latest Git tag as primary version tag
-# - Creates additional tags for commit SHA and 'latest'
+# - Creates additional manifest tags for commit SHA and 'latest'
+# - Builds for linux/amd64 and linux/arm64 platforms using Podman manifests
 # - Adds OCI-compliant labels with metadata
 # - Includes error handling and visual feedback
+# - Uses only Podman (no Docker dependencies)
 [tasks.clean-build-cache]
 description = "clean-build-cache: clean container build cache to free disk space"
-category = "Docker"
+category = "Container"
 script_runner = "bash"
 script = "scripts/clean-build-cache.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 
 [tasks.build-image]
-description = "build-image: build Docker image for rc-web with latest Git tag"
-category = "Docker"
+description = "build-image: build multi-platform container image for rc-web with latest Git tag using Podman"
+category = "Container"
 script_runner = "bash"
 script = "scripts/build-image.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 
-# Docker Image Publishing with Git Tag Integration
-# This task pushes the built Docker images to the container registry
+# Multi-Platform Container Image Publishing with Git Tag Integration
+# This task pushes the built multi-platform container manifests to the container registry
 # Features:
-# - Validates local images exist before pushing
-# - Pushes all tagged versions (git tag, commit SHA, latest)
+# - Validates local manifests exist before pushing
+# - Pushes all tagged manifests (git tag, commit SHA, latest) for both linux/amd64 and linux/arm64
 # - Provides detailed feedback and error handling
+# - Uses only Podman manifest push (no Docker dependencies)
 # - Requires 'build-image' task to be run first
 [tasks.push-image]
-description = "push-image: push Docker images with Git tags to registry"
-category = "Docker"
+description = "push-image: push multi-platform container manifests with Git tags to registry using Podman"
+category = "Container"
 script_runner = "bash"
 script = "scripts/push-image.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 
-# Combined Build and Push Workflow
+# Combined Multi-Platform Build and Push Workflow
 # This composite task runs both build-image and push-image in sequence
+# Builds and pushes multi-platform container images (linux/amd64, linux/arm64) using Podman
 # Useful for CI/CD pipelines and one-command deployments
 [tasks.build-image-clean]
-description = "build-image-clean: build Docker image with aggressive cleanup for low disk space"
-category = "Docker"
+description = "build-image-clean: build multi-platform container image with aggressive cleanup for low disk space"
+category = "Container"
 dependencies = ["clean-build-cache"]
 run_task = "build-image"
 
 [tasks.build-and-push]
-description = "build-and-push: build and push Docker images with Git tags"
-category = "Docker"
+description = "build-and-push: build and push multi-platform container images with Git tags using Podman"
+category = "Container"
 dependencies = ["build-image", "push-image"]
 
 [tasks.build-and-push-clean]
-description = "build-and-push-clean: build and push with cleanup for low disk space environments"
-category = "Docker"
+description = "build-and-push-clean: build and push multi-platform images with cleanup for low disk space environments"
+category = "Container"
 dependencies = ["clean-build-cache", "build-image", "push-image"]
+
+# Single-Platform Build Tasks
+# These tasks build for specific platforms when multi-platform builds are problematic
+[tasks.build-image-amd64]
+description = "build-image-amd64: build container image for linux/amd64 only using Podman"
+category = "Container"
+script_runner = "bash"
+script = "scripts/build-image.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1", "BUILD_PLATFORMS" = "linux/amd64" }
+
+[tasks.build-image-arm64]
+description = "build-image-arm64: build container image for linux/arm64 only using Podman"
+category = "Container"
+script_runner = "bash"
+script = "scripts/build-image.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1", "BUILD_PLATFORMS" = "linux/arm64" }
+
+[tasks.push-image-amd64]
+description = "push-image-amd64: push linux/amd64 container manifest to registry using Podman"
+category = "Container"
+dependencies = ["build-image-amd64"]
+run_task = "push-image"
+
+[tasks.push-image-arm64]
+description = "push-image-arm64: push linux/arm64 container manifest to registry using Podman"
+category = "Container"
+dependencies = ["build-image-arm64"]
+run_task = "push-image"
+
+[tasks.build-and-push-amd64]
+description = "build-and-push-amd64: build and push container image for linux/amd64 only"
+category = "Container"
+dependencies = ["build-image-amd64", "push-image"]
+
+[tasks.build-and-push-arm64]
+description = "build-and-push-arm64: build and push container image for linux/arm64 only"
+category = "Container"
+dependencies = ["build-image-arm64", "push-image"]
+
+# Reliable Single-Platform Build Tasks
+# These tasks use a dedicated single-platform script to avoid manifest issues
+[tasks.build-image-amd64-single]
+description = "build-image-amd64-single: build container image for linux/amd64 using single-platform script"
+category = "Container"
+script_runner = "bash"
+script = "scripts/build-image-single.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1", "BUILD_PLATFORM" = "linux/amd64" }
+
+[tasks.build-image-arm64-single]
+description = "build-image-arm64-single: build container image for linux/arm64 using single-platform script"
+category = "Container"
+script_runner = "bash"
+script = "scripts/build-image-single.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1", "BUILD_PLATFORM" = "linux/arm64" }
+
+[tasks.build-and-push-amd64-single]
+description = "build-and-push-amd64-single: build and push container image for linux/amd64 using reliable single-platform method"
+category = "Container"
+dependencies = ["build-image-amd64-single", "push-image"]
+
+[tasks.build-and-push-arm64-single]
+description = "build-and-push-arm64-single: build and push container image for linux/arm64 using reliable single-platform method"
+category = "Container"
+dependencies = ["build-image-arm64-single", "push-image"]
 
 [tasks.check-disk-space]
 description = "check-disk-space: comprehensive disk space monitoring for host and Podman VM"

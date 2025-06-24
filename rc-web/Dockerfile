@@ -5,6 +5,7 @@
 # Using specific Rust version for reproducible builds
 FROM lukemathwalker/cargo-chef:latest-rust-1.86.0-alpine as chef
 
+ENV DEBIAN_FRONTEND=noninteractive
 # Install build dependencies including OpenSSL
 RUN apk add --no-cache \
     musl-dev \
@@ -51,7 +52,7 @@ RUN cargo build --release --bin rc-web
 
 # Runtime stage - minimal production image
 FROM debian:bookworm-slim AS runtime
-
+ENV DEBIAN_FRONTEND=noninteractive
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
@@ -80,11 +81,6 @@ USER appuser
 
 # Expose port
 EXPOSE 8000
-
-# Add health check with database connectivity
-# Provides container orchestration with health status
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/readyz || exit 1
 
 # Add OCI-compliant labels for better container metadata
 LABEL org.opencontainers.image.title="RC Web Application"

@@ -237,3 +237,54 @@ ghcr.io/daksha-rc/rc-web:v.0.1.1
 ghcr.io/daksha-rc/rc-web:v0.1.1
 docker pull ghcr.io/daksha-rc/rc-web:v0.1.1
 ```
+
+### Sit cluster
+#### Debug
+```shell
+kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml config current-context
+kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml get svc/nginx-service
+```
+
+#### Install
+
+```shell
+export KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml
+kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml config current-context
+helm --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml  install traefik-crds traefik/traefik-crds --namespace traefik-system --create-namespace
+
+helm --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml  upgrade --install traefik traefik/traefik -f k8s/manual/sit-traefik-values.yaml --namespace traefik-system --create-namespace
+
+kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml wait --for=condition=ready pod -l app.kubernetes.io/name=traefik -n traefik-system --timeout=60s
+
+kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml apply -f k8s/manual/sit-traefik-dashboard-ingressroute.yaml
+
+helm upgrade --install cnpg \
+  --namespace cnpg-system \
+  --create-namespace \
+  cnpg/cloudnative-pg
+
+kubectl wait --for=condition=Available deployment/cnpg-cloudnative-pg -n cnpg-system --timeout=120s
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml helm upgrade --install sit rc-app -f manual/sit-rc-app-values.yaml
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl logs
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml k9s --readonly
+
+```
+
+## Multi platform builds
+```shell
+podman build -f rc-web/Dockerfile --manifest ghcr.io/daksha-rc/rc-web:v0.1.1-dev.4 .
+
+podman build -f rc-web/Dockerfile --platform linux/amd64,linux/arm64  --manifest ghcr.io/daksha-rc/rc-web:v0.1.1-dev.4 .
+
+podman build --platform linux/amd64,linux/arm64 --manifest localhost/hello .
+
+podman manifest inspect ghcr.io/daksha-rc/rc-web:v0.1.5 | jq -r '.manifests[].platform | "\(.os)/\(.architecture)"'
+
+
+podman image inspect ghcr.io/daksha-rc/rc-web:v0.1.1-dev.4 --format '{{json .Architecture}}'
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.nodeInfo.architecture}{"\t"}{.status.nodeInfo.operatingSystem}{"\n"}{end}'
+
+
+```
