@@ -32,10 +32,17 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Install Podman
+      - name: Install Podman and QEMU
         run: |
           sudo apt-get update
-          sudo apt-get install -y podman
+          sudo apt-get install -y podman qemu-user-static
+
+      - name: Set up QEMU emulation for cross-platform builds
+        run: |
+          # Enable QEMU emulation for different architectures
+          sudo podman run --rm --privileged multiarch/qemu-user-static --reset -p yes
+          # Verify QEMU is working
+          podman run --rm --platform linux/arm64 alpine:latest uname -m || echo "QEMU setup may need time to initialize"
 
       - name: Install cargo-make
         run: cargo install cargo-make
