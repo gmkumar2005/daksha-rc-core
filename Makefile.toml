@@ -259,3 +259,71 @@ category = "Debug"
 script_runner = "bash"
 script = "scripts/debug-mirrord.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+# Basic Image Tasks
+# These tasks build and manage the basic Alpine image using Dockerfile.basic
+
+[tasks.get-basic-image-tag]
+description = "get-basic-image-tag: get tag for basic image (from TAG env var or git tag)"
+category = "Container"
+script_runner = "bash"
+script = "scripts/get-basic-image-tag.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+[tasks.build-basic-image-amd64]
+description = "build-basic-image-amd64: build basic image for amd64 platform (TAG=version to override git tag)"
+category = "Container"
+script_runner = "bash"
+script = "scripts/build-basic-image-amd64.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+[tasks.build-basic-image-arm64]
+description = "build-basic-image-arm64: build basic image for arm64 platform (TAG=version to override git tag)"
+category = "Container"
+script_runner = "bash"
+script = "scripts/build-basic-image-arm64.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+[tasks.build-basic-image-all]
+description = "build-basic-image-all: build basic image for all platforms (amd64/arm64) with manifests (TAG=version to override git tag)"
+category = "Container"
+script_runner = "bash"
+script = "scripts/build-basic-image-all.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+[tasks.push-basic-image]
+description = "push-basic-image: push basic images and manifests to registry (TAG=version to override git tag)"
+category = "Container"
+script_runner = "bash"
+script = "scripts/push-basic-image.sh"
+env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+
+[tasks.build-and-push-basic-image]
+description = "build-and-push-basic-image: build and push basic images for current platform (TAG=version to override git tag)"
+category = "Container"
+dependencies = ["build-basic-image-all", "push-basic-image"]
+
+[tasks.build-and-push-basic-image-clean]
+description = "build-and-push-basic-image-clean: build and push basic images with cleanup for low disk space (TAG=version to override git tag)"
+category = "Container"
+dependencies = [
+    "clean-build-cache",
+    "build-basic-image-all",
+    "push-basic-image",
+]
+
+# Parameterized Tasks for Basic Image with Custom Tags
+[tasks.build-basic-with-tag]
+description = "build-basic-with-tag: build basic image for current platform with specified tag (usage: cargo make build-basic-with-tag --env TAG=v1.0.0)"
+category = "Container"
+run_task = "build-basic-image-all"
+
+[tasks.push-basic-with-tag]
+description = "push-basic-with-tag: push basic images with specified tag (usage: cargo make push-basic-with-tag --env TAG=v1.0.0)"
+category = "Container"
+run_task = "push-basic-image"
+
+[tasks.build-and-push-basic-with-tag]
+description = "build-and-push-basic-with-tag: build and push basic images with specified tag (usage: cargo make build-and-push-basic-with-tag --env TAG=v1.0.0)"
+category = "Container"
+dependencies = ["build-basic-image-all", "push-basic-image"]
