@@ -7,7 +7,7 @@ on:
         description: "Tag for the basic image (e.g., v0.0.2)"
         required: true
         type: string
-        default: "v0.0.1"
+        default: "v0.0.2"
   push:
     branches:
       - "#36_Deploy_to_UTHO_k8s"
@@ -56,13 +56,6 @@ jobs:
           toolchain: stable
           override: true
           components: rustfmt, clippy
-
-      - name: Set up QEMU emulation for cross-platform builds
-        run: |
-          # Enable QEMU emulation for different architectures
-          sudo podman run --rm --privileged multiarch/qemu-user-static --reset -p yes
-          # Verify QEMU is working
-          podman run --rm --platform linux/arm64 alpine:latest uname -m || echo "QEMU setup may need time to initialize"
 
       - name: Install cargo-make
         uses: actions-rs/cargo@v1
