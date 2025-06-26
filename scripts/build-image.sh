@@ -35,10 +35,31 @@ fi
 
 echo -e "${GREEN}🦭 Using Podman container engine${NC}"
 
-# Get the current platform
-CURRENT_PLATFORM=$(bash scripts/get-platform.sh)
-if [ $? -ne 0 ]; then
-    echo -e "${RED}❌ Failed to detect current platform${NC}"
+# Get the current platform with better error handling
+echo -e "${YELLOW}🔍 Detecting current platform...${NC}"
+if [ -f "scripts/get-platform.sh" ]; then
+    if CURRENT_PLATFORM=$(bash scripts/get-platform.sh 2>&1); then
+        echo -e "${GREEN}✅ Platform detected: ${CURRENT_PLATFORM}${NC}"
+    else
+        echo -e "${RED}❌ Platform detection script failed: ${CURRENT_PLATFORM}${NC}"
+        echo -e "${YELLOW}💡 Falling back to manual detection...${NC}"
+        # Manual platform detection as fallback
+        case "$(uname -m)" in
+            x86_64|amd64)
+                CURRENT_PLATFORM="amd64"
+                ;;
+            aarch64|arm64)
+                CURRENT_PLATFORM="arm64"
+                ;;
+            *)
+                echo -e "${RED}❌ Unsupported architecture: $(uname -m)${NC}"
+                exit 1
+                ;;
+        esac
+        echo -e "${GREEN}✅ Manual detection successful: ${CURRENT_PLATFORM}${NC}"
+    fi
+else
+    echo -e "${RED}❌ Platform detection script not found: scripts/get-platform.sh${NC}"
     exit 1
 fi
 echo -e "${GREEN}🏗️  Building for current platform: ${CURRENT_PLATFORM}${NC}"
@@ -69,6 +90,7 @@ IMAGE_BASE="ghcr.io/daksha-rc/rc-web"
 
 # Define final image names for current platform
 FINAL_IMAGES=(
+    "${IMAGE_BASE}:${GIT_TAG}"
     "${IMAGE_BASE}:${GIT_TAG}-${CURRENT_PLATFORM}"
     "${IMAGE_BASE}:${GIT_SHA}-${CURRENT_PLATFORM}"
     "${IMAGE_BASE}:latest-${CURRENT_PLATFORM}"
@@ -95,8 +117,13 @@ echo -e "${GREEN}🦭 Building for ${CURRENT_PLATFORM}...${NC}"
 
 # Build the image with the first tag
 PRIMARY_IMAGE="${FINAL_IMAGES[0]}"
+echo -e "${YELLOW}🔨 Building primary image: ${PRIMARY_IMAGE}${NC}"
+
+# Set SQLX_OFFLINE for build
+export SQLX_OFFLINE=true
+
 if podman build \
-    --arch "$CURRENT_PLATFORM" \
+    --platform "linux/${CURRENT_PLATFORM}" \
     -f "rc-web/Dockerfile" \
     -t "$PRIMARY_IMAGE" \
     --label "org.opencontainers.image.version=${GIT_TAG}" \
@@ -109,8 +136,22 @@ if podman build \
     --rm \
     .; then
     echo -e "${GREEN}✅ Successfully built ${CURRENT_PLATFORM} image${NC}"
+
+    # Verify the image was created
+    if podman image exists "$PRIMARY_IMAGE"; then
+        echo -e "${GREEN}✅ Primary image verified: ${PRIMARY_IMAGE}${NC}"
+    else
+        echo -e "${RED}❌ Primary image not found after build: ${PRIMARY_IMAGE}${NC}"
+        exit 1
+    fi
 else
     echo -e "${RED}❌ Failed to build ${CURRENT_PLATFORM} image${NC}"
+    echo -e "${YELLOW}💡 Check the build logs above for specific errors${NC}"
+    echo -e "${YELLOW}💡 Common issues:${NC}"
+    echo -e "${YELLOW}   - Insufficient disk space${NC}"
+    echo -e "${YELLOW}   - Missing dependencies in Dockerfile${NC}"
+    echo -e "${YELLOW}   - Network connectivity issues${NC}"
+    echo -e "${YELLOW}   - Ring crate compilation issues (for cross-platform builds)${NC}"
     exit 1
 fi
 
@@ -139,9 +180,27 @@ echo -e "${YELLOW}📊 Image information:${NC}"
 echo -e "${YELLOW}Platform: ${CURRENT_PLATFORM}${NC}"
 echo -e "${YELLOW}Base image: ${PRIMARY_IMAGE}${NC}"
 
-# Show image size
-IMAGE_SIZE=$(podman inspect "$PRIMARY_IMAGE" --format '{{.Size}}' 2>/dev/null | numfmt --to=iec 2>/dev/null || echo "unknown")
-echo -e "${YELLOW}Size: ${IMAGE_SIZE}${NC}"
+# Show image size and details
+if IMAGE_SIZE=$(podman inspect "$PRIMARY_IMAGE" --format '{{.Size}}' 2>/dev/null); then
+    if command -v numfmt >/dev/null 2>&1; then
+        IMAGE_SIZE_HUMAN=$(echo "$IMAGE_SIZE" | numfmt --to=iec 2>/dev/null || echo "$IMAGE_SIZE bytes")
+    else
+        IMAGE_SIZE_HUMAN="$IMAGE_SIZE bytes"
+    fi
+    echo -e "${YELLOW}Size: ${IMAGE_SIZE_HUMAN}${NC}"
+else
+    echo -e "${YELLOW}Size: Unable to determine${NC}"
+fi
+
+# Show all created images
+echo -e "${YELLOW}📋 All created images:${NC}"
+for image in "${FINAL_IMAGES[@]}"; do
+    if podman image exists "$image"; then
+        echo -e "${GREEN}   ✅ ${image}${NC}"
+    else
+        echo -e "${RED}   ❌ ${image}${NC}"
+    fi
+done
 
 echo -e "${GREEN}🎉 Single-platform build completed successfully!${NC}"
 echo -e "${BLUE}💡 Built for current platform: ${CURRENT_PLATFORM}${NC}"
