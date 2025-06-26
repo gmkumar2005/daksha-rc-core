@@ -9,6 +9,17 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${YELLOW}🏗️  Building multi-platform container images for rc-web (amd64 & arm64)...${NC}"
+echo -e "${BLUE}💡 Using smart build script for optimized native/emulated builds${NC}"
+
+# Check if smart build script exists
+SMART_SCRIPT="$(dirname "$0")/build-image-smart.sh"
+if [ -f "$SMART_SCRIPT" ]; then
+    echo -e "${GREEN}🧠 Using smart build script: $SMART_SCRIPT${NC}"
+    USE_SMART_SCRIPT=true
+else
+    echo -e "${YELLOW}⚠️  Smart build script not found, using legacy method${NC}"
+    USE_SMART_SCRIPT=false
+fi
 
 # Check available disk space before building
 echo -e "${YELLOW}📊 Checking available disk space...${NC}"
@@ -86,69 +97,117 @@ for image in "${MANIFEST_IMAGES[@]}"; do
     echo -e "  - ${image}"
 done
 
-# Clean up any existing images and manifests with these names (but preserve base-builder stages)
-echo -e "${YELLOW}🧹 Cleaning up existing images and manifests (preserving base-builder stages)...${NC}"
-for image in "${PLATFORM_IMAGES[@]}" "${MANIFEST_IMAGES[@]}"; do
-    # Remove manifest if it exists
-    if podman manifest exists "$image" 2>/dev/null; then
-        echo -e "${YELLOW}  Removing existing manifest: ${image}${NC}"
-        podman manifest rm "$image" 2>/dev/null || true
+# Execute build using smart script or legacy method
+if [[ "$USE_SMART_SCRIPT" == "true" ]]; then
+    echo -e "${GREEN}🧠 Delegating to smart build script...${NC}"
+
+    # Export tag for smart script
+    export TAG="$GIT_TAG"
+
+    # Execute smart build with multi-platform option
+    if bash "$SMART_SCRIPT" --verbose build-multi; then
+        echo -e "${GREEN}✅ Smart build completed successfully${NC}"
+    else
+        echo -e "${RED}❌ Smart build failed${NC}"
+        exit 1
     fi
-    # Don't remove images that might be base-builder stages
-    if [[ "$image" != *"base"* && "$image" != *"builder"* ]]; then
-        podman rmi "$image" 2>/dev/null || true
+
+    # Tag images with additional variants
+    echo -e "${YELLOW}🏷️  Creating additional image tags...${NC}"
+
+    # Tag with commit SHA and latest variants
+    if podman image exists "${IMAGE_BASE}:${GIT_TAG}-amd64"; then
+        podman tag "${IMAGE_BASE}:${GIT_TAG}-amd64" "${IMAGE_BASE}:${GIT_SHA}-amd64"
+        podman tag "${IMAGE_BASE}:${GIT_TAG}-amd64" "${IMAGE_BASE}:latest-amd64"
+        echo -e "${GREEN}✅ Tagged amd64 image variants${NC}"
     fi
-done
 
-# Build for amd64
-echo -e "${GREEN}🦭 Building for amd64...${NC}"
-if podman build \
-    --arch amd64 \
-    -f "rc-web/Dockerfile" \
-    -t "${IMAGE_BASE}:${GIT_TAG}-amd64" \
-    --label "org.opencontainers.image.version=${GIT_TAG}" \
-    --label "org.opencontainers.image.revision=${GIT_SHA}" \
-    --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    --label "org.opencontainers.image.source=https://github.com/daksha-rc/daksha-rc" \
-    --label "org.opencontainers.image.description=Daksha RC Web Application" \
-    --label "org.opencontainers.image.platform=amd64" \
-    --squash-all \
-    --rm \
-    .; then
-    echo -e "${GREEN}✅ Successfully built amd64 image${NC}"
+    if podman image exists "${IMAGE_BASE}:${GIT_TAG}-arm64"; then
+        podman tag "${IMAGE_BASE}:${GIT_TAG}-arm64" "${IMAGE_BASE}:${GIT_SHA}-arm64"
+        podman tag "${IMAGE_BASE}:${GIT_TAG}-arm64" "${IMAGE_BASE}:latest-arm64"
+        echo -e "${GREEN}✅ Tagged arm64 image variants${NC}"
+    fi
+
 else
-    echo -e "${RED}❌ Failed to build amd64 image${NC}"
-    exit 1
+    # Legacy build method
+    echo -e "${YELLOW}🔧 Using legacy build method...${NC}"
+
+    # Clean up any existing images and manifests with these names (but preserve base-builder stages)
+    echo -e "${YELLOW}🧹 Cleaning up existing images and manifests (preserving base-builder stages)...${NC}"
+    for image in "${PLATFORM_IMAGES[@]}" "${MANIFEST_IMAGES[@]}"; do
+        # Remove manifest if it exists
+        if podman manifest exists "$image" 2>/dev/null; then
+            echo -e "${YELLOW}  Removing existing manifest: ${image}${NC}"
+            podman manifest rm "$image" 2>/dev/null || true
+        fi
+        # Don't remove images that might be base-builder stages
+        if [[ "$image" != *"base"* && "$image" != *"builder"* ]]; then
+            podman rmi "$image" 2>/dev/null || true
+        fi
+    done
+
+    # Build for amd64
+    echo -e "${GREEN}🦭 Building for amd64...${NC}"
+    if podman build \
+        --arch amd64 \
+        -f "rc-web/Dockerfile" \
+        -t "${IMAGE_BASE}:${GIT_TAG}-amd64" \
+        --label "org.opencontainers.image.version=${GIT_TAG}" \
+        --label "org.opencontainers.image.revision=${GIT_SHA}" \
+        --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --label "org.opencontainers.image.source=https://github.com/daksha-rc/daksha-rc" \
+        --label "org.opencontainers.image.description=Daksha RC Web Application" \
+        --label "org.opencontainers.image.platform=amd64" \
+        --squash-all \
+        --rm \
+        .; then
+        echo -e "${GREEN}✅ Successfully built amd64 image${NC}"
+    else
+        echo -e "${RED}❌ Failed to build amd64 image${NC}"
+        exit 1
+    fi
+
+    # Tag amd64 image with other amd64 variants
+    podman tag "${IMAGE_BASE}:${GIT_TAG}-amd64" "${IMAGE_BASE}:${GIT_SHA}-amd64"
+    podman tag "${IMAGE_BASE}:${GIT_TAG}-amd64" "${IMAGE_BASE}:latest-amd64"
+
+    # Build for arm64 with improved error handling
+    echo -e "${GREEN}🦭 Building for arm64...${NC}"
+
+    # Set memory limits and timeout for ARM64 build
+    ARM64_BUILD_TIMEOUT="${ARM64_BUILD_TIMEOUT:-3600}"  # 1 hour default
+    ARM64_MEMORY_LIMIT="${ARM64_MEMORY_LIMIT:-4g}"
+
+    if timeout "$ARM64_BUILD_TIMEOUT" podman build \
+        --arch arm64 \
+        --memory="$ARM64_MEMORY_LIMIT" \
+        --build-arg RING_DISABLE_ASSEMBLY=1 \
+        --build-arg RING_PREGENERATE_ASM=0 \
+        --build-arg RUSTFLAGS="-C opt-level=1" \
+        --build-arg CARGO_BUILD_JOBS=1 \
+        -f "rc-web/Dockerfile" \
+        -t "${IMAGE_BASE}:${GIT_TAG}-arm64" \
+        --label "org.opencontainers.image.version=${GIT_TAG}" \
+        --label "org.opencontainers.image.revision=${GIT_SHA}" \
+        --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --label "org.opencontainers.image.source=https://github.com/daksha-rc/daksha-rc" \
+        --label "org.opencontainers.image.description=Daksha RC Web Application" \
+        --label "org.opencontainers.image.platform=arm64" \
+        --squash-all \
+        --rm \
+        .; then
+        echo -e "${GREEN}✅ Successfully built arm64 image${NC}"
+    else
+        echo -e "${RED}❌ Failed to build arm64 image${NC}"
+        echo -e "${YELLOW}💡 ARM64 build failed. This is often due to ring crate compilation issues in QEMU emulation.${NC}"
+        echo -e "${YELLOW}💡 Consider using native ARM64 runners or the smart build script for better compatibility.${NC}"
+        exit 1
+    fi
+
+    # Tag arm64 image with other arm64 variants
+    podman tag "${IMAGE_BASE}:${GIT_TAG}-arm64" "${IMAGE_BASE}:${GIT_SHA}-arm64"
+    podman tag "${IMAGE_BASE}:${GIT_TAG}-arm64" "${IMAGE_BASE}:latest-arm64"
 fi
-
-# Tag amd64 image with other amd64 variants
-podman tag "${IMAGE_BASE}:${GIT_TAG}-amd64" "${IMAGE_BASE}:${GIT_SHA}-amd64"
-podman tag "${IMAGE_BASE}:${GIT_TAG}-amd64" "${IMAGE_BASE}:latest-amd64"
-
-# Build for arm64
-echo -e "${GREEN}🦭 Building for arm64...${NC}"
-if podman build \
-    --arch arm64 \
-    -f "rc-web/Dockerfile" \
-    -t "${IMAGE_BASE}:${GIT_TAG}-arm64" \
-    --label "org.opencontainers.image.version=${GIT_TAG}" \
-    --label "org.opencontainers.image.revision=${GIT_SHA}" \
-    --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    --label "org.opencontainers.image.source=https://github.com/daksha-rc/daksha-rc" \
-    --label "org.opencontainers.image.description=Daksha RC Web Application" \
-    --label "org.opencontainers.image.platform=arm64" \
-    --squash-all \
-    --rm \
-    .; then
-    echo -e "${GREEN}✅ Successfully built arm64 image${NC}"
-else
-    echo -e "${RED}❌ Failed to build arm64 image${NC}"
-    exit 1
-fi
-
-# Tag arm64 image with other arm64 variants
-podman tag "${IMAGE_BASE}:${GIT_TAG}-arm64" "${IMAGE_BASE}:${GIT_SHA}-arm64"
-podman tag "${IMAGE_BASE}:${GIT_TAG}-arm64" "${IMAGE_BASE}:latest-arm64"
 
 # Create manifests for each final image
 for manifest_image in "${MANIFEST_IMAGES[@]}"; do
@@ -235,6 +294,12 @@ for manifest_image in "${MANIFEST_IMAGES[@]}"; do
 done
 
 echo -e "${GREEN}🎉 Multi-platform build completed successfully!${NC}"
+if [[ "$USE_SMART_SCRIPT" == "true" ]]; then
+    echo -e "${BLUE}💡 Built using smart script with optimized native/emulated strategy${NC}"
+else
+    echo -e "${BLUE}💡 Built using legacy method with QEMU emulation${NC}"
+fi
 echo -e "${BLUE}💡 Platform-specific images created with -amd64 and -arm64 suffixes${NC}"
 echo -e "${BLUE}💡 Multi-platform manifests created with amd64 and arm64 support${NC}"
 echo -e "${BLUE}💡 Images will automatically select the correct platform when pulled${NC}"
+echo -e "${CYAN}💡 Local builds remain fully compatible with existing cargo-make workflows${NC}"
