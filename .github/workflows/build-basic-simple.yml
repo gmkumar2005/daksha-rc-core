@@ -1,9 +1,6 @@
 name: Build Basic Image - Simple
 
 on:
-  push:
-    branches:
-      - "#36_Deploy_to_UTHO_k8s"
   workflow_dispatch:
     inputs:
       tag:
@@ -53,20 +50,9 @@ jobs:
 
       - name: Build and push basic image
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG=${{ github.event.inputs.tag }}
-          else
-            # Use git tag or fallback to branch-based tag for push events
-            TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "branch-$(date +%Y%m%d-%H%M%S)")
-          fi
-          TAG=$TAG cargo make build-and-push-basic-with-tag
+          TAG=${{ github.event.inputs.tag }} cargo make build-and-push-basic-with-tag
 
       - name: Verify build
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG=${{ github.event.inputs.tag }}
-          else
-            TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "branch-$(date +%Y%m%d-%H%M%S)")
-          fi
-          echo "✅ Successfully built and pushed basic image with tag: $TAG"
+          echo "✅ Successfully built and pushed basic image with tag: ${{ github.event.inputs.tag }}"
           podman images | grep rc-basic || true
