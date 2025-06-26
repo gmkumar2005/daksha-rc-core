@@ -1,0 +1,53 @@
+ports:
+  web:
+    port: 8000
+    expose:
+      default: true
+  traefik:
+    port: 8080
+    expose:
+      default: true
+
+entryPoints:
+  web:
+    address: ":8000"
+  traefik:
+    address: ":8080"
+
+service:
+  type: LoadBalancer
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-protocol: "http"
+    service.beta.kubernetes.io/do-loadbalancer-tls-ports: "443"
+    service.beta.kubernetes.io/do-loadbalancer-certificate-id: "806c5cb4-7f4f-4147-b962-7b583f9e4b68"
+    service.beta.kubernetes.io/do-loadbalancer-redirect-http-to-https: "false"
+    service.beta.kubernetes.io/do-loadbalancer-name: "sit-lb-v2"
+  spec:
+    ports:
+      - name: web
+        port: 80
+        targetPort: 8000
+        protocol: TCP
+      - name: websecure
+        port: 443
+        targetPort: 8000 # Same target as HTTP
+        protocol: TCP
+      - name: traefik
+        port: 8080
+        targetPort: 8080
+        protocol: TCP
+
+providers:
+  kubernetesCRD:
+    enabled: true
+  kubernetesIngress:
+    enabled: true
+
+api:
+  dashboard: true
+  insecure: true
+
+additionalArguments:
+  - "--log.level=DEBUG"
+  - "--api.insecure=true"
+  - "--api.dashboard=true"
