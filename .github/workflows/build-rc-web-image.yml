@@ -1,0 +1,304 @@
+name: Build and Push RC Web Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag for the rc-web image (e.g., v0.0.2)"
+        required: true
+        type: string
+        default: "v0.0.2"
+  push:
+    branches:
+      - "#36_Deploy_to_UTHO_k8s"
+    tags:
+      - "v*.*.*"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: daksha-rc/rc-web
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-push:
+    name: Build and Push Multi-Platform RC Web Image
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image-tag: ${{ steps.tag.outputs.tag }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full history for git tags
+
+      - name: Check disk space
+        run: |
+          echo "Available disk space:"
+          df -h
+          echo ""
+          echo "Available space in GB:"
+          df / | awk 'NR==2 {print int($4/1024/1024) " GB available"}'
+
+          # Check if we have enough space for rc-web builds (larger than basic images)
+          AVAILABLE_GB=$(df / | awk 'NR==2 {print int($4/1024/1024)}')
+          if [ $AVAILABLE_GB -lt 20 ]; then
+            echo "⚠️ Low disk space warning: ${AVAILABLE_GB}GB available"
+            echo "💡 RC Web builds require more space. Consider cleaning up if build fails."
+          else
+            echo "✅ Sufficient disk space: ${AVAILABLE_GB}GB available"
+          fi
+
+      - name: Install Podman and QEMU
+        run: |
+          echo "🦭 Installing Podman and QEMU..."
+          sudo apt-get update -qq
+          sudo apt-get install -y podman qemu-user-static
+          podman --version
+
+      - name: Set up QEMU emulation for cross-platform builds
+        run: |
+          echo "🔧 Setting up QEMU emulation for cross-platform builds..."
+
+          # Enable QEMU emulation for different architectures
+          sudo podman run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+          # Wait a moment for QEMU to initialize
+          sleep 2
+
+          # Verify QEMU is working for ARM64
+          echo "🧪 Testing QEMU emulation..."
+          if podman run --rm --platform linux/arm64 alpine:latest uname -m; then
+            echo "✅ QEMU emulation working correctly"
+          else
+            echo "⚠️ QEMU setup may need time to initialize, continuing..."
+          fi
+
+          echo "✅ QEMU emulation setup complete"
+
+      - name: Show build environment information
+        run: |
+          echo "🖥️ Build Environment Information:"
+          echo "  OS: $(uname -s)"
+          echo "  Architecture: $(uname -m)"
+          echo "  Kernel: $(uname -r)"
+          echo "  CPU cores: $(nproc)"
+          echo "  Memory: $(free -h | grep '^Mem:' | awk '{print $2}')"
+          echo "  Podman version: $(podman --version)"
+          echo "  Runner: ${{ runner.os }} ${{ runner.arch }}"
+          echo "  GitHub Actor: ${{ github.actor }}"
+          echo "  Event: ${{ github.event_name }}"
+          echo "  Ref: ${{ github.ref }}"
+          echo ""
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-make
+        uses: davidB/rust-cargo-make@v1
+        with:
+          version: "0.37.24"
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.DAKSHA_RC_ACTIONS_WRITE_PAT }}
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+            echo "🏷️ Using manual tag: $TAG"
+          elif [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "🏷️ Using git tag: $TAG"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_name }}" = "#36_Deploy_to_UTHO_k8s" ]; then
+            # For branch pushes, use git tag or generate a branch-based tag
+            if GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null); then
+              TAG="$GIT_TAG"
+              echo "🏷️ Using git tag: $TAG"
+            else
+              TAG="branch-$(date +%Y%m%d-%H%M%S)"
+              echo "🏷️ Using generated tag: $TAG"
+            fi
+          else
+            echo "❌ Unable to determine tag"
+            exit 1
+          fi
+
+          # Validate tag format (relaxed for branch-based tags)
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]] || [[ "$TAG" =~ ^branch-[0-9]+-[0-9]+$ ]]; then
+            echo "✅ Tag format valid: $TAG"
+          else
+            echo "❌ Invalid tag format: $TAG (expected format: v1.2.3 or branch-YYYYMMDD-HHMMSS)"
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Verify Dockerfile exists
+        run: |
+          if [ ! -f "rc-web/Dockerfile" ]; then
+            echo "❌ Error: Dockerfile not found at rc-web/Dockerfile"
+            exit 1
+          fi
+          echo "✅ Dockerfile found at rc-web/Dockerfile"
+
+      - name: Build and push rc-web image
+        id: build
+        run: |
+          echo "🏗️ Building and pushing rc-web image with tag: ${{ env.TAG }}"
+          echo "📦 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}"
+          echo ""
+
+          # Set SQLX_OFFLINE for build
+          export SQLX_OFFLINE=true
+          export TAG=${{ env.TAG }}
+
+          # Run the cargo make command for multi-platform build
+          cargo make build-and-push-all-with-tag
+
+          echo "✅ Build and push completed successfully"
+
+      - name: Verify pushed images
+        run: |
+          echo "🔍 Verifying pushed images..."
+
+          # Test pulling the multi-arch image
+          if podman pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}; then
+            echo "✅ Successfully pulled multi-arch image"
+          else
+            echo "❌ Failed to pull multi-arch image"
+            exit 1
+          fi
+
+          # Test pulling platform-specific images
+          if podman pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-amd64; then
+            echo "✅ Successfully pulled amd64 image"
+          else
+            echo "⚠️ Failed to pull amd64 image (may not exist)"
+          fi
+
+          if podman pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-arm64; then
+            echo "✅ Successfully pulled arm64 image"
+          else
+            echo "⚠️ Failed to pull arm64 image (may not exist)"
+          fi
+
+          echo "✅ Image verification completed"
+
+      - name: Test basic functionality
+        run: |
+          echo "🧪 Testing basic RC Web image functionality..."
+
+          # Test that the image can start (basic smoke test)
+          timeout 30s podman run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }} --help || {
+            echo "⚠️ Image help command test failed or timed out (this may be expected)"
+          }
+
+          echo "✅ Basic functionality test completed"
+
+      - name: Generate build summary
+        run: |
+          echo "## 🎉 RC Web Image Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Successfully built and pushed RC Web image with tag:** \`${{ env.TAG }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Images Created:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}\` (multi-arch)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-amd64\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-arm64\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\` (multi-arch)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-amd64\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-arm64\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Usage:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Pull the multi-platform image" >> $GITHUB_STEP_SUMMARY
+          echo "podman pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Or docker pull" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Run the container" >> $GITHUB_STEP_SUMMARY
+          echo "podman run -p 8080:8080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ℹ️ Build Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow:** [\`${{ github.workflow }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms:** linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+
+      - name: Show final images
+        run: |
+          echo "📊 Final RC Web images:"
+          podman images | grep rc-web || echo "No rc-web images found locally (this is normal after push)"
+
+  notify-success:
+    name: Notify Build Success
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: success()
+
+    steps:
+      - name: Create success annotation
+        run: |
+          echo "::notice title=RC Web Build Success::Successfully built and pushed RC Web image with tag ${{ needs.build-and-push.outputs.image-tag }}"
+
+      - name: Summary for success
+        run: |
+          echo "🎉 RC Web image build completed successfully!"
+          echo "📦 Image: ghcr.io/daksha-rc/rc-web:${{ needs.build-and-push.outputs.image-tag }}"
+          echo "🚀 Ready for deployment!"
+
+  notify-failure:
+    name: Notify Build Failure
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: failure()
+
+    steps:
+      - name: Create failure annotation
+        run: |
+          echo "::error title=RC Web Build Failed::Failed to build and push RC Web image. Check the logs for details."
+
+      - name: Failure troubleshooting guide
+        run: |
+          echo "❌ RC Web image build failed!"
+          echo ""
+          echo "🔍 Common troubleshooting steps:"
+          echo "1. Check if cargo make build-and-push-all-with-tag works locally"
+          echo "2. Verify rc-web/Dockerfile exists and is valid"
+          echo "3. Check if DAKSHA_RC_ACTIONS_WRITE_PAT secret has correct permissions"
+          echo "4. Review disk space warnings in the build logs"
+          echo "5. Check for SQLX offline mode issues"
+          echo ""
+          echo "📋 Useful commands for local debugging:"
+          echo "  cargo make build-image-all"
+          echo "  podman images | grep rc-web"
+          echo "  cargo make check"

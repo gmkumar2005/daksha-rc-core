@@ -1,16 +1,7 @@
 name: Build and Push Basic Image
 
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Tag for the basic image (e.g., v0.0.2)"
-        required: true
-        type: string
-        default: "v0.0.2"
-  push:
-    branches:
-      - "#36_Deploy_to_UTHO_k8s"
+  workflow_call:
 
 env:
   REGISTRY: ghcr.io
@@ -68,28 +59,20 @@ jobs:
       - name: Determine tag
         id: tag
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-            echo "🏷️ Using manual tag: $TAG"
-          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_name }}" = "#36_Deploy_to_UTHO_k8s" ]; then
-            # For branch pushes, use git tag or generate a branch-based tag
-            if GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null); then
-              TAG="$GIT_TAG"
-              echo "🏷️ Using git tag: $TAG"
-            else
-              TAG="branch-$(date +%Y%m%d-%H%M%S)"
-              echo "🏷️ Using generated tag: $TAG"
-            fi
+          # For workflow_call, use git tag or generate a fallback tag
+          if GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null); then
+            TAG="$GIT_TAG"
+            echo "🏷️ Using git tag: $TAG"
           else
-            echo "❌ Unable to determine tag"
-            exit 1
+            TAG="workflow-$(date +%Y%m%d-%H%M%S)"
+            echo "🏷️ Using generated tag: $TAG"
           fi
 
-          # Validate tag format (relaxed for branch-based tags)
-          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]] || [[ "$TAG" =~ ^branch-[0-9]+-[0-9]+$ ]]; then
+          # Validate tag format (relaxed for generated tags)
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]] || [[ "$TAG" =~ ^workflow-[0-9]+-[0-9]+$ ]]; then
             echo "✅ Tag format valid: $TAG"
           else
-            echo "❌ Invalid tag format: $TAG (expected format: v1.2.3 or branch-YYYYMMDD-HHMMSS)"
+            echo "❌ Invalid tag format: $TAG (expected format: v1.2.3 or workflow-YYYYMMDD-HHMMSS)"
             exit 1
           fi
 
