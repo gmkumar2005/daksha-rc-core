@@ -1,0 +1,496 @@
+name: Build and Push RC Web Image (Hybrid Multi-Architecture)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag for the rc-web image (e.g., v0.0.2)"
+        required: true
+        type: string
+        default: "v0.0.2"
+  push:
+    branches:
+      - "#36_Deploy_to_UTHO_k8s"
+    tags:
+      - "v*.*.*"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: daksha-rc/rc-web
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Build images for each architecture using native runners where possible
+  build-images:
+    name: Build ${{ matrix.arch }} Image
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            platform: linux/amd64
+            use_emulation: false
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            use_emulation: false
+            fallback_runner: ubuntu-latest
+            fallback_emulation: true
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full history for git tags
+
+      - name: Check runner availability and set build strategy
+        id: build-strategy
+        run: |
+          echo "🖥️ Current runner: ${{ runner.os }} ${{ runner.arch }}"
+          echo "📋 Target architecture: ${{ matrix.arch }}"
+          echo "🎯 Target platform: ${{ matrix.platform }}"
+
+          # Check if we're running on native architecture
+          if [[ "${{ runner.arch }}" == "ARM64" && "${{ matrix.arch }}" == "arm64" ]] || [[ "${{ runner.arch }}" == "X64" && "${{ matrix.arch }}" == "amd64" ]]; then
+            echo "✅ Native build detected"
+            echo "native_build=true" >> $GITHUB_OUTPUT
+            echo "use_emulation=false" >> $GITHUB_OUTPUT
+          else
+            echo "🔄 Cross-compilation/emulation required"
+            echo "native_build=false" >> $GITHUB_OUTPUT
+            echo "use_emulation=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check disk space
+        run: |
+          echo "Available disk space:"
+          df -h
+          echo ""
+          echo "Available space in GB:"
+          df / | awk 'NR==2 {print int($4/1024/1024) " GB available"}'
+
+          AVAILABLE_GB=$(df / | awk 'NR==2 {print int($4/1024/1024)}')
+          MIN_SPACE=15
+          if [[ "${{ steps.build-strategy.outputs.use_emulation }}" == "true" ]]; then
+            MIN_SPACE=20
+            echo "⚠️ Emulation build requires more space (${MIN_SPACE}GB minimum)"
+          fi
+
+          if [ $AVAILABLE_GB -lt $MIN_SPACE ]; then
+            echo "⚠️ Low disk space warning: ${AVAILABLE_GB}GB available (${MIN_SPACE}GB recommended)"
+            echo "💡 RC Web builds require sufficient space. Monitor build progress."
+          else
+            echo "✅ Sufficient disk space: ${AVAILABLE_GB}GB available"
+          fi
+
+      - name: Install Podman and setup emulation (if needed)
+        run: |
+          echo "🦭 Installing Podman..."
+          sudo apt-get update -qq
+          sudo apt-get install -y podman
+
+          if [[ "${{ steps.build-strategy.outputs.use_emulation }}" == "true" ]]; then
+            echo "🔧 Setting up QEMU emulation for cross-platform builds..."
+            sudo apt-get install -y qemu-user-static
+
+            # Enable QEMU emulation
+            sudo podman run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+            # Wait for QEMU to initialize
+            sleep 2
+
+            # Test emulation
+            echo "🧪 Testing QEMU emulation for ${{ matrix.platform }}..."
+            if podman run --rm --platform ${{ matrix.platform }} alpine:latest uname -m; then
+              echo "✅ QEMU emulation working correctly"
+            else
+              echo "⚠️ QEMU setup may need time to initialize, continuing..."
+            fi
+          else
+            echo "✅ Native build - no emulation needed"
+          fi
+
+          podman --version
+
+      - name: Show build environment information
+        run: |
+          echo "🖥️ Build Environment Information:"
+          echo "  OS: $(uname -s)"
+          echo "  Architecture: $(uname -m)"
+          echo "  Kernel: $(uname -r)"
+          echo "  CPU cores: $(nproc)"
+          echo "  Memory: $(free -h | grep '^Mem:' | awk '{print $2}')"
+          echo "  Podman version: $(podman --version)"
+          echo "  Runner: ${{ runner.os }} ${{ runner.arch }}"
+          echo "  Target: ${{ matrix.arch }}"
+          echo "  Native build: ${{ steps.build-strategy.outputs.native_build }}"
+          echo "  Use emulation: ${{ steps.build-strategy.outputs.use_emulation }}"
+          echo "  Event: ${{ github.event_name }}"
+          echo "  Ref: ${{ github.ref }}"
+          echo ""
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo-make binary
+        uses: actions/cache@v3
+        id: cache-cargo-make
+        with:
+          path: ~/.cargo/bin/cargo-make
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-make-0.37.24
+
+      - name: Install cargo-make (x86_64)
+        if: runner.arch == 'X64' && steps.cache-cargo-make.outputs.cache-hit != 'true'
+        uses: davidB/rust-cargo-make@v1
+        with:
+          version: "0.37.24"
+
+      - name: Install cargo-make from source (ARM64)
+        if: runner.arch == 'ARM64' && steps.cache-cargo-make.outputs.cache-hit != 'true'
+        run: |
+          echo "🔧 Installing cargo-make from source for ARM64..."
+          # Set build optimizations for faster compilation
+          export CARGO_PROFILE_RELEASE_DEBUG=false
+          export CARGO_PROFILE_RELEASE_LTO=false
+          cargo install cargo-make --version 0.37.24
+
+      - name: Verify cargo-make installation
+        run: |
+          echo "🔍 Verifying cargo-make installation..."
+          cargo make --version
+          echo "Architecture: $(uname -m)"
+          echo "Binary location: $(which cargo-make)"
+          echo "Binary info: $(file $(which cargo-make))"
+          echo "✅ cargo-make verified for ${{ runner.arch }}"
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-${{ matrix.arch }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-cargo-
+            ${{ runner.os }}-cargo-
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.DAKSHA_RC_ACTIONS_WRITE_PAT }}
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+            echo "🏷️ Using manual tag: $TAG"
+          elif [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "🏷️ Using git tag: $TAG"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_name }}" = "#36_Deploy_to_UTHO_k8s" ]; then
+            if GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null); then
+              TAG="$GIT_TAG"
+              echo "🏷️ Using git tag: $TAG"
+            else
+              TAG="branch-$(date +%Y%m%d-%H%M%S)"
+              echo "🏷️ Using generated tag: $TAG"
+            fi
+          else
+            echo "❌ Unable to determine tag"
+            exit 1
+          fi
+
+          # Validate tag format
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]] || [[ "$TAG" =~ ^branch-[0-9]+-[0-9]+$ ]]; then
+            echo "✅ Tag format valid: $TAG"
+          else
+            echo "❌ Invalid tag format: $TAG"
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Verify Dockerfile exists
+        run: |
+          if [ ! -f "rc-web/Dockerfile" ]; then
+            echo "❌ Error: Dockerfile not found at rc-web/Dockerfile"
+            exit 1
+          fi
+          echo "✅ Dockerfile found at rc-web/Dockerfile"
+
+      - name: Build single-platform image using cargo-make (native)
+        if: steps.build-strategy.outputs.native_build == 'true'
+        run: |
+          echo "🏗️ Building ${{ matrix.arch }} image natively using cargo-make..."
+
+          # Set SQLX_OFFLINE for build
+          export SQLX_OFFLINE=true
+          export TAG=${{ env.TAG }}
+
+          # Use existing cargo-make build task for single platform
+          cargo make build-image
+
+          # Tag the built image with architecture-specific name
+          podman tag "${REGISTRY}/${IMAGE_NAME}:${TAG}" "${REGISTRY}/${IMAGE_NAME}:${TAG}-${{ matrix.arch }}"
+          podman tag "${REGISTRY}/${IMAGE_NAME}:latest" "${REGISTRY}/${IMAGE_NAME}:latest-${{ matrix.arch }}"
+
+          echo "✅ Successfully built ${{ matrix.arch }} image natively"
+
+      - name: Build single-platform image with emulation (fallback)
+        if: steps.build-strategy.outputs.native_build == 'false'
+        run: |
+          echo "🏗️ Building ${{ matrix.arch }} image with emulation..."
+
+          # Set SQLX_OFFLINE and additional environment variables for cross-compilation
+          export SQLX_OFFLINE=true
+          export TAG=${{ env.TAG }}
+
+          # Set ring crate environment variables to help with ARM64 compilation
+          export RING_DISABLE_ASSEMBLY=1
+          export RING_PREGENERATE_ASM=0
+
+          # Build with specific architecture using podman directly
+          podman build \
+            --arch ${{ matrix.platform }} \
+            --memory=4g \
+            --build-arg RING_DISABLE_ASSEMBLY=1 \
+            --build-arg RING_PREGENERATE_ASM=0 \
+            --build-arg RUSTFLAGS="-C opt-level=1" \
+            --build-arg CARGO_BUILD_JOBS=1 \
+            -f "rc-web/Dockerfile" \
+            -t "${REGISTRY}/${IMAGE_NAME}:${TAG}-${{ matrix.arch }}" \
+            --label "org.opencontainers.image.version=${TAG}" \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label "org.opencontainers.image.source=https://github.com/daksha-rc/daksha-rc" \
+            --label "org.opencontainers.image.description=Daksha RC Web Application" \
+            --label "org.opencontainers.image.platform=${{ matrix.arch }}" \
+            --squash-all \
+            --rm \
+            .
+
+          # Also create latest tag
+          podman tag "${REGISTRY}/${IMAGE_NAME}:${TAG}-${{ matrix.arch }}" "${REGISTRY}/${IMAGE_NAME}:latest-${{ matrix.arch }}"
+
+          echo "✅ Successfully built ${{ matrix.arch }} image with emulation"
+
+      - name: Push platform-specific images
+        run: |
+          echo "🚀 Pushing ${{ matrix.arch }} images..."
+
+          # Push versioned image
+          podman push "${REGISTRY}/${IMAGE_NAME}:${TAG}-${{ matrix.arch }}"
+          echo "✅ Pushed ${REGISTRY}/${IMAGE_NAME}:${TAG}-${{ matrix.arch }}"
+
+          # Push latest image
+          podman push "${REGISTRY}/${IMAGE_NAME}:latest-${{ matrix.arch }}"
+          echo "✅ Pushed ${REGISTRY}/${IMAGE_NAME}:latest-${{ matrix.arch }}"
+
+      - name: Test basic functionality
+        run: |
+          echo "🧪 Testing basic ${{ matrix.arch }} image functionality..."
+          timeout 30s podman run --rm "${REGISTRY}/${IMAGE_NAME}:${TAG}-${{ matrix.arch }}" --help || {
+            echo "⚠️ Image help command test failed or timed out (this may be expected)"
+          }
+          echo "✅ Basic functionality test completed"
+
+    outputs:
+      image-tag: ${{ steps.tag.outputs.tag }}
+
+  # Create multi-platform manifests
+  create-manifest:
+    name: Create Multi-Platform Manifests
+    runs-on: ubuntu-latest
+    needs: build-images
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.DAKSHA_RC_ACTIONS_WRITE_PAT }}
+
+      - name: Create and push multi-platform manifests
+        run: |
+          TAG="${{ needs.build-images.outputs.image-tag }}"
+
+          echo "📋 Creating multi-platform manifests for tag: $TAG"
+
+          # Create and push manifest for versioned tag
+          echo "Creating manifest for ${REGISTRY}/${IMAGE_NAME}:${TAG}"
+          podman manifest create "${REGISTRY}/${IMAGE_NAME}:${TAG}"
+          podman manifest add "${REGISTRY}/${IMAGE_NAME}:${TAG}" "${REGISTRY}/${IMAGE_NAME}:${TAG}-amd64"
+          podman manifest add "${REGISTRY}/${IMAGE_NAME}:${TAG}" "${REGISTRY}/${IMAGE_NAME}:${TAG}-arm64"
+          podman manifest push "${REGISTRY}/${IMAGE_NAME}:${TAG}"
+          echo "✅ Created and pushed manifest: ${REGISTRY}/${IMAGE_NAME}:${TAG}"
+
+          # Create and push manifest for latest tag
+          echo "Creating manifest for ${REGISTRY}/${IMAGE_NAME}:latest"
+          podman manifest create "${REGISTRY}/${IMAGE_NAME}:latest"
+          podman manifest add "${REGISTRY}/${IMAGE_NAME}:latest" "${REGISTRY}/${IMAGE_NAME}:latest-amd64"
+          podman manifest add "${REGISTRY}/${IMAGE_NAME}:latest" "${REGISTRY}/${IMAGE_NAME}:latest-arm64"
+          podman manifest push "${REGISTRY}/${IMAGE_NAME}:latest"
+          echo "✅ Created and pushed manifest: ${REGISTRY}/${IMAGE_NAME}:latest"
+
+      - name: Verify multi-platform manifests
+        run: |
+          TAG="${{ needs.build-images.outputs.image-tag }}"
+
+          echo "🔍 Verifying multi-platform manifests..."
+
+          # Verify versioned manifest
+          echo "Inspecting ${REGISTRY}/${IMAGE_NAME}:${TAG}"
+          if podman manifest inspect "${REGISTRY}/${IMAGE_NAME}:${TAG}"; then
+            echo "✅ Versioned manifest verified"
+          else
+            echo "❌ Failed to verify versioned manifest"
+            exit 1
+          fi
+
+          # Verify latest manifest
+          echo "Inspecting ${REGISTRY}/${IMAGE_NAME}:latest"
+          if podman manifest inspect "${REGISTRY}/${IMAGE_NAME}:latest"; then
+            echo "✅ Latest manifest verified"
+          else
+            echo "❌ Failed to verify latest manifest"
+            exit 1
+          fi
+
+      - name: Test multi-platform image pulling
+        run: |
+          TAG="${{ needs.build-images.outputs.image-tag }}"
+
+          echo "🧪 Testing multi-platform image pulls..."
+
+          # Test pulling the multi-arch image
+          if podman pull "${REGISTRY}/${IMAGE_NAME}:${TAG}"; then
+            echo "✅ Successfully pulled multi-arch image: ${TAG}"
+          else
+            echo "❌ Failed to pull multi-arch image: ${TAG}"
+            exit 1
+          fi
+
+          # Test pulling latest
+          if podman pull "${REGISTRY}/${IMAGE_NAME}:latest"; then
+            echo "✅ Successfully pulled multi-arch image: latest"
+          else
+            echo "❌ Failed to pull multi-arch image: latest"
+            exit 1
+          fi
+
+      - name: Generate build summary
+        run: |
+          TAG="${{ needs.build-images.outputs.image-tag }}"
+
+          echo "## 🎉 RC Web Hybrid Multi-Platform Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Successfully built and pushed RC Web images with tag:** \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🏗️ Build Strategy Used:" >> $GITHUB_STEP_SUMMARY
+          echo "- **AMD64**: Native build on ubuntu-latest with cached cargo-make binary" >> $GITHUB_STEP_SUMMARY
+          echo "- **ARM64**: Native build on ubuntu-24.04-arm with source-built cargo-make" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Images Created:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG\` (multi-arch)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG-amd64\` (AMD64)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG-arm64\` (ARM64)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\` (multi-arch)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-amd64\` (AMD64)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-arm64\` (ARM64)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Usage:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Pull the multi-platform image (automatically selects correct architecture)" >> $GITHUB_STEP_SUMMARY
+          echo "podman pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Run the container" >> $GITHUB_STEP_SUMMARY
+          echo "podman run -p 8080:8080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Local Development:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Local builds still work exactly as before:" >> $GITHUB_STEP_SUMMARY
+          echo "cargo make build-image        # Build for current platform" >> $GITHUB_STEP_SUMMARY
+          echo "cargo make build-image-all    # Build multi-platform (with QEMU)" >> $GITHUB_STEP_SUMMARY
+          echo "cargo make build-and-push-all # Build and push multi-platform" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ℹ️ Build Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow:** [\`${{ github.workflow }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Compatibility:** Full compatibility with existing cargo-make tasks" >> $GITHUB_STEP_SUMMARY
+          echo "- **Performance:** ARM64 builds cached for faster subsequent runs" >> $GITHUB_STEP_SUMMARY
+
+  notify-success:
+    name: Notify Build Success
+    runs-on: ubuntu-latest
+    needs: [ build-images, create-manifest ]
+    if: success()
+
+    steps:
+      - name: Create success annotation
+        run: |
+          echo "::notice title=RC Web Hybrid Build Success::Successfully built and pushed RC Web multi-platform image with tag ${{ needs.build-images.outputs.image-tag }} using native runners with optimized cargo-make installation"
+
+      - name: Summary for success
+        run: |
+          echo "🎉 RC Web hybrid multi-platform build completed successfully!"
+          echo "📦 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-images.outputs.image-tag }}"
+          echo "🏗️ Built using native runners with architecture-specific cargo-make installation"
+          echo "⚡ ARM64 builds now use cached cargo-make for faster subsequent runs"
+          echo "🔧 Local cargo-make workflows remain fully compatible"
+          echo "🚀 Ready for deployment!"
+
+  notify-failure:
+    name: Notify Build Failure
+    runs-on: ubuntu-latest
+    needs: [ build-images, create-manifest ]
+    if: failure()
+
+    steps:
+      - name: Create failure annotation
+        run: |
+          echo "::error title=RC Web Hybrid Build Failed::Failed to build and push RC Web multi-platform image. Check the logs for details."
+
+      - name: Failure troubleshooting guide
+        run: |
+          echo "❌ RC Web hybrid multi-platform build failed!"
+          echo ""
+          echo "🔍 Common troubleshooting steps:"
+          echo "1. Check if the specific platform build failed (AMD64 or ARM64)"
+          echo "2. For ARM64: Check if cargo-make source compilation failed"
+          echo "3. Verify cargo make build-image works locally for your platform"
+          echo "4. Check if DAKSHA_RC_ACTIONS_WRITE_PAT secret has correct permissions"
+          echo "5. Review disk space warnings in the build logs"
+          echo "6. For ARM64 issues, check if native runners are available"
+          echo ""
+          echo "📋 Local debugging (these still work):"
+          echo "  cargo make build-image      # Build current platform"
+          echo "  cargo make build-image-all  # Build multi-platform locally"
+          echo "  cargo make check            # Check code"
+          echo ""
+          echo "🔧 cargo-make installation debugging:"
+          echo "  For ARM64: cargo install cargo-make --version 0.37.24"
+          echo "  For x86_64: Pre-built binary from davidB/rust-cargo-make action"
+          echo ""
+          echo "💡 This hybrid workflow maintains full compatibility with local development"

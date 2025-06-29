@@ -1,0 +1,25 @@
+{
+  "name": "a0e3834ef6ca94ea8afb347f1d4ec504",
+  "region": "blr1",
+  "forwarding_rules": [
+    {
+      "entry_protocol": "http",
+      "entry_port": 80,
+      "target_protocol": "http",
+      "target_port": 80
+    },
+    {
+      "entry_protocol": "tcp",
+      "entry_port": 8080,
+      "target_protocol": "tcp",
+      "target_port": 8080
+    },
+    {
+      "entry_protocol": "https",
+      "entry_port": 443,
+      "target_protocol": "http",
+      "target_port": 80,
+      "certificate_id": "806c5cb4-7f4f-4147-b962-7b583f9e4b68"
+    }
+  ]
+}

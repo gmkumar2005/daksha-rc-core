@@ -1,0 +1,249 @@
+name: Build Basic Image - Docker
+
+on:
+  push:
+    branches:
+      - "#36_Deploy_to_UTHO_k8s"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag for the basic image (e.g., v0.0.2)"
+        required: true
+        type: string
+        default: "v0.0.2"
+      platforms:
+        description: "Target platforms"
+        required: false
+        type: choice
+        default: "linux/amd64,linux/arm64"
+        options:
+          - "linux/amd64,linux/arm64"
+          - "linux/amd64"
+          - "linux/arm64"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: daksha-rc/rc-basic
+
+jobs:
+  build-basic-docker:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+            echo "🏷️ Using manual tag: $TAG"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_name }}" = "#36_Deploy_to_UTHO_k8s" ]; then
+            # For branch pushes, use git tag or generate a branch-based tag
+            if GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null); then
+              TAG="$GIT_TAG"
+              echo "🏷️ Using git tag: $TAG"
+            else
+              TAG="branch-$(date +%Y%m%d-%H%M%S)"
+              echo "🏷️ Using generated tag: $TAG"
+            fi
+          else
+            echo "❌ Unable to determine tag"
+            exit 1
+          fi
+
+          # Validate tag format (relaxed for branch-based tags)
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]] || [[ "$TAG" =~ ^branch-[0-9]+-[0-9]+$ ]]; then
+            echo "✅ Tag format valid: $TAG"
+          else
+            echo "❌ Invalid tag format: $TAG (expected format: v1.2.3 or branch-YYYYMMDD-HHMMSS)"
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.DAKSHA_RC_ACTIONS_WRITE_PAT }}
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-make
+        uses: davidB/rust-cargo-make@v1
+        with:
+          version: "0.37.24"
+
+      - name: Generate Docker build metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ env.TAG }}
+            type=raw,value=${{ env.TAG }}-amd64,suffix=-amd64
+            type=raw,value=${{ env.TAG }}-arm64,suffix=-arm64
+            type=raw,value=latest
+            type=raw,value=latest-amd64,suffix=-amd64
+            type=raw,value=latest-arm64,suffix=-arm64
+            type=sha,prefix={{branch}}-
+
+      - name: Determine platforms
+        id: platforms
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PLATFORMS="${{ github.event.inputs.platforms }}"
+          else
+            PLATFORMS="linux/amd64,linux/arm64"
+          fi
+          echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
+          echo "🏗️ Building for platforms: $PLATFORMS"
+
+      - name: Build and push multi-platform image with Docker
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./rc-web/basic-image/Dockerfile.basic
+          platforms: ${{ steps.platforms.outputs.platforms }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.version=${{ env.TAG }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+            org.opencontainers.image.source=https://github.com/daksha-rc/daksha-rc-core
+            org.opencontainers.image.title=RC Basic Image
+            org.opencontainers.image.description=Basic Alpine image for Daksha RC
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build platform-specific images
+        run: |
+          echo "🏗️ Building individual platform images..."
+
+          # Build AMD64 image
+          docker buildx build \
+            --platform linux/amd64 \
+            --file ./rc-web/basic-image/Dockerfile.basic \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-amd64 \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-amd64 \
+            --label "org.opencontainers.image.version=${{ env.TAG }}" \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label "org.opencontainers.image.source=https://github.com/daksha-rc/daksha-rc-core" \
+            --label "org.opencontainers.image.title=RC Basic Image" \
+            --label "org.opencontainers.image.description=Basic Alpine image for Daksha RC" \
+            --label "org.opencontainers.image.platform=linux/amd64" \
+            --push \
+            .
+
+          # Build ARM64 image
+          docker buildx build \
+            --platform linux/arm64 \
+            --file ./rc-web/basic-image/Dockerfile.basic \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-arm64 \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-arm64 \
+            --label "org.opencontainers.image.version=${{ env.TAG }}" \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label "org.opencontainers.image.source=https://github.com/daksha-rc/daksha-rc-core" \
+            --label "org.opencontainers.image.title=RC Basic Image" \
+            --label "org.opencontainers.image.description=Basic Alpine image for Daksha RC" \
+            --label "org.opencontainers.image.platform=linux/arm64" \
+            --push \
+            .
+
+      - name: Verify images
+        run: |
+          echo "🔍 Verifying pushed images..."
+
+          # Test pulling multi-arch image
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
+
+          # Test pulling platform-specific images
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-amd64
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-arm64
+
+          # Inspect the multi-arch manifest
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
+
+          echo "✅ All images verified successfully"
+
+      - name: Test cross-platform functionality
+        run: |
+          echo "🧪 Testing cross-platform functionality..."
+
+          # Test AMD64 image
+          echo "Testing AMD64 image..."
+          docker run --rm --platform linux/amd64 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-amd64 uname -m
+
+          # Test ARM64 image (via emulation)
+          echo "Testing ARM64 image..."
+          docker run --rm --platform linux/arm64 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-arm64 uname -m
+
+          # Test multi-arch image auto-selection
+          echo "Testing multi-arch image..."
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }} uname -a
+
+          echo "✅ Cross-platform tests passed"
+
+      - name: Generate build summary
+        run: |
+          echo "## 🎉 Basic Image Build Summary (Docker)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Successfully built and pushed basic image with tag:** \`${{ env.TAG }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Images Created:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}\` (multi-arch)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-amd64\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-arm64\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\` (multi-arch)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-amd64\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-arm64\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🏗️ Build Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms:** ${{ steps.platforms.outputs.platforms }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Tool:** Docker Buildx" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Usage:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Pull the multi-platform image" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Pull specific architecture" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-amd64" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}-arm64" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Output image information
+        run: |
+          echo "::notice title=Build Success::Successfully built basic image ${{ env.TAG }} for multiple platforms using Docker Buildx"
+          echo "IMAGE_TAG=${{ env.TAG }}" >> $GITHUB_OUTPUT
+          echo "IMAGE_DIGEST=${{ steps.build.outputs.digest }}" >> $GITHUB_OUTPUT

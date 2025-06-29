@@ -1,0 +1,57 @@
+name: Build Basic Image - Simple
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag for the basic image (e.g., v0.0.2)"
+        required: true
+        type: string
+        default: "v0.0.2"
+
+jobs:
+  build-basic:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Podman and QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman qemu-user-static
+
+      - name: Set up QEMU emulation for cross-platform builds
+        run: |
+          # Enable QEMU emulation for different architectures
+          sudo podman run --rm --privileged multiarch/qemu-user-static --reset -p yes
+          # Verify QEMU is working
+          podman run --rm --platform linux/arm64 alpine:latest uname -m || echo "QEMU setup may need time to initialize"
+
+      - name: Install cargo-make
+        uses: davidB/rust-cargo-make@v1
+        with:
+          version: "0.37.24"
+
+      - name: Login to GitHub Container Registry
+        run: |
+          echo ${{ secrets.DAKSHA_RC_ACTIONS_WRITE_PAT }} | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push basic image
+        run: |
+          TAG=${{ github.event.inputs.tag }} cargo make build-and-push-basic-with-tag
+
+      - name: Verify build
+        run: |
+          echo "✅ Successfully built and pushed basic image with tag: ${{ github.event.inputs.tag }}"
+          podman images | grep rc-basic || true

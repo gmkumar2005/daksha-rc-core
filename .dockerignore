@@ -1,7 +1,7 @@
 # Rust build artifacts and cache
 target/
 **/target/
-Cargo.lock
+# Cargo.lock - needed for Docker builds for dependency resolution
 
 # IDE and editor files
 .vscode/

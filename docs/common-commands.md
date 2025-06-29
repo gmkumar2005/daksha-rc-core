@@ -195,7 +195,9 @@ curl -k https://httpbin.127.0.0.1.nip.io/get
 curl -k https://whoami.127.0.0.1.nip.io/
 
 ```
+
 ## Install cnpg
+
 ```shell
 helm upgrade --install cnpg \
   --namespace cnpg-system \
@@ -209,7 +211,9 @@ kubectl wait --for=condition=Available deployment/dev-rc-app -n default --timeou
 curl -k https://rc.127.0.0.1.nip.io/healthz
 
 ```
+
 ### Connecting to postgres on k8s
+
 ```shell
 
 Service name dev-rc-app-database-rw
@@ -225,15 +229,227 @@ PGPASSWORD=<password> psql -h localhost -p 5432 -U <username> -d <dbname>
 ```
 
 ###
+
 ```shell
 psql postgresql://daksha_rc:NYpVusIWuctlwdOh60SroevN2BFizyw4YomTKMXHZo4gAn8ou0uN5aF4lwB8IgWk@localhost:5432/daksha_rc
 
 ```
 
 ### Pull image debug
+
 ```shell
 
 ghcr.io/daksha-rc/rc-web:v.0.1.1
 ghcr.io/daksha-rc/rc-web:v0.1.1
 docker pull ghcr.io/daksha-rc/rc-web:v0.1.1
+```
+
+### Sit cluster
+
+#### Debug
+
+```shell
+kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml config current-context
+kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml get svc/nginx-service
+```
+
+#### Install
+
+```shell
+export KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml
+kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml config current-context
+helm --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml  install traefik-crds traefik/traefik-crds --namespace traefik-system --create-namespace
+
+helm --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml  upgrade --install traefik traefik/traefik -f k8s/manual/sit-traefik-values.yaml --namespace traefik-system --create-namespace
+
+kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml wait --for=condition=ready pod -l app.kubernetes.io/name=traefik -n traefik-system --timeout=60s
+
+kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml apply -f k8s/manual/sit-traefik-dashboard-ingressroute.yaml
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml helm upgrade --install cnpg \
+  --namespace cnpg-system \
+  --create-namespace \
+  cnpg/cloudnative-pg
+
+kubectl wait --for=condition=Available deployment/cnpg-cloudnative-pg -n cnpg-system --timeout=120s
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml helm upgrade --install sit rc-app -f manual/sit-rc-app-values.yaml
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl logs
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml k9s --readonly
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml  helm uninstall cnpg \
+  --namespace cnpg-system \
+  cnpg/cloudnative-pg
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml  helm uninstall  sit rc-app
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl delete metrics-server-5b6cc55b86-j752f -n kube-system
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl delete metrics-server-5cd4986bbc-6sqd9 -n kube-system
+```
+
+## Multi platform builds
+
+```shell
+podman build -f rc-web/Dockerfile --manifest ghcr.io/daksha-rc/rc-web:v0.1.1-dev.4 .
+
+podman build -f rc-web/Dockerfile --platform linux/amd64,linux/arm64  --manifest ghcr.io/daksha-rc/rc-web:v0.1.1-dev.4 .
+
+podman build --platform linux/amd64,linux/arm64 --manifest localhost/hello .
+
+podman manifest inspect ghcr.io/daksha-rc/rc-web:v0.1.5 | jq -r '.manifests[].platform | "\(.os)/\(.architecture)"'
+
+
+podman image inspect ghcr.io/daksha-rc/rc-web:v0.1.1-dev.4 --format '{{json .Architecture}}'
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.nodeInfo.architecture}{"\t"}{.status.nodeInfo.operatingSystem}{"\n"}{end}'
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl patch storageclass utho-block-storage -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl patch pvc sit-rc-app-database-1 -p '{"spec": {"storageClassName": "utho-block-storage"}}'
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get storageclass
+```
+
+## Multi platform build
+
+```shell
+
+podman build --arch amd64 -t ghcr.io/daksha-rc/rc-web:amd64 .
+podman build --arch arm64 -t ghcr.io/daksha-rc/rc-web:arm64 .
+podman manifest create ghcr.io/daksha-rc/rc-web:latest
+podman manifest add ghcr.io/daksha-rc/rc-web:latest containers-storage:ghcr.io/daksha-rc/rc-web:amd64
+podman manifest add ghcr.io/daksha-rc/rc-web:latest containers-storage:ghcr.io/daksha-rc/rc-web:arm64
+podman manifest inspect ghcr.io/daksha-rc/rc-web:latest
+
+```
+
+## Debug remote k8s
+
+```shell
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get nodes --show-labels
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl cluster-info
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get cluster
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get nodes -o wide
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get pod sit-rc-app-5c9fcd44d5-2s72w -o jsonpath='{.spec.containers[0].image}'
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml  kubectl get pvc -l cnpg.io/cluster=sit-rc-app-database  -n default
+
+KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml  kubectl get storageclass
+
+
+TAG=v0.1.9 cargo make build-image-all
+TAG=v0.1.9 cargo make push-with-tag
+
+
+```
+
+# Start of digital ocean deployemnt
+
+```shell
+export KUBECONFIG=/Users/mallru/.kube/sit-daksha-kubeconfig.yaml
+helm repo update
+helm install sit-db bitnami/postgresql -f do-sit-pg-values.yaml
+sit-db-postgresql.default.svc.cluster.local - Read/Write connection
+export POSTGRES_ADMIN_PASSWORD=$(kubectl get secret --namespace default sit-db-postgresql -o jsonpath="{.data.postgres-password}" | base64 -d)
+export POSTGRES_PASSWORD=$(kubectl get secret --namespace default sit-db-postgresql -o jsonpath="{.data.password}" | base64 -d)
+kubectl run sit-db-postgresql-client --rm --tty -i --restart='Never' --namespace default --image docker.io/bitnami/postgresql:17.5.0-debian-12-r12 --env="PGPASSWORD=$POSTGRES_PASSWORD" \
+      --command -- psql --host sit-db-postgresql -U daksha_rc -d daksha_rc -p 5432
+
+postgresql://user:secretpassword@localhost:5432/mydatabase
+postgresql://daksha_rc:daksha_rc@sit-db-postgresql.default.svc.cluster.local:5432/daksha_rc
+
+```
+
+## install rc-app on do
+
+```shell
+
+helm upgrade --install sit rc-app -f manual/do-sit-rc-values.yaml --dry-run --debug
+helm upgrade --install  sit rc-app -f manual/do-sit-rc-values.yaml
+helm uninstall  dev
+kubectl apply -f do-sit-rc-ingressroute.yaml
+```
+
+## DO Dns
+
+```shell
+dig rc.daksha-rc.in @8.8.8.8 +short
+dig dashboard.daksha-rc.in @8.8.8.8 +short
+dig rc.daksha-rc.in  +short
+
+doctl compute certificate create --type lets_encrypt --name daksha-rc-subdomains-cert --dns-names rc.daksha-rc.in,dashboard.daksha-rc.in
+
+
+
+
+
+
+```
+
+```shell
+Tokens
+
+DAKSHA_RC_ACTIONS_WRITE_PAT
+```
+
+### Cilium
+
+```shell
+CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
+CLI_ARCH=amd64
+if [ "$(uname -m)" = "arm64" ]; then CLI_ARCH=arm64; fi
+curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-darwin-${CLI_ARCH}.tar.gz{,.sha256sum}
+shasum -a 256 -c cilium-darwin-${CLI_ARCH}.tar.gz.sha256sum
+ tar xzvfC cilium-darwin-${CLI_ARCH}.tar.gz ~/opt/cillium/bin
+rm cilium-darwin-${CLI_ARCH}.tar.gz{,.sha256sum}
+
+
+```
+
+```shell
+
+kubectl annotate service cilium-gateway-sit-daksha-gateway  service.beta.kubernetes.io/do-loadbalancer-protocol=https 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-tls-ports=443 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-certificate-id=806c5cb4-7f4f-4147-b962-7b583f9e4b68 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-redirect-http-to-https=true 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-name=sit-lb-v11 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-tls-passthrough=false
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/load-balancer-name=sit-lb-v11 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-protocol=https 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-tls-ports=443 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-certificate-id=806c5cb4-7f4f-4147-b962-7b583f9e4b68 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-redirect-http-to-https=true 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-name=sit-lb-v11 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-tls-passthrough=false 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-protocol=https 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-tls-ports=443 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-certificate-id=806c5cb4-7f4f-4147-b962-7b583f9e4b68 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-redirect-http-to-https=true 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-name=sit-lb-v11 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-tls-passthrough=false
+  
+  
+```
+
+## Lets encrypt
+
+```shell
+
+export DIGITALOCEAN_ACCESS_TOKEN="your_digitalocean_api_token"
+export DO_AUTH_TOKEN="your_digitalocean_api_token_here"
+
+
+lego --dns digitalocean --domains daksha-rc.in --domains '*.daksha-rc.in' --email dmkumar2014@gmail.com run
+
+lego --dns digitalocean  --dns-timeout 1800 --dns.propagation-wait 1800s   --domains daksha-rc.in --domains '*.daksha-rc.in' --email dmkumar2014@gmail.com run
+  
+  run
+
+
+kubectl create secret tls daksha-rc-tls \
+  --cert=daksha-rc.in.crt \
+  --key=daksha-rc.in.key 
+
 ```

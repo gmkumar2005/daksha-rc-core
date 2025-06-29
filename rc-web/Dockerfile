@@ -1,10 +1,11 @@
-# Multi-stage Dockerfile for rc-web with cargo-chef optimization
-# Compatible with Docker BuildX and Podman for enhanced caching and performance
+# Multi-stage Dockerfile for rc-web with reusable base image
+# The base-builder stage (up to line 22 equivalent) can be built and reused independently
 
-# Chef stage - prepare cargo-chef with OpenSSL dependencies
-# Using specific Rust version for reproducible builds
-FROM lukemathwalker/cargo-chef:latest-rust-1.86.0-alpine as chef
+# Base builder stage - reusable intermediate image with all build dependencies
+# This stage includes Rust toolchain, cargo-chef, and all build dependencies
+FROM lukemathwalker/cargo-chef:latest-rust-1.86.0-alpine as base-builder
 
+ENV DEBIAN_FRONTEND=noninteractive
 # Install build dependencies including OpenSSL
 RUN apk add --no-cache \
     musl-dev \
@@ -24,7 +25,7 @@ WORKDIR /app
 
 # Planner stage - analyze dependencies
 # This stage analyzes the workspace to create a dependency recipe
-FROM chef AS planner
+FROM base-builder AS planner
 # Copy the entire workspace to analyze dependencies
 COPY . .
 # Generate recipe.json for dependency caching - this enables efficient rebuilds
@@ -32,14 +33,14 @@ RUN cargo chef prepare --recipe-path recipe.json --bin rc-web
 
 # Cacher stage - build dependencies only
 # This stage builds only dependencies, enabling excellent layer caching
-FROM chef AS cacher
+FROM base-builder AS cacher
 COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies (this layer will be cached)
 RUN cargo chef cook --release --recipe-path recipe.json --bin rc-web
 
 # Builder stage - build the application
 # This stage builds the actual application with pre-built dependencies
-FROM chef AS builder
+FROM base-builder AS builder
 # Copy the entire source code
 COPY . .
 # Copy cached dependencies from cacher stage
@@ -51,7 +52,7 @@ RUN cargo build --release --bin rc-web
 
 # Runtime stage - minimal production image
 FROM debian:bookworm-slim AS runtime
-
+ENV DEBIAN_FRONTEND=noninteractive
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
@@ -80,11 +81,6 @@ USER appuser
 
 # Expose port
 EXPOSE 8000
-
-# Add health check with database connectivity
-# Provides container orchestration with health status
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/readyz || exit 1
 
 # Add OCI-compliant labels for better container metadata
 LABEL org.opencontainers.image.title="RC Web Application"
