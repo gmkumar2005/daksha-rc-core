@@ -362,21 +362,6 @@ postgresql://daksha_rc:daksha_rc@sit-db-postgresql.default.svc.cluster.local:543
 
 ```
 
-## Treafik installation
-
-```shell
-helm install traefik-crds traefik/traefik-crds
-
-helm upgrade --install traefik traefik/traefik -f do-sit-traefik-values.yaml
-#traefik with docker.io/traefik:v3.4.1 has been deployed successfully on default namespace !
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=traefik --timeout=60s
-kubectl apply -f do-sit-dashboard-ingressroute.yaml
-
-helm uninstall traefik traefik/traefik
-http://dashboard.68.183.244.95.nip.io/dashboard/#/
-
-```
-
 ## install rc-app on do
 
 ```shell
@@ -397,24 +382,6 @@ dig rc.daksha-rc.in  +short
 doctl compute certificate create --type lets_encrypt --name daksha-rc-subdomains-cert --dns-names rc.daksha-rc.in,dashboard.daksha-rc.in
 
 
-kubectl patch service traefik -n default --type='merge' -p '{
-  "metadata": {
-    "annotations": {
-      "service.beta.kubernetes.io/do-loadbalancer-protocol": "https",
-      "service.beta.kubernetes.io/do-loadbalancer-certificate-name": "daksha-rc-subdomains-cert",
-      "service.beta.kubernetes.io/do-loadbalancer-certificate-id": "806c5cb4-7f4f-4147-b962-7b583f9e4b68",
-      "service.beta.kubernetes.io/do-loadbalancer-disable-lets-encrypt-dns-records": "false",
-      "service.beta.kubernetes.io/do-loadbalancer-redirect-http-to-https": "true"
-    }
-  }
-}'
-
-
-doctl compute load-balancer update 7edd6f38-ca2a-4a2c-a3d0-87cc28697eb7 \
-  --forwarding-rules \
-    entry_protocol:http,entry_port:80,target_protocol:http,target_port:80 \
-    entry_protocol:tcp,entry_port:8080,target_protocol:tcp,target_port:8080 \
-    entry_protocol:https,entry_port:443,target_protocol:http,target_port:80,certificate_id:806c5cb4-7f4f-4147-b962-7b583f9e4b68
 
 
 
@@ -422,22 +389,67 @@ doctl compute load-balancer update 7edd6f38-ca2a-4a2c-a3d0-87cc28697eb7 \
 ```
 
 ```shell
+Tokens
 
-protocol:http,port:10256,path:/healthz,check_interval_seconds:3,response_timeout_seconds:5,healthy_threshold:5,unhealthy_threshold:3,proxy_protocol:0xc0002576f0
-entry_protocol:http,entry_port:8080,target_protocol:http,target_port:30090,certificate_id:,tls_passthrough:false
-entry_protocol:http,entry_port:80,target_protocol:http,target_port:30080,certificate_id:,tls_passthrough:false
-entry_protocol:https,entry_port:443,target_protocol:http,target_port:30443,certificate_id:806c5cb4-7f4f-4147-b962-7b583f9e4b68,tls_passthrough:false
+DAKSHA_RC_ACTIONS_WRITE_PAT
+```
+
+### Cilium
+
+```shell
+CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
+CLI_ARCH=amd64
+if [ "$(uname -m)" = "arm64" ]; then CLI_ARCH=arm64; fi
+curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-darwin-${CLI_ARCH}.tar.gz{,.sha256sum}
+shasum -a 256 -c cilium-darwin-${CLI_ARCH}.tar.gz.sha256sum
+ tar xzvfC cilium-darwin-${CLI_ARCH}.tar.gz ~/opt/cillium/bin
+rm cilium-darwin-${CLI_ARCH}.tar.gz{,.sha256sum}
 
 
-entry_protocol:http,entry_port:8080,target_protocol:http,target_port:30090,certificate_id:,tls_passthrough:false
-entry_protocol:http,entry_port:80,target_protocol:http,target_port:30080,certificate_id:,tls_passthrough:false
-entry_protocol:https,entry_port:443,target_protocol:http,target_port:30443,certificate_id:806c5cb4-7f4f-4147-b962-7b583f9e4b68,tls_passthrough:false
+```
 
-entry_protocol:tcp,entry_port:8080,target_protocol:tcp,target_port:8080,certificate_id:,tls_passthrough:false entry_protocol:tcp,entry_port:80,target_protocol:tcp,target_port:80,certificate_id:,tls_passthrough:false
+```shell
 
-entry_protocol:tcp,entry_port:8080,target_protocol:tcp,target_port:8080,certificate_id:,tls_passthrough:false entry_protocol:tcp,entry_port:80,target_protocol:tcp,target_port:80,certificate_id:,tls_passthrough:false entry_protocol:tcp,entry_port:443,target_protocol:tcp,target_port:443,certificate_id:,tls_passthrough:false
+kubectl annotate service cilium-gateway-sit-daksha-gateway  service.beta.kubernetes.io/do-loadbalancer-protocol=https 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-tls-ports=443 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-certificate-id=806c5cb4-7f4f-4147-b962-7b583f9e4b68 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-redirect-http-to-https=true 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-name=sit-lb-v11 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-tls-passthrough=false
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/load-balancer-name=sit-lb-v11 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-protocol=https 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-tls-ports=443 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-certificate-id=806c5cb4-7f4f-4147-b962-7b583f9e4b68 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-redirect-http-to-https=true 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-name=sit-lb-v11 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-tls-passthrough=false 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-protocol=https 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-tls-ports=443 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-certificate-id=806c5cb4-7f4f-4147-b962-7b583f9e4b68 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-redirect-http-to-https=true 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-name=sit-lb-v11 
+kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-tls-passthrough=false
+  
+  
+```
 
-entry_protocol:tcp,entry_port:8080,target_protocol:tcp,target_port:8080,certificate_id:,tls_passthrough:false entry_protocol:tcp,entry_port:80,target_protocol:tcp,target_port:80,certificate_id:,tls_passthrough:false entry_protocol:tcp,entry_port:443,target_protocol:tcp,target_port:443,certificate_id:,tls_passthrough:false
+## Lets encrypt
 
+```shell
+
+export DIGITALOCEAN_ACCESS_TOKEN="your_digitalocean_api_token"
+export DO_AUTH_TOKEN="your_digitalocean_api_token_here"
+
+
+lego --dns digitalocean --domains daksha-rc.in --domains '*.daksha-rc.in' --email dmkumar2014@gmail.com run
+
+lego --dns digitalocean  --dns-timeout 1800 --dns.propagation-wait 1800s   --domains daksha-rc.in --domains '*.daksha-rc.in' --email dmkumar2014@gmail.com run
+  
+  run
+
+
+kubectl create secret tls daksha-rc-tls \
+  --cert=daksha-rc.in.crt \
+  --key=daksha-rc.in.key 
 
 ```
