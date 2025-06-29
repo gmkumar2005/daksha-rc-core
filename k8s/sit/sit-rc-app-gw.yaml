@@ -1,0 +1,132 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: sit-daksha-gateway
+  namespace: default
+  labels:
+    # Environment and application identification
+    app.kubernetes.io/name: daksha-gateway
+    app.kubernetes.io/instance: sit
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: daksha-rc
+    app.kubernetes.io/managed-by: cilium
+    app.kubernetes.io/version: "v1"
+    # Environment specific
+    environment: sit
+    project: daksha-rc
+    tier: networking
+spec:
+  gatewayClassName: cilium
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      hostname: "*.daksha-rc.in"
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: "*.daksha-rc.in"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: daksha-rc-tls
+            kind: Secret
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: sit-rc-app-route
+  namespace: default
+  labels:
+    # Application identification
+    app.kubernetes.io/name: rc-app-route
+    app.kubernetes.io/instance: sit
+    app.kubernetes.io/component: http-route
+    app.kubernetes.io/part-of: daksha-rc
+    app.kubernetes.io/managed-by: kubectl
+    # Environment specific
+    environment: sit
+    project: daksha-rc
+    service: rc-app
+spec:
+  parentRefs:
+    - name: sit-daksha-gateway
+      namespace: default
+      sectionName: https  # Add this line
+  hostnames:
+    - rc.daksha-rc.in
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: sit-rc-app
+          port: 8000
+          weight: 100
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: sit-rc-app-route-test
+  namespace: default
+  labels:
+    # Application identification
+    app.kubernetes.io/name: rc-app-route-test
+    app.kubernetes.io/instance: sit
+    app.kubernetes.io/component: http-route
+    app.kubernetes.io/part-of: daksha-rc
+    app.kubernetes.io/managed-by: kubectl
+    # Environment specific
+    environment: sit
+    project: daksha-rc
+    service: rc-app
+    # Test specific
+    purpose: testing
+spec:
+  parentRefs:
+    - name: sit-daksha-gateway
+      namespace: default
+      sectionName: https  # Add this line
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: sit-rc-app
+          port: 8000
+          weight: 100
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: http-redirect-route
+  namespace: default
+  labels:
+    app.kubernetes.io/name: http-redirect
+    app.kubernetes.io/instance: sit
+    app.kubernetes.io/component: http-route
+    app.kubernetes.io/part-of: daksha-rc
+    environment: sit
+    project: daksha-rc
+    purpose: redirect
+spec:
+  parentRefs:
+    - name: sit-daksha-gateway
+      namespace: default
+      sectionName: http  # Add this line
+  hostnames:
+    - "*.daksha-rc.in"
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
