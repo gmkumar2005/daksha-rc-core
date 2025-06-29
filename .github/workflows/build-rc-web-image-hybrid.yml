@@ -139,16 +139,41 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install cargo-make
+      - name: Cache cargo-make binary
+        uses: actions/cache@v3
+        id: cache-cargo-make
+        with:
+          path: ~/.cargo/bin/cargo-make
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-make-0.37.24
+
+      - name: Install cargo-make (x86_64)
+        if: runner.arch == 'X64' && steps.cache-cargo-make.outputs.cache-hit != 'true'
         uses: davidB/rust-cargo-make@v1
         with:
           version: "0.37.24"
+
+      - name: Install cargo-make from source (ARM64)
+        if: runner.arch == 'ARM64' && steps.cache-cargo-make.outputs.cache-hit != 'true'
+        run: |
+          echo "🔧 Installing cargo-make from source for ARM64..."
+          # Set build optimizations for faster compilation
+          export CARGO_PROFILE_RELEASE_DEBUG=false
+          export CARGO_PROFILE_RELEASE_LTO=false
+          cargo install cargo-make --version 0.37.24
+
+      - name: Verify cargo-make installation
+        run: |
+          echo "🔍 Verifying cargo-make installation..."
+          cargo make --version
+          echo "Architecture: $(uname -m)"
+          echo "Binary location: $(which cargo-make)"
+          echo "Binary info: $(file $(which cargo-make))"
+          echo "✅ cargo-make verified for ${{ runner.arch }}"
 
       - name: Cache Rust dependencies
         uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
@@ -380,8 +405,8 @@ jobs:
           echo "✅ **Successfully built and pushed RC Web images with tag:** \`$TAG\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🏗️ Build Strategy Used:" >> $GITHUB_STEP_SUMMARY
-          echo "- **AMD64**: Native build on ubuntu-latest" >> $GITHUB_STEP_SUMMARY
-          echo "- **ARM64**: Native build on ubuntu-latest-arm64 (with QEMU fallback)" >> $GITHUB_STEP_SUMMARY
+          echo "- **AMD64**: Native build on ubuntu-latest with cached cargo-make binary" >> $GITHUB_STEP_SUMMARY
+          echo "- **ARM64**: Native build on ubuntu-24.04-arm with source-built cargo-make" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 Images Created:" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG\` (multi-arch)" >> $GITHUB_STEP_SUMMARY
@@ -414,6 +439,7 @@ jobs:
           echo "- **Actor:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Workflow:** [\`${{ github.workflow }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
           echo "- **Compatibility:** Full compatibility with existing cargo-make tasks" >> $GITHUB_STEP_SUMMARY
+          echo "- **Performance:** ARM64 builds cached for faster subsequent runs" >> $GITHUB_STEP_SUMMARY
 
   notify-success:
     name: Notify Build Success
@@ -424,13 +450,14 @@ jobs:
     steps:
       - name: Create success annotation
         run: |
-          echo "::notice title=RC Web Hybrid Build Success::Successfully built and pushed RC Web multi-platform image with tag ${{ needs.build-images.outputs.image-tag }} using native runners"
+          echo "::notice title=RC Web Hybrid Build Success::Successfully built and pushed RC Web multi-platform image with tag ${{ needs.build-images.outputs.image-tag }} using native runners with optimized cargo-make installation"
 
       - name: Summary for success
         run: |
           echo "🎉 RC Web hybrid multi-platform build completed successfully!"
           echo "📦 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-images.outputs.image-tag }}"
-          echo "🏗️ Built using native runners for maximum reliability"
+          echo "🏗️ Built using native runners with architecture-specific cargo-make installation"
+          echo "⚡ ARM64 builds now use cached cargo-make for faster subsequent runs"
           echo "🔧 Local cargo-make workflows remain fully compatible"
           echo "🚀 Ready for deployment!"
 
@@ -451,14 +478,19 @@ jobs:
           echo ""
           echo "🔍 Common troubleshooting steps:"
           echo "1. Check if the specific platform build failed (AMD64 or ARM64)"
-          echo "2. Verify cargo make build-image works locally for your platform"
-          echo "3. Check if DAKSHA_RC_ACTIONS_WRITE_PAT secret has correct permissions"
-          echo "4. Review disk space warnings in the build logs"
-          echo "5. For ARM64 issues, check if native runners are available"
+          echo "2. For ARM64: Check if cargo-make source compilation failed"
+          echo "3. Verify cargo make build-image works locally for your platform"
+          echo "4. Check if DAKSHA_RC_ACTIONS_WRITE_PAT secret has correct permissions"
+          echo "5. Review disk space warnings in the build logs"
+          echo "6. For ARM64 issues, check if native runners are available"
           echo ""
           echo "📋 Local debugging (these still work):"
           echo "  cargo make build-image      # Build current platform"
           echo "  cargo make build-image-all  # Build multi-platform locally"
           echo "  cargo make check            # Check code"
+          echo ""
+          echo "🔧 cargo-make installation debugging:"
+          echo "  For ARM64: cargo install cargo-make --version 0.37.24"
+          echo "  For x86_64: Pre-built binary from davidB/rust-cargo-make action"
           echo ""
           echo "💡 This hybrid workflow maintains full compatibility with local development"
