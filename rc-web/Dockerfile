@@ -3,7 +3,7 @@
 
 # Base builder stage - reusable intermediate image with all build dependencies
 # This stage includes Rust toolchain, cargo-chef, and all build dependencies
-FROM lukemathwalker/cargo-chef:latest-rust-1.86.0-alpine as base-builder
+FROM lukemathwalker/cargo-chef:latest-rust-1.86.0-alpine AS base-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 # Install build dependencies including OpenSSL

@@ -1,10 +1,13 @@
 use crate::middleware::claims::Claims;
 use crate::HEALTH;
 use actix_web::{get, post, web, HttpResponse, Responder, Scope};
+use cached::proc_macro::cached;
+use cached::SizedCache;
 use chrono::Utc;
 use log::debug;
 use serde_json::{json, Value};
 use sqlx::PgPool;
+use std::time::Duration;
 
 pub fn routes() -> Scope {
     web::scope("")
@@ -96,11 +99,22 @@ async fn healthz() -> impl Responder {
 )]
 #[get("/readyz")]
 async fn readyz(db_pool: web::Data<PgPool>) -> impl Responder {
-    // Run a simple query to check DB connectivity (adapt query to your DB as needed)
-    match sqlx::query("SELECT 1").execute(db_pool.get_ref()).await {
+    debug!("Before cached Checking DB health");
+    match check_db_health(db_pool.get_ref()).await {
         Ok(_) => HttpResponse::Ok()
             .content_type("text/plain; charset=utf-8")
             .body("ready"),
         Err(_) => HttpResponse::ServiceUnavailable().body("db unavailable"),
     }
 }
+
+
+/// Cached database health check
+/// Cached database health check
+#[cached(time = 30, result = true, key = "String", convert = r#"{ "db_health".to_string() }"#)]
+async fn check_db_health(db_pool: &PgPool) -> Result<(), sqlx::Error> {
+    debug!("Checking DB health");
+    sqlx::query("SELECT 1").execute(db_pool).await?;
+    Ok(())
+}
+

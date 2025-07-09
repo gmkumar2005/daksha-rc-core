@@ -12,6 +12,7 @@ actix-web = { workspace = true }
 actix-web-httpauth = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+cached = { workspace = true }
 chrono = { workspace = true }
 config = { workspace = true }
 ctor = { workspace = true }
