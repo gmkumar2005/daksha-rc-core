@@ -1,21 +1,3 @@
-### Use podman compose to start database
-
-```shell
-podman compose up -d
-```
-
-### Enable docker host access via podman
-
-```shell
-export DOCKER_HOST="unix://$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}')"
-```
-
-### Copy log files from container to host
-
-```shell
-podman cp sunbird-rc-core-registry-1:/app/logs/app.log app.log
-
-```
 
 ### Run sqlx migrations
 
@@ -26,93 +8,6 @@ env $(envsubst < .env | xargs) cargo sqlx migrate info --source ../migrations
 env $(envsubst < .env | xargs) cargo sqlx migrate run --source ../migrations
 ```
 
-### Helm commands
-
-``
-helm show values runix/pgadmin4 > pgadminvalues.yaml
-helm template dev-app rc-app > demo.yaml
-helm install <release-name> . --dry-run --debug
-helm install my-postgresql bitnami/postgresql --dry-run --debug -f pgvalues.yaml > demo.yaml
-
-helm template dev-app bitnami/postgresql -f pgvalues.yaml > demo.yaml
-
-helm show values bitnami/postgresql > pgvalues.yaml
-
-kubectl get secret my-postgresql -o yaml
-
-podman exec -it kind-control-plane crictl images
-kind load docker-image my-image:tag
-
-kind load docker-image docker.io/library/rc-web:latest
-
-KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster
-kubectl cluster-info
-
-kubectl rollout status deployment \
--n cnpg-system cnpg-controller-manager
-``
-
-## Installing postgres
-
-```shell
-helm repo add cnpg https://cloudnative-pg.github.io/charts
-helm upgrade --install cnpg \
-  --namespace cnpg-system \
-  --create-namespace \
-  cnpg/cloudnative-pg
-
-
-```
-
-## Manual deploy commands
-
-```shell
-KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster
-helm repo add cnpg https://cloudnative-pg.github.io/charts
-helm upgrade --install cnpg \
-  --namespace cnpg-system \
-  --create-namespace \
-  cnpg/cloudnative-pg
-
-kubectl get deployment -n cnpg-system
-
-kubectl apply -f k8s/manual/pgcluster.yaml
-kubectl get cluster rc-database
-// build app container image
-kind load docker-image docker.io/library/rc-web:latest
-kubectl apply -f k8s/manual/rc-web-deployment.yaml
-kubectl rollout status deployment/rc-web
-kubectl port-forward service/rc-web 8000:8000 &
-
-```
-
-## Helm based install
-
-```shell
-cd k8s
-KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster
-helm repo add cnpg https://cloudnative-pg.github.io/charts
-helm upgrade --install cnpg \
-  --namespace cnpg-system \
-  --create-namespace \
-  cnpg/cloudnative-pg
-
-
-kubectl wait --for=condition=Available deployment/cnpg-cloudnative-pg -n cnpg-system --timeout=120s
-
-// build app container image
-kind load docker-image docker.io/library/rc-web:latest
-helm install dev rc-app
-helm status dev
-kubectl wait --for=condition=Available deployment/dev-rc-app -n default --timeout=120s
-
-curl -k https://rc.127.0.0.1.nip.io/healthz
-
-kubectl port-forward service/dev-rc-app 8000:8000 &
-
-curl http://localhost:50000/healthz
-
-```
 
 ## Mirrord commands
 
@@ -125,92 +20,6 @@ RUST_LOG=debug mirrord exec cargo run --target pod/dev-rc-app-ffc4969db-4zjcv
 RUST_LOG=rc_web=debug mirrord exec cargo run --target pod/dev-rc-app-ffc4969db-4zjcv
 ```
 
-## Tag container images
-
-```shell
-
-echo github_pat | docker login ghcr.io -u gmkumar2005 --password-stdin
-ghcr.io -u gmkumar2005 --password-stdin
-
-docker tag docker.io/library/rc-web  ghcr.io/daksha-rc/rc-web:0.0.10
-
-docker push  ghcr.io/daksha-rc/rc-web:0.0.10
-
-
-```
-
-## Trafeak
-
-```shell
-KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster --config kind-config.yaml
-
-kubectl label node kind-control-plane ingress-ready=true
-
-helm repo add traefik https://helm.traefik.io/traefik
-helm repo update
-
-helm install traefik-crds traefik/traefik-crds
-<!-- helm install traefik traefik/traefik --set crds.enabled=true -->
-helm upgrade --install traefik traefik/traefik -f k8s/traefik-values.yaml
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=traefik --timeout=60s
-
-kubectl create namespace httpbin
-kubectl apply -n httpbin -f https://github.com/istio/istio/raw/master/samples/httpbin/httpbin.yaml
-
-kubectl apply -f whoami.yaml
-kubectl apply -f whoami-service.yaml
-
-kubectl apply -f httpbin-ingressroute.yaml
-kubectl apply -f whoami-ingressroute.yaml
-kubectl apply -f traefik-dashboard-ingressroute.yaml
-
-curl -k https://httpbin.127.0.0.1.nip.io/get
-curl -k https://whoami.127.0.0.1.nip.io/
-
-```
-
-## Debiug
-
-```shell
-kubectl get pods -n default -o wide | grep traefik
-
-```
-
-## Install treafik and cnpg with KIND
-
-```shell
-KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster --config kind-config.yaml
-helm repo add traefik https://helm.traefik.io/traefik
-helm repo update
-helm install traefik-crds traefik/traefik-crds
-helm upgrade --install traefik traefik/traefik -f k8s/traefik-values.yaml
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=traefik --timeout=60s
-kubectl apply -f k8s/manual/traefik-dashboard-ingressroute.yaml
-
-
-kubectl apply -f k8s/manual/whoami.yaml
-kubectl apply -n httpbin -f k8s/manual/httpbin.yaml
-
-curl -k https://httpbin.127.0.0.1.nip.io/get
-curl -k https://whoami.127.0.0.1.nip.io/
-
-```
-
-## Install cnpg
-
-```shell
-helm upgrade --install cnpg \
-  --namespace cnpg-system \
-  --create-namespace \
-  cnpg/cloudnative-pg
-
-kubectl wait --for=condition=Available deployment/cnpg-cloudnative-pg -n cnpg-system --timeout=120s
-
-helm install dev rc-app
-kubectl wait --for=condition=Available deployment/dev-rc-app -n default --timeout=120s
-curl -k https://rc.127.0.0.1.nip.io/healthz
-
-```
 
 ### Connecting to postgres on k8s
 
@@ -235,23 +44,9 @@ psql postgresql://daksha_rc:NYpVusIWuctlwdOh60SroevN2BFizyw4YomTKMXHZo4gAn8ou0uN
 
 ```
 
-### Pull image debug
-
-```shell
-
-ghcr.io/daksha-rc/rc-web:v.0.1.1
-ghcr.io/daksha-rc/rc-web:v0.1.1
-docker pull ghcr.io/daksha-rc/rc-web:v0.1.1
-```
 
 ### Sit cluster
 
-#### Debug
-
-```shell
-kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml config current-context
-kubectl --kubeconfig=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml get svc/nginx-service
-```
 
 #### Install
 
@@ -287,41 +82,6 @@ KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl del
 KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl delete metrics-server-5cd4986bbc-6sqd9 -n kube-system
 ```
 
-## Multi platform builds
-
-```shell
-podman build -f rc-web/Dockerfile --manifest ghcr.io/daksha-rc/rc-web:v0.1.1-dev.4 .
-
-podman build -f rc-web/Dockerfile --platform linux/amd64,linux/arm64  --manifest ghcr.io/daksha-rc/rc-web:v0.1.1-dev.4 .
-
-podman build --platform linux/amd64,linux/arm64 --manifest localhost/hello .
-
-podman manifest inspect ghcr.io/daksha-rc/rc-web:v0.1.5 | jq -r '.manifests[].platform | "\(.os)/\(.architecture)"'
-
-
-podman image inspect ghcr.io/daksha-rc/rc-web:v0.1.1-dev.4 --format '{{json .Architecture}}'
-
-KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.nodeInfo.architecture}{"\t"}{.status.nodeInfo.operatingSystem}{"\n"}{end}'
-
-KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl patch storageclass utho-block-storage -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
-
-KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl patch pvc sit-rc-app-database-1 -p '{"spec": {"storageClassName": "utho-block-storage"}}'
-
-KUBECONFIG=/Users/mallru/.kube/SIT-Daksha-kubeconfig_mks_750390.yaml kubectl get storageclass
-```
-
-## Multi platform build
-
-```shell
-
-podman build --arch amd64 -t ghcr.io/daksha-rc/rc-web:amd64 .
-podman build --arch arm64 -t ghcr.io/daksha-rc/rc-web:arm64 .
-podman manifest create ghcr.io/daksha-rc/rc-web:latest
-podman manifest add ghcr.io/daksha-rc/rc-web:latest containers-storage:ghcr.io/daksha-rc/rc-web:amd64
-podman manifest add ghcr.io/daksha-rc/rc-web:latest containers-storage:ghcr.io/daksha-rc/rc-web:arm64
-podman manifest inspect ghcr.io/daksha-rc/rc-web:latest
-
-```
 
 ## Debug remote k8s
 
@@ -394,45 +154,6 @@ Tokens
 DAKSHA_RC_ACTIONS_WRITE_PAT
 ```
 
-### Cilium
-
-```shell
-CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
-CLI_ARCH=amd64
-if [ "$(uname -m)" = "arm64" ]; then CLI_ARCH=arm64; fi
-curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-darwin-${CLI_ARCH}.tar.gz{,.sha256sum}
-shasum -a 256 -c cilium-darwin-${CLI_ARCH}.tar.gz.sha256sum
- tar xzvfC cilium-darwin-${CLI_ARCH}.tar.gz ~/opt/cillium/bin
-rm cilium-darwin-${CLI_ARCH}.tar.gz{,.sha256sum}
-
-
-```
-
-```shell
-
-kubectl annotate service cilium-gateway-sit-daksha-gateway  service.beta.kubernetes.io/do-loadbalancer-protocol=https 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-tls-ports=443 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-certificate-id=806c5cb4-7f4f-4147-b962-7b583f9e4b68 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-redirect-http-to-https=true 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-name=sit-lb-v11 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   service.beta.kubernetes.io/do-loadbalancer-tls-passthrough=false
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/load-balancer-name=sit-lb-v11 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-protocol=https 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-tls-ports=443 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-certificate-id=806c5cb4-7f4f-4147-b962-7b583f9e4b68 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-redirect-http-to-https=true 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-name=sit-lb-v11 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/do-loadbalancer-tls-passthrough=false 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-protocol=https 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-tls-ports=443 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-certificate-id=806c5cb4-7f4f-4147-b962-7b583f9e4b68 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-redirect-http-to-https=true 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-name=sit-lb-v11 
-kubectl annotate service cilium-gateway-sit-daksha-gateway   kubernetes.digitalocean.com/loadbalancer-tls-passthrough=false
-  
-  
-```
-
 ## Lets encrypt
 
 ```shell
@@ -451,5 +172,72 @@ lego --dns digitalocean  --dns-timeout 1800 --dns.propagation-wait 1800s   --dom
 kubectl create secret tls daksha-rc-tls \
   --cert=daksha-rc.in.crt \
   --key=daksha-rc.in.key 
+
+```
+
+```shell
+
+build 
+
+docker pull ghcr.io/daksha-rc/rc-web:v0.1.3
+
+
+nerdctl build \
+  --platform=linux/amd64,linux/arm64 \
+  --output type=image,name=ghcr.io/daksha-rc/rc-web:latest,push=true \
+  .
+
+nerdctl build \
+  --platform=linux/amd64,linux/arm64 \
+  --output type=image,name=ghcr.io/daksha-rc/rc-web:latest,push=true \
+  -f rc-web/Dockerfile \
+  .
+
+
+
+nerdctl build \
+  --platform=linux/amd64,linux/arm64 \
+  --output type=image,name=ghcr.io/daksha-rc/rc-web:latest,push=false \
+  -f rc-web/Dockerfile \
+  .
+
+nerdctl build \
+  --platform=linux/amd64,linux/arm64 \
+  --output type=image,name=ghcr.io/daksha-rc/rc-web:latest,oci-mediatypes=true,oci-store=true \
+  -f rc-web/Dockerfile \
+  .
+
+
+nerdctl push ghcr.io/daksha-rc/rc-web:latest
+
+docker pull ghcr.io/daksha-rc/rc-web:v0.1.3
+
+```
+
+```shell
+nerdctl pull alpine
+nerdctl tag alpine ghcr.io/daksha-rc/rc-web:latest
+nerdctl push ghcr.io/daksha-rc/rc-web:latest
+
+nerdctl image prune -a -f
+
+
+nerdctl --namespace buildkit image prune -a -f
+
+nerdctl --namespace buildkit pull --platform linux/arm64 ghcr.io/daksha-rc/rc-web:latest 
+nerdctl --namespace buildkit pull --platform linux/amd64 ghcr.io/daksha-rc/rc-web:latest 
+nerdctl --namespace buildkit images
+
+```
+
+```shell
+
+nerdctl run --rm --platform=amd64 alpine uname -a
+
+nerdctl build --platform=linux/amd64,linux/arm64 -t ghcr.io/daksha-rc/rc-web:latest -f rc-web/Dockerfile .
+
+nerdctl build  -t ghcr.io/daksha-rc/rc-web:latest -f rc-web/Dockerfile .
+  
+nerdctl push --all-platforms ghcr.io/daksha-rc/rc-web:latest
 
 ```

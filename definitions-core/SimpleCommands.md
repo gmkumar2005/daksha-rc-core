@@ -7,3 +7,4 @@ cargo llvm-cov --html --workspace --all-features -- tests
 
 sqlx migrate run
 ```
+

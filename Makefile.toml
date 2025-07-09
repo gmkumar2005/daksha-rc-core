@@ -59,3 +59,34 @@ script_runner = "bash"
 script = "scripts/debug-mirrord.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 
+[tasks.build-image]
+description = "build-image: build Docker image using nerdctl"
+category = "Docker"
+command = "nerdctl"
+args = ["build", "-t", "ghcr.io/daksha-rc/rc-web:latest", "-f", "rc-web/Dockerfile", "."]
+
+[tasks.build-push]
+description = "build-push: build multi-platform Docker image and push to registry"
+category = "Docker"
+script_runner = "bash"
+script = '''
+# Get the current git tag
+GIT_TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
+
+# Build with latest tag and optionally with git tag
+if [ -n "$GIT_TAG" ]; then
+    echo "Building with tags: latest and $GIT_TAG"
+    nerdctl build --platform=linux/amd64,linux/arm64 \
+        -t ghcr.io/daksha-rc/rc-web:latest \
+        -t ghcr.io/daksha-rc/rc-web:$GIT_TAG \
+        -f rc-web/Dockerfile .
+    nerdctl push --all-platforms ghcr.io/daksha-rc/rc-web:latest
+    nerdctl push --all-platforms ghcr.io/daksha-rc/rc-web:$GIT_TAG
+else
+    echo "No git tag found, building with latest tag only"
+    nerdctl build --platform=linux/amd64,linux/arm64 \
+        -t ghcr.io/daksha-rc/rc-web:latest \
+        -f rc-web/Dockerfile .
+    nerdctl push --all-platforms ghcr.io/daksha-rc/rc-web:latest
+fi
+'''
