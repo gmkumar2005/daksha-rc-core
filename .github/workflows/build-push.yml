@@ -79,7 +79,7 @@ jobs:
         # and pushes it to the configured registry.
         uses: docker/build-push-action@v5
         with:
-          context: ./rc-web # Updated context to point to rc-web directory
+          context: . # Updated context to point to rc-web directory
           file: ./rc-web/Dockerfile # Updated to use rc-web/Dockerfile
           # Define the target platforms to build for. BuildKit will create a multi-arch manifest list.
           platforms: linux/amd64,linux/arm64 # You can add more like 'linux/arm/v7', 'linux/386', etc.
