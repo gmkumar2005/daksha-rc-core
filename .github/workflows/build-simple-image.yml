@@ -151,46 +151,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: 'yarn'
 
-      - name: Install semantic-release
-        run: |
-          npm install -g semantic-release
-          npm install -g @semantic-release/changelog
-          npm install -g @semantic-release/git
-          npm install -g @semantic-release/github
-
-      - name: Create semantic-release config
-        run: |
-          cat > .releaserc.json << 'EOF'
-          {
-            "branches": [
-              "main",
-              "53_caching"
-            ],
-            "plugins": [
-              "@semantic-release/commit-analyzer",
-              "@semantic-release/release-notes-generator",
-              "@semantic-release/changelog",
-              "@semantic-release/github",
-              [
-                "@semantic-release/git",
-                {
-                  "assets": ["CHANGELOG.md"],
-                  "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
-                }
-              ]
-            ]
-          }
-          EOF
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
 
       - name: Run semantic-release
         id: semantic
-        run: |
-          npx semantic-release --debug
+        run: yarn semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Output release information
         run: |
@@ -250,21 +220,46 @@ jobs:
         id: version
         run: |
           if [[ "${{ needs.semantic-release.outputs.new-release-published }}" == "true" ]]; then
-            # Use semantic-release generated version
             VERSION="${{ needs.semantic-release.outputs.new-release-version }}"
             echo "Using semantic-release version: $VERSION"
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.version }}" != "" ]]; then
-            # Use manually provided version
             VERSION="${{ github.event.inputs.version }}"
             echo "Using manually provided version: $VERSION"
           else
-            # Fallback to git tag or branch name
             VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev-${{ github.ref_name }}")
             echo "Using fallback version: $VERSION"
           fi
           
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Final version: $VERSION"
+
+      - name: Get commit and PR information
+        id: git-info
+        run: |
+          # Get the previous tag/release
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          
+          # Get commits since last release
+          COMMITS=$(git log --oneline ${PREV_TAG}..HEAD --pretty=format:"- %s (%an)" | head -20)
+          
+          # Get merged PRs since last release
+          PRS=$(git log --oneline ${PREV_TAG}..HEAD --grep="Merge pull request" --pretty=format:"- %s" | head -10)
+          
+          # Store in outputs (escape newlines)
+          echo "prev-tag=$PREV_TAG" >> $GITHUB_OUTPUT
+          {
+            echo "commits<<EOF"
+            echo "$COMMITS"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+          
+          {
+            echo "prs<<EOF"
+            echo "$PRS"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+          
+          echo "commit-count=$(echo "$COMMITS" | wc -l)" >> $GITHUB_OUTPUT
 
       - name: Extract metadata and generate tags
         id: meta
@@ -279,6 +274,7 @@ jobs:
             type=raw,value=${{ needs.semantic-release.outputs.new-release-major-version }}.${{ needs.semantic-release.outputs.new-release-minor-version }},enable=${{ needs.semantic-release.outputs.new-release-published == 'true' }}
 
       - name: Build and push Docker image (multi-arch, all tags)
+        id: docker-build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -290,14 +286,158 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Display build success
+      - name: Success notification
         if: success()
         run: |
-          echo "🎉 DOCKER BUILD AND PUSH COMPLETED SUCCESSFULLY!"
-          echo "Version: ${{ steps.version.outputs.version }}"
-          echo "Tags: ${{ steps.meta.outputs.tags }}"
-          echo "Semantic Release Published: ${{ needs.semantic-release.outputs.new-release-published }}"
+          # Create a formatted list of built images
+          TAGS_LIST=""
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              TAGS_LIST="$TAGS_LIST\n- \`$tag\`"
+            fi
+          done <<< "${{ steps.meta.outputs.tags }}"
+          
+          # Create GitHub step summary
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          ## 🎉 Docker Build & Release Success
+          
+          ### 📦 Images Built and Pushed
+          EOF
+          
+          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              echo "- \`$tag\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 🔧 Build Information
+          - **Version**: `${{ steps.version.outputs.version }}`
+          - **Build ID**: `${{ steps.docker-build.outputs.imageid }}`
+          - **Digest**: `${{ steps.docker-build.outputs.digest }}`
+          - **Platforms**: `linux/amd64`, `linux/arm64`
+          - **Registry**: `${{ env.REGISTRY }}`
+          - **Branch**: `${{ github.ref_name }}`
+          - **Commit**: `${{ github.sha }}`
+          EOF
           
           if [[ "${{ needs.semantic-release.outputs.new-release-published }}" == "true" ]]; then
-            echo "🏷️ New release created: v${{ needs.semantic-release.outputs.new-release-version }}"
+            cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 🚀 New Release Information
+          - **New Release**: `v${{ needs.semantic-release.outputs.new-release-version }}`
+          - **Major Version**: `${{ needs.semantic-release.outputs.new-release-major-version }}`
+          - **Minor Version**: `${{ needs.semantic-release.outputs.new-release-minor-version }}`
+          - **Patch Version**: `${{ needs.semantic-release.outputs.new-release-patch-version }}`
+          EOF
           fi
+          
+          if [[ -n "${{ steps.git-info.outputs.commits }}" ]]; then
+            cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 📝 Recent Commits (since ${{ steps.git-info.outputs.prev-tag }})
+          EOF
+            echo "${{ steps.git-info.outputs.commits }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ -n "${{ steps.git-info.outputs.prs }}" ]]; then
+            cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 🔀 Merged Pull Requests
+          EOF
+            echo "${{ steps.git-info.outputs.prs }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 🔗 Usage Examples
+          ```bash
+          # Pull latest image
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          
+          # Pull specific version
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          
+          # Run container
+          docker run -p 8080:8080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          ```
+          EOF
+          
+          # Console output
+          echo "🎉 SUCCESS: Docker images built and pushed successfully!"
+          echo "📦 Images:"
+          echo "${{ steps.meta.outputs.tags }}" | sed 's/^/  - /'
+          echo "🔧 Version: ${{ steps.version.outputs.version }}"
+          echo "📝 Commits since last release: ${{ steps.git-info.outputs.commit-count }}"
+
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [test, build, semantic-release, docker-build]
+    if: failure()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Failure notification
+        run: |
+          # Determine which job failed
+          FAILED_JOBS=""
+          if [[ "${{ needs.test.result }}" == "failure" ]]; then
+            FAILED_JOBS="$FAILED_JOBS\n- ❌ **Test Job**: Tests failed"
+          fi
+          if [[ "${{ needs.build.result }}" == "failure" ]]; then
+            FAILED_JOBS="$FAILED_JOBS\n- ❌ **Build Job**: Binary compilation failed"
+          fi
+          if [[ "${{ needs.semantic-release.result }}" == "failure" ]]; then
+            FAILED_JOBS="$FAILED_JOBS\n- ❌ **Semantic Release Job**: Version release failed"
+          fi
+          if [[ "${{ needs.docker-build.result }}" == "failure" ]]; then
+            FAILED_JOBS="$FAILED_JOBS\n- ❌ **Docker Build Job**: Image build/push failed"
+          fi
+          
+          # Get recent commits for context
+          RECENT_COMMITS=$(git log --oneline -5 --pretty=format:"- %s (%an)")
+          
+          # Create failure summary
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          ## ❌ Build Pipeline Failed
+          
+          ### 💥 Failed Jobs
+          EOF
+          
+          echo -e "$FAILED_JOBS" >> $GITHUB_STEP_SUMMARY
+          
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 🔍 Context Information
+          - **Branch**: `${{ github.ref_name }}`
+          - **Commit**: `${{ github.sha }}`
+          - **Triggered by**: `${{ github.event_name }}`
+          - **Actor**: `${{ github.actor }}`
+          - **Workflow Run**: [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          
+          ### 📝 Recent Commits
+          EOF
+          
+          echo "$RECENT_COMMITS" >> $GITHUB_STEP_SUMMARY
+          
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 🔧 Troubleshooting
+          - Check the failed job logs above
+          - Verify commit message format for semantic-release
+          - Ensure all tests pass locally
+          - Check Docker file and build context
+          - Verify secrets and permissions
+          EOF
+          
+          # Console output
+          echo "❌ FAILURE: Build pipeline failed!"
+          echo "💥 Failed jobs:"
+          echo -e "$FAILED_JOBS"
+          echo "🔍 Check the workflow logs and step summary for details"
