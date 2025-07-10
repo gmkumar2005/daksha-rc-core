@@ -1,18 +1,23 @@
 name: Build and Push RC Web Image (Hybrid Multi-Architecture)
 
+
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Tag for the rc-web image (e.g., v0.0.2)"
-        required: true
-        type: string
-        default: "v0.0.2"
-  push:
-    branches:
-      - "#36_Deploy_to_UTHO_k8s"
-    tags:
-      - "v*.*.*"
+  workflow_call:
+
+
+#on:
+#  workflow_dispatch:
+#    inputs:
+#      tag:
+#        description: "Tag for the rc-web image (e.g., v0.0.2)"
+#        required: true
+#        type: string
+#        default: "v0.0.2"
+#  push:
+#    branches:
+#      - "#36_Deploy_to_UTHO_k8s"
+#    tags:
+#      - "v*.*.*"
 
 env:
   REGISTRY: ghcr.io
