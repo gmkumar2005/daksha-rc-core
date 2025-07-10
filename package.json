@@ -1,7 +1,7 @@
 {
   "name": "daksha-rc-core",
   "version": "1.0.0",
-  "description": "Rust web application with automated semantic versioning",
+  "description": "High performance Electronic Registries and Verifiable Credentials",
   "repository": {
     "type": "git",
     "url": "https://github.com/daksha-rc/daksha-rc-core.git"
