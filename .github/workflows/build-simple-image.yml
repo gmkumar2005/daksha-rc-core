@@ -327,12 +327,14 @@ jobs:
           context: .
           file: ./rc-web/Dockerfile.simple
           push: true
+          provenance: false
           tags: ${{ steps.all_tags.outputs.all-tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
           outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=Multi-platform Rust web application
+
 
       - name: Display build success
         if: success()
