@@ -106,8 +106,6 @@ jobs:
             libssl-dev:arm64 \
             libpq-dev:arm64 \
             pkg-config
-          
-          # Set environment variables for ARM64 cross-compilation
           cat >> $GITHUB_ENV << 'EOF'
           CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc
           CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
@@ -130,11 +128,83 @@ jobs:
           path: target/${{ matrix.target }}/release/rc-web
           retention-days: 1
 
+  semantic-release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/53_caching')
+    outputs:
+      new-release-published: ${{ steps.semantic.outputs.new-release-published }}
+      new-release-version: ${{ steps.semantic.outputs.new-release-version }}
+      new-release-major-version: ${{ steps.semantic.outputs.new-release-major-version }}
+      new-release-minor-version: ${{ steps.semantic.outputs.new-release-minor-version }}
+      new-release-patch-version: ${{ steps.semantic.outputs.new-release-patch-version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install semantic-release
+        run: |
+          npm install -g semantic-release
+          npm install -g @semantic-release/changelog
+          npm install -g @semantic-release/git
+          npm install -g @semantic-release/github
+
+      - name: Create semantic-release config
+        run: |
+          cat > .releaserc.json << 'EOF'
+          {
+            "branches": [
+              "main",
+              "53_caching"
+            ],
+            "plugins": [
+              "@semantic-release/commit-analyzer",
+              "@semantic-release/release-notes-generator",
+              "@semantic-release/changelog",
+              "@semantic-release/github",
+              [
+                "@semantic-release/git",
+                {
+                  "assets": ["CHANGELOG.md"],
+                  "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+                }
+              ]
+            ]
+          }
+          EOF
+
+      - name: Run semantic-release
+        id: semantic
+        run: |
+          npx semantic-release --debug
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Output release information
+        run: |
+          echo "New release published: ${{ steps.semantic.outputs.new-release-published }}"
+          echo "New release version: ${{ steps.semantic.outputs.new-release-version }}"
+          echo "New release major version: ${{ steps.semantic.outputs.new-release-major-version }}"
+          echo "New release minor version: ${{ steps.semantic.outputs.new-release-minor-version }}"
+          echo "New release patch version: ${{ steps.semantic.outputs.new-release-patch-version }}"
+
   docker-build:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/53_caching') || startsWith(github.ref, 'refs/tags/')
+    needs: [build, semantic-release]
+    if: always() && (needs.build.result == 'success') && (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/53_caching') || startsWith(github.ref, 'refs/tags/'))
 
     steps:
       - name: Checkout repository
@@ -157,22 +227,13 @@ jobs:
 
       - name: Prepare artifacts
         run: |
-          # Create target directory structure
           mkdir -p target/x86_64-unknown-linux-gnu/release
           mkdir -p target/aarch64-unknown-linux-gnu/release
-          
-          # Move and rename artifacts to expected locations
           mv artifacts/amd64/rc-web target/x86_64-unknown-linux-gnu/release/rc-web
           mv artifacts/arm64/rc-web target/aarch64-unknown-linux-gnu/release/rc-web
-          
-          # Make binaries executable
           chmod +x target/x86_64-unknown-linux-gnu/release/rc-web
           chmod +x target/aarch64-unknown-linux-gnu/release/rc-web
-          
-          # Verify files exist
           ls -la target/*/release/rc-web
-          
-          # Clean up artifact directories
           rm -rf artifacts
 
       - name: Set up Docker Buildx
@@ -185,40 +246,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.PUSH_PKG_TO_RC_ORG }}
 
-      - name: Get latest git tag
-        id: latest_tag
+      - name: Determine version for Docker tags
+        id: version
         run: |
-          # Robust tag detection with multiple fallbacks
-          if git remote | grep -q "upstream"; then
-            git fetch upstream --tags --force
+          if [[ "${{ needs.semantic-release.outputs.new-release-published }}" == "true" ]]; then
+            # Use semantic-release generated version
+            VERSION="${{ needs.semantic-release.outputs.new-release-version }}"
+            echo "Using semantic-release version: $VERSION"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.version }}" != "" ]]; then
+            # Use manually provided version
+            VERSION="${{ github.event.inputs.version }}"
+            echo "Using manually provided version: $VERSION"
           else
-            # Handle forks
-            UPSTREAM_REPO=$(curl -s "https://api.github.com/repos/${{ github.repository }}" | \
-                            jq -r '.parent.full_name // .full_name')
-            if [[ "$UPSTREAM_REPO" != "${{ github.repository }}" ]]; then
-              git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
-              git fetch upstream --tags --force
-            else
-              git fetch --tags --force
-            fi
+            # Fallback to git tag or branch name
+            VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev-${{ github.ref_name }}")
+            echo "Using fallback version: $VERSION"
           fi
           
-          # Get latest tag with multiple fallbacks
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || \
-                git tag -l --sort=-version:refname | head -n1 || \
-                echo "0.0.0")
-          
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "Latest git tag: ${TAG}"
-
-      - name: Debug branch and event information
-        run: |
-          echo "Event name: ${{ github.event_name }}"
-          echo "Branch/Ref: ${{ github.ref }}"
-          echo "Branch name: ${{ github.ref_name }}"
-          echo "Default branch: ${{ github.event.repository.default_branch }}"
-          echo "Is default branch: ${{ github.ref_name == github.event.repository.default_branch }}"
-          echo "Is main branch: ${{ github.ref == 'refs/heads/main' }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Final version: $VERSION"
 
       - name: Extract metadata and generate tags
         id: meta
@@ -227,198 +273,31 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=pr
-            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=raw,value=latest,enable=${{ github.ref_name == github.event.repository.default_branch }}
-            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version != '' }}
-            type=raw,value=${{ steps.latest_tag.outputs.tag }},enable=${{ github.event_name == 'push' && steps.latest_tag.outputs.tag != '0.0.0' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/53_caching' }}
+            type=raw,value=${{ steps.version.outputs.version }},enable=${{ steps.version.outputs.version != '' }}
+            type=raw,value=${{ needs.semantic-release.outputs.new-release-major-version }},enable=${{ needs.semantic-release.outputs.new-release-published == 'true' }}
+            type=raw,value=${{ needs.semantic-release.outputs.new-release-major-version }}.${{ needs.semantic-release.outputs.new-release-minor-version }},enable=${{ needs.semantic-release.outputs.new-release-published == 'true' }}
 
-      - name: Debug metadata output
-        run: |
-          echo "Generated tags from metadata:"
-          echo "${{ steps.meta.outputs.tags }}"
-          echo ""
-          echo "Generated labels:"
-          echo "${{ steps.meta.outputs.labels }}"
-
-      - name: Generate all tags (multi-platform + platform-specific)
-        id: all_tags
-        run: |
-          # Get base tags from metadata
-          BASE_TAGS="${{ steps.meta.outputs.tags }}"
-          
-          # Ensure latest tag is always included for default branch pushes
-          if [[ "${{ github.ref_name }}" == "${{ github.event.repository.default_branch }}" ]] && [[ "${{ github.event_name }}" == "push" ]]; then
-            LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-            # Use grep for an exact match to avoid partial matches, e.g. "latest-beta"
-            if ! echo "${BASE_TAGS}" | grep -qxF "$LATEST_TAG"; then
-              echo "Adding missing latest tag for default branch push"
-              if [[ -n "$BASE_TAGS" ]]; then
-                # Append with a newline for the while-read loop below
-                BASE_TAGS=$(printf '%s\n%s' "$BASE_TAGS" "$LATEST_TAG")
-              else
-                BASE_TAGS="$LATEST_TAG"
-              fi
-            fi
-          fi
-          
-          # Generate platform-specific tags
-          AMD64_TAGS=""
-          ARM64_TAGS=""
-          MULTI_PLATFORM_TAGS=""
-          
-          echo "Processing base tags: $BASE_TAGS"
-          while IFS= read -r tag; do
-            if [[ -n "$tag" ]]; then
-              # The input from the 'meta' action is newline-separated.
-              # Convert to comma-separated for the build-push action.
-              if [[ -n "$MULTI_PLATFORM_TAGS" ]]; then
-                MULTI_PLATFORM_TAGS="${MULTI_PLATFORM_TAGS},$tag"
-              else
-                MULTI_PLATFORM_TAGS="$tag"
-              fi
-          
-              # Create platform-specific tags
-              VERSION=$(echo "$tag" | sed 's/.*://')
-              BASE_IMAGE=$(echo "$tag" | sed 's/:.*//')
-              AMD64_TAG="${BASE_IMAGE}:${VERSION}-amd64"
-              ARM64_TAG="${BASE_IMAGE}:${VERSION}-arm64"
-          
-              if [[ -n "$AMD64_TAGS" ]]; then
-                AMD64_TAGS="${AMD64_TAGS},${AMD64_TAG}"
-                ARM64_TAGS="${ARM64_TAGS},${ARM64_TAG}"
-              else
-                AMD64_TAGS="$AMD64_TAG"
-                ARM64_TAGS="$ARM64_TAG"
-              fi
-          
-              echo "  Multi-platform: $tag"
-              echo "  AMD64: $AMD64_TAG"
-              echo "  ARM64: $ARM64_TAG"
-            fi
-          done <<< "$BASE_TAGS"
-          
-          # Combine all tags for the final push
-          ALL_TAGS="$MULTI_PLATFORM_TAGS"
-          if [[ -n "$AMD64_TAGS" ]]; then
-            ALL_TAGS="$ALL_TAGS,$AMD64_TAGS"
-          fi
-          if [[ -n "$ARM64_TAGS" ]]; then
-            ALL_TAGS="$ALL_TAGS,$ARM64_TAGS"
-          fi
-          
-          # Store outputs
-          echo "multi-platform-tags=$MULTI_PLATFORM_TAGS" >> $GITHUB_OUTPUT
-          echo "amd64-tags=$AMD64_TAGS" >> $GITHUB_OUTPUT
-          echo "arm64-tags=$ARM64_TAGS" >> $GITHUB_OUTPUT
-          echo "all-tags=$ALL_TAGS" >> $GITHUB_OUTPUT
-          
-          echo ""
-          echo "Final tag summary:"
-          echo "  Multi-platform tags: $MULTI_PLATFORM_TAGS"
-          echo "  AMD64 tags: $AMD64_TAGS"
-          echo "  ARM64 tags: $ARM64_TAGS"
-          echo "  All tags: $ALL_TAGS"
-
-      - name: Build and push Docker images
-        id: build
-        uses: docker/build-push-action@v6
+      - name: Build and push Docker image (multi-arch, all tags)
+        uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./rc-web/Dockerfile.simple
+          file: ./Dockerfile
           push: true
-          provenance: false
-          tags: ${{ steps.all_tags.outputs.all-tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=Multi-platform Rust web application
-
 
       - name: Display build success
         if: success()
         run: |
-          cat << 'EOF'
-          🎉 DOCKER BUILD AND PUSH COMPLETED SUCCESSFULLY!
-          ==================================================================
+          echo "🎉 DOCKER BUILD AND PUSH COMPLETED SUCCESSFULLY!"
+          echo "Version: ${{ steps.version.outputs.version }}"
+          echo "Tags: ${{ steps.meta.outputs.tags }}"
+          echo "Semantic Release Published: ${{ needs.semantic-release.outputs.new-release-published }}"
           
-          📦 REPOSITORY INFORMATION:
-            Repository: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-            Registry: GitHub Container Registry (ghcr.io)
-            Latest Git Tag: ${{ steps.latest_tag.outputs.tag }}
-          
-          🏗️ BUILD INFORMATION:
-            Build ID: ${{ steps.build.outputs.imageid }}
-            Digest: ${{ steps.build.outputs.digest }}
-            Built From: ${{ github.ref_name }} (${{ github.sha }})
-            Platforms: linux/amd64, linux/arm64
-          
-          🏷️ TAGS CREATED:
-          EOF
-          
-          # Count and display tags
-          TOTAL_MULTI=$(echo "${{ steps.all_tags.outputs.multi-platform-tags }}" | tr ',' '\n' | wc -l)
-          TOTAL_AMD64=$(echo "${{ steps.all_tags.outputs.amd64-tags }}" | tr ',' '\n' | wc -l)
-          TOTAL_ARM64=$(echo "${{ steps.all_tags.outputs.arm64-tags }}" | tr ',' '\n' | wc -l)
-          
-          echo "    Multi-platform tags ($TOTAL_MULTI):"
-          echo "${{ steps.all_tags.outputs.multi-platform-tags }}" | tr ',' '\n' | sed 's/^/      🏷️  /'
-          
-          echo ""
-          echo "    AMD64-specific tags ($TOTAL_AMD64):"
-          echo "${{ steps.all_tags.outputs.amd64-tags }}" | tr ',' '\n' | sed 's/^/      🔧  /'
-          
-          echo ""
-          echo "    ARM64-specific tags ($TOTAL_ARM64):"
-          echo "${{ steps.all_tags.outputs.arm64-tags }}" | tr ',' '\n' | sed 's/^/      🔧  /'
-          
-          cat << 'EOF'
-          
-          🔗 USAGE EXAMPLES:
-            # Pull latest multi-platform image
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          
-            # Pull specific version
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.latest_tag.outputs.tag }}
-          
-            # Pull platform-specific images
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.latest_tag.outputs.tag }}-amd64
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.latest_tag.outputs.tag }}-arm64
-          
-            # Run container
-            docker run -p 8080:8080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          
-          🎯 All images successfully pushed to registry!
-          ==================================================================
-          EOF
-
-      - name: Create deployment summary
-        if: success()
-        run: |
-          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
-          ## 🎉 Docker Build Success Summary
-          
-          ### 📋 Build Information
-          - **Latest Git Tag**: `${{ steps.latest_tag.outputs.tag }}`
-          - **Build ID**: `${{ steps.build.outputs.imageid }}`
-          - **Digest**: `${{ steps.build.outputs.digest }}`
-          - **Registry**: `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}`
-          - **Platforms**: linux/amd64, linux/arm64
-          - **Built from**: ${{ github.ref_name }} (`${{ github.sha }}`)
-          
-          ### 📦 Multi-Platform Images
-          | Tag | Type | Platform Support | Pull Command |
-          |-----|------|------------------|--------------|
-          EOF
-          
-          # Add multi-platform tags to summary
-          echo "${{ steps.all_tags.outputs.multi-platform-tags }}" | tr ',' '\n' | while IFS= read -r tag; do
-            if [[ -n "$tag" ]]; then
-              VERSION=$(echo "$tag" | sed 's/.*://')
-              TYPE="Multi-platform"
-              [[ "$VERSION" == "latest" ]] && TYPE="$TYPE (Latest)"
-              PULL_CMD="`docker pull $tag`"
-              echo "| **$VERSION** | $TYPE | `linux/amd64`, `linux/arm64` | $PULL_CMD |" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
+          if [[ "${{ needs.semantic-release.outputs.new-release-published }}" == "true" ]]; then
+            echo "🏷️ New release created: v${{ needs.semantic-release.outputs.new-release-version }}"
+          fi
