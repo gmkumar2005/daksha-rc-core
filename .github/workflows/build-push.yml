@@ -54,7 +54,7 @@ jobs:
           NERDCTL_VERSION="1.7.0" # Check https://github.com/containerd/nerdctl/releases for latest
           HOST_ARCH=$(dpkg --print-architecture) # Detect runner architecture (should be amd64)
           wget https://github.com/containerd/nerdctl/releases/download/v${NERDCTL_VERSION}/nerdctl-${NERDCTL_VERSION}-linux-${HOST_ARCH}.tar.gz
-          sudo tar C/usr/local/bin -xzf nerdctl-${NERDCTL_VERSION}-linux-${HOST_ARCH}.tar.gz
+          sudo tar -C /usr/local/bin -xzf nerdctl-${NERDCTL_VERSION}-linux-${HOST_ARCH}.tar.gz
 
           containerd --version
           nerdctl --version
