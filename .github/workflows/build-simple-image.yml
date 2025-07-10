@@ -205,36 +205,101 @@ jobs:
           cache-to: type=gha,mode=max
           outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=Multi-platform Rust web application
 
-      - name: Success Notification
+      - name: Enhanced Success Notification
         if: success()
         run: |
-          echo "🎉 Docker Build and Push Successful!"
-          echo "================================================"
-          echo "📦 IMAGES PUSHED:"
-          echo "Repository: ghcr.io/daksha-rc/rc-web"
+          echo "🎉 DOCKER BUILD AND PUSH COMPLETED SUCCESSFULLY!"
+          echo "=================================================================="
           echo ""
-          echo "🏷️  TAGS:"
-          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
-            if [[ -n "$tag" ]]; then
-              echo "  ✅ $tag"
-            fi
-          done
+          echo "📦 REPOSITORY INFORMATION:"
+          echo "  Repository: ghcr.io/daksha-rc/rc-web"
+          echo "  Registry: GitHub Container Registry (ghcr.io)"
+          echo "  Namespace: daksha-rc"
+          echo "  Image Name: rc-web"
           echo ""
-          echo "🏗️  PLATFORMS:"
-          echo "  ✅ linux/amd64"
-          echo "  ✅ linux/arm64"
-          echo ""
-          echo "📋 BUILD DETAILS:"
+          echo "🏗️  BUILD INFORMATION:"
           echo "  Build ID: ${{ steps.build.outputs.imageid }}"
           echo "  Digest: ${{ steps.build.outputs.digest }}"
-          echo "  Metadata: ${{ steps.build.outputs.metadata }}"
+          echo "  Build Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "  Built From: ${{ github.ref_name }} (${{ github.sha }})"
+          echo "  Workflow: ${{ github.workflow }}"
+          echo "  Run ID: ${{ github.run_id }}"
+          echo "  Run Number: ${{ github.run_number }}"
           echo ""
-          echo "🔗 REGISTRY URLS:"
+          echo "🏷️  TAGS AND VERSIONS CREATED:"
+          echo "  Total Tags: $(echo '${{ steps.meta.outputs.tags }}' | wc -l)"
+          echo ""
+          COUNTER=1
           echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
             if [[ -n "$tag" ]]; then
-              echo "  🌐 https://github.com/daksha-rc/rc-web/pkgs/container/rc-web"
+              # Extract tag version from full image name
+              TAG_VERSION=$(echo "$tag" | sed 's/.*://')
+              echo "  [$COUNTER] 🏷️  $tag"
+              echo "      └── Version: $TAG_VERSION"
+              echo "      └── Full Image: $tag"
+              echo "      └── Pull Command: docker pull $tag"
+              echo ""
+              COUNTER=$((COUNTER + 1))
             fi
           done
           echo ""
-          echo "================================================"
-          echo "✨ Ready to deploy!"
+          echo "🌐 SUPPORTED PLATFORMS:"
+          echo "  ✅ linux/amd64 (Intel/AMD 64-bit)"
+          echo "  ✅ linux/arm64 (ARM 64-bit / Apple Silicon)"
+          echo ""
+          echo "📋 IMAGE METADATA:"
+          echo "  Labels: ${{ steps.meta.outputs.labels }}"
+          echo ""
+          echo "🔗 REGISTRY AND USAGE LINKS:"
+          echo "  📦 Package Page: https://github.com/daksha-rc/rc-web/pkgs/container/rc-web"
+          echo "  📚 Documentation: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry"
+          echo "  🔧 Usage Examples:"
+          echo ""
+          echo "     # Pull latest image"
+          echo "     docker pull ghcr.io/daksha-rc/rc-web:latest"
+          echo ""
+          echo "     # Pull specific version (if available)"
+          echo "     docker pull ghcr.io/daksha-rc/rc-web:${{ steps.latest_tag.outputs.tag }}"
+          echo ""
+          echo "     # Run container"
+          echo "     docker run -p 8080:8080 ghcr.io/daksha-rc/rc-web:latest"
+          echo ""
+          echo "     # Pull for specific platform"
+          echo "     docker pull --platform linux/amd64 ghcr.io/daksha-rc/rc-web:latest"
+          echo "     docker pull --platform linux/arm64 ghcr.io/daksha-rc/rc-web:latest"
+          echo ""
+          echo "🎯 DEPLOYMENT READY!"
+          echo "  All images have been successfully built and pushed to the registry."
+          echo "  Multi-platform support ensures compatibility across different architectures."
+          echo ""
+          echo "=================================================================="
+          echo "✨ Build completed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=================================================================="
+
+      - name: Create deployment summary
+        if: success()
+        run: |
+          echo "## 🎉 Docker Build Success Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Images Created" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | Version | Platform Support | Pull Command |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|---------|------------------|--------------|" >> $GITHUB_STEP_SUMMARY
+          
+          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              TAG_VERSION=$(echo "$tag" | sed 's/.*://')
+              echo "| \`$tag\` | \`$TAG_VERSION\` | linux/amd64, linux/arm64 | \`docker pull $tag\` |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [📦 Package Registry](https://github.com/daksha-rc/rc-web/pkgs/container/rc-web)" >> $GITHUB_STEP_SUMMARY
+          echo "- [🏗️ Build Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ℹ️ Build Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build ID**: \`${{ steps.build.outputs.imageid }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Digest**: \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry**: GitHub Container Registry (ghcr.io)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Built from**: ${{ github.ref_name }} (\`${{ github.sha }}\`)" >> $GITHUB_STEP_SUMMARY
