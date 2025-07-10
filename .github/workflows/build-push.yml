@@ -46,30 +46,51 @@ jobs:
         # It integrates with the QEMU setup.
         uses: docker/setup-buildx-action@v3
 
-      - name: Install containerd and nerdctl
+      - name: Install and configure containerd and nerdctl
         run: |
+          # Stop any existing containerd
+          sudo systemctl stop containerd || true
+          
+          # Install containerd
           sudo apt-get update
           sudo apt-get install -y containerd.io
 
-          NERDCTL_VERSION="1.7.0" # Check https://github.com/containerd/nerdctl/releases for latest
-          HOST_ARCH=$(dpkg --print-architecture) # Detect runner architecture (should be amd64)
+          # Configure containerd
+          sudo mkdir -p /etc/containerd
+          sudo containerd config default | sudo tee /etc/containerd/config.toml
+
+          # Start containerd service
+          sudo systemctl start containerd
+          sudo systemctl enable containerd
+
+          # Install nerdctl
+          NERDCTL_VERSION="1.7.0"
+          HOST_ARCH=$(dpkg --print-architecture)
           wget https://github.com/containerd/nerdctl/releases/download/v${NERDCTL_VERSION}/nerdctl-${NERDCTL_VERSION}-linux-${HOST_ARCH}.tar.gz
           sudo tar -C /usr/local/bin -xzf nerdctl-${NERDCTL_VERSION}-linux-${HOST_ARCH}.tar.gz
 
-          containerd --version
-          nerdctl --version
+          # Install buildkit for multi-platform builds
+          BUILDKIT_VERSION="0.12.5"
+          wget https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-${HOST_ARCH}.tar.gz
+          sudo tar -C /usr/local -xzf buildkit-v${BUILDKIT_VERSION}.linux-${HOST_ARCH}.tar.gz
+
+          # Start buildkitd
+          sudo /usr/local/bin/buildkitd --root /var/lib/buildkit --addr unix:///run/buildkit/buildkitd.sock &
+          sleep 5 # Give buildkitd time to start
+
+          # Verify installations
+          sudo containerd --version
+          sudo nerdctl --version
+          sudo buildctl --version
 
       - name: Login to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | sudo nerdctl login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Build Multi-Platform Docker Image
         run: |
           GIT_TAG="${{ steps.get_git_tag.outputs.GIT_TAG }}"
-          BUILD_COMMAND="nerdctl build --platform=linux/amd64,linux/arm64"
+          BUILD_COMMAND="sudo nerdctl build --platform=linux/amd64,linux/arm64"
           
           # Always add the latest tag
           BUILD_COMMAND+=" -t ${{ env.IMAGE_REPO }}:latest"
@@ -83,11 +104,11 @@ jobs:
           fi
 
           # Add Dockerfile path and build context
-          BUILD_COMMAND+=" -f rc-web/Dockerfile ." # Make sure your Dockerfile path is correct
+          BUILD_COMMAND+=" -f rc-web/Dockerfile ."
 
           echo "Executing build command:"
           echo "$BUILD_COMMAND"
-          eval "$BUILD_COMMAND" # Use eval to execute the dynamically built command string
+          eval "$BUILD_COMMAND"
 
       - name: Push Multi-Platform Docker Image
         # This step will push the manifest list and the underlying images.
@@ -100,12 +121,12 @@ jobs:
 
           # Always push the latest tag
           echo "Pushing latest multi-platform image: ${{ env.IMAGE_REPO }}:latest"
-          nerdctl push --all-platforms ${{ env.IMAGE_REPO }}:latest
+          sudo nerdctl push --all-platforms ${{ env.IMAGE_REPO }}:latest
 
           # Conditionally push the git tag
           if [ -n "$GIT_TAG" ]; then
               echo "Pushing multi-platform image with Git tag: ${{ env.IMAGE_REPO }}:$GIT_TAG"
-              nerdctl push --all-platforms ${{ env.IMAGE_REPO }}:$GIT_TAG
+              sudo nerdctl push --all-platforms ${{ env.IMAGE_REPO }}:$GIT_TAG
           else
               echo "No Git tag to push."
           fi
