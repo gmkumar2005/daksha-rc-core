@@ -21,8 +21,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  buildandtest:
-    name: cargo
+  test:
+    name: Test
     runs-on: ubuntu-latest
     container:
       image: rust:1.86.0
@@ -55,12 +55,51 @@ jobs:
       - name: Run Tests
         run: cargo test
 
-      - name: Install cross-compilation targets
-        run: |
-          rustup target add x86_64-unknown-linux-gnu
-          rustup target add aarch64-unknown-linux-gnu
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    needs: test
+    container:
+      image: rust:1.86.0
 
-      - name: Enable ARM64 architecture and install dependencies
+    strategy:
+      matrix:
+        include:
+          - platform: amd64
+            target: x86_64-unknown-linux-gnu
+            artifact-name: rust-binary-amd64
+          - platform: arm64
+            target: aarch64-unknown-linux-gnu
+            artifact-name: rust-binary-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup caching
+        uses: actions/cache@v4
+        if: ${{ env.ACT != 'true' }}
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.target }}-
+            ${{ runner.os }}-cargo-
+
+      - name: Manual cache setup for local run
+        if: ${{ env.ACT == 'true' }}
+        run: |
+          echo "Running locally with act, manually setting up cache..."
+          mkdir -p ~/.cargo/registry ~/.cargo/git target
+
+      - name: Install cross-compilation target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Setup ARM64 cross-compilation
+        if: matrix.platform == 'arm64'
         run: |
           dpkg --add-architecture arm64
           apt-get update
@@ -71,7 +110,8 @@ jobs:
             libpq-dev:arm64 \
             pkg-config
 
-      - name: Configure cross-compilation environment
+      - name: Configure ARM64 cross-compilation environment
+        if: matrix.platform == 'arm64'
         run: |
           echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
           echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++" >> $GITHUB_ENV
@@ -83,30 +123,20 @@ jobs:
           echo "OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu" >> $GITHUB_ENV
           echo "OPENSSL_INCLUDE_DIR=/usr/include/openssl" >> $GITHUB_ENV
 
-      - name: Build Release Binary - AMD64
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+      - name: Build Release Binary
+        run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Build Release Binary - ARM64
-        run: cargo build --release --target aarch64-unknown-linux-gnu
-
-      - name: Upload AMD64 build artifacts
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: rust-binary-amd64
-          path: target/x86_64-unknown-linux-gnu/release/rc-web
-          retention-days: 1
-
-      - name: Upload ARM64 build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: rust-binary-arm64
-          path: target/aarch64-unknown-linux-gnu/release/rc-web
+          name: ${{ matrix.artifact-name }}
+          path: target/${{ matrix.target }}/release/rc-web
           retention-days: 1
 
   docker-build:
     name: Build Docker Image
     runs-on: ubuntu-latest
-    needs: buildandtest
+    needs: build
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/53_caching') || startsWith(github.ref, 'refs/tags/')
 
     steps:
@@ -160,7 +190,6 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version != '' }}
             type=raw,value=${{ steps.latest_tag.outputs.tag }},enable=${{ github.event_name == 'push' }}
- 
 
       - name: Build and push Docker image
         id: build

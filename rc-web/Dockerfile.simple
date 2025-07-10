@@ -1,5 +1,5 @@
 # Dockerfile.simple
-FROM rust:1.86.0-slim as runtime
+FROM rust:1.86.0-slim AS runtime
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
