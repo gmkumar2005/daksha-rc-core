@@ -241,3 +241,8 @@ nerdctl build  -t ghcr.io/daksha-rc/rc-web:latest -f rc-web/Dockerfile .
 nerdctl push --all-platforms ghcr.io/daksha-rc/rc-web:latest
 
 ```
+
+```shell
+
+echo $(cat /Users/mallru/.ssh/PUSH_PKG_TO_RC_ORG.token) | nerdctl login ghcr.io -u gmkumar2005 --password-stdin
+```

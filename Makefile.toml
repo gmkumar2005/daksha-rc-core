@@ -90,3 +90,161 @@ else
     nerdctl push --all-platforms ghcr.io/daksha-rc/rc-web:latest
 fi
 '''
+
+[tasks.build-chef-base]
+description = "build-chef-base: Build and push cargo-chef base image with system dependencies"
+category = "Docker"
+script_runner = "bash"
+script = '''
+#!/bin/bash
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Get version from Cargo.toml or use timestamp
+VERSION=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/' | head -1)
+if [ -z "$VERSION" ]; then
+    VERSION=$(date +%Y%m%d%H%M%S)
+fi
+
+REGISTRY_URL="ghcr.io/daksha-rc"
+IMAGE_NAME="cargo-chef-base"
+DOCKERFILE="Dockerfile.chef"
+
+# Build tags
+LATEST_TAG="${REGISTRY_URL}/${IMAGE_NAME}:latest"
+VERSION_TAG="${REGISTRY_URL}/${IMAGE_NAME}:${VERSION}"
+RUST_VERSION_TAG="${REGISTRY_URL}/${IMAGE_NAME}:rust-1.86.0"
+
+echo -e "${YELLOW}Building cargo-chef base image...${NC}"
+echo "Version: ${VERSION}"
+echo "Tags: ${LATEST_TAG}, ${VERSION_TAG}, ${RUST_VERSION_TAG}"
+
+# Build with multiple tags
+echo -e "${YELLOW}Building image...${NC}"
+nerdctl build \
+    -t "${LATEST_TAG}" \
+    -t "${VERSION_TAG}" \
+    -t "${RUST_VERSION_TAG}" \
+    -f "${DOCKERFILE}" \
+    .
+
+echo -e "${YELLOW}Pushing images...${NC}"
+
+# Push all tags
+echo -e "${YELLOW}Pushing ${LATEST_TAG}...${NC}"
+nerdctl push "${LATEST_TAG}"
+
+echo -e "${YELLOW}Pushing ${VERSION_TAG}...${NC}"
+nerdctl push "${VERSION_TAG}"
+
+echo -e "${YELLOW}Pushing ${RUST_VERSION_TAG}...${NC}"
+nerdctl push "${RUST_VERSION_TAG}"
+
+echo -e "${GREEN}✅ Successfully built and pushed cargo-chef base image${NC}"
+echo -e "${GREEN}   Latest: ${LATEST_TAG}${NC}"
+echo -e "${GREEN}   Version: ${VERSION_TAG}${NC}"
+echo -e "${GREEN}   Rust: ${RUST_VERSION_TAG}${NC}"
+'''
+
+[tasks.build-chef-base-local]
+description = "build-chef-base-local: Build cargo-chef base image locally (no push)"
+category = "Docker"
+script_runner = "bash"
+script = '''
+#!/bin/bash
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Get version from Cargo.toml or use timestamp
+VERSION=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/' | head -1)
+if [ -z "$VERSION" ]; then
+    VERSION=$(date +%Y%m%d%H%M%S)
+fi
+
+REGISTRY_URL="ghcr.io/daksha-rc"
+IMAGE_NAME="cargo-chef-base"
+DOCKERFILE="Dockerfile.chef"
+
+# Build tags
+LATEST_TAG="${REGISTRY_URL}/${IMAGE_NAME}:latest"
+VERSION_TAG="${REGISTRY_URL}/${IMAGE_NAME}:${VERSION}"
+RUST_VERSION_TAG="${REGISTRY_URL}/${IMAGE_NAME}:rust-1.86.0"
+LOCAL_TAG="${IMAGE_NAME}:latest"
+
+echo -e "${YELLOW}Building cargo-chef base image locally...${NC}"
+echo "Version: ${VERSION}"
+echo "Tags: ${LATEST_TAG}, ${VERSION_TAG}, ${RUST_VERSION_TAG}, ${LOCAL_TAG}"
+
+# Build with multiple tags including local tag
+echo -e "${YELLOW}Building image...${NC}"
+nerdctl build \
+    -t "${LATEST_TAG}" \
+    -t "${VERSION_TAG}" \
+    -t "${RUST_VERSION_TAG}" \
+    -t "${LOCAL_TAG}" \
+    -f "${DOCKERFILE}" \
+    .
+
+echo -e "${GREEN}✅ Successfully built cargo-chef base image locally${NC}"
+echo -e "${GREEN}   Latest: ${LATEST_TAG}${NC}"
+echo -e "${GREEN}   Version: ${VERSION_TAG}${NC}"
+echo -e "${GREEN}   Rust: ${RUST_VERSION_TAG}${NC}"
+echo -e "${GREEN}   Local: ${LOCAL_TAG}${NC}"
+echo -e "${YELLOW}ℹ️  Use 'cargo make build-chef-base' to build and push to registry${NC}"
+'''
+
+[tasks.inspect-chef-base]
+description = "inspect-chef-base: inspect the cargo-chef base image"
+category = "Docker"
+script_runner = "bash"
+script = '''
+#!/bin/bash
+
+# Configuration
+REGISTRY="ghcr.io"
+NAMESPACE="daksha-rc"
+IMAGE_NAME="cargo-chef-base"
+FULL_IMAGE_NAME="${REGISTRY}/${NAMESPACE}/${IMAGE_NAME}"
+
+# Colors for output
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+echo -e "${YELLOW}Inspecting cargo-chef base image...${NC}"
+
+# Check if image exists locally
+if nerdctl images | grep -q "${FULL_IMAGE_NAME}"; then
+    echo -e "${GREEN}✅ Image found locally${NC}"
+
+    # Show image details
+    echo -e "${YELLOW}Image details:${NC}"
+    nerdctl images | grep "${FULL_IMAGE_NAME}" | head -5
+
+    # Show image history
+    echo -e "${YELLOW}Image layers:${NC}"
+    nerdctl history "${FULL_IMAGE_NAME}:latest" 2>/dev/null || \
+    nerdctl history "${FULL_IMAGE_NAME}:local" 2>/dev/null || \
+    echo "No image found with :latest or :local tag"
+
+    # Show image info
+    echo -e "${YELLOW}Image info:${NC}"
+    nerdctl inspect "${FULL_IMAGE_NAME}:latest" 2>/dev/null | \
+    jq -r '.[] | {Id: .Id, Created: .Created, Size: .Size, Architecture: .Architecture, Os: .Os}' 2>/dev/null || \
+    nerdctl inspect "${FULL_IMAGE_NAME}:local" 2>/dev/null | \
+    jq -r '.[] | {Id: .Id, Created: .Created, Size: .Size, Architecture: .Architecture, Os: .Os}' 2>/dev/null || \
+    echo "Unable to inspect image (jq might not be installed)"
+else
+    echo "Image not found locally. Try running: cargo make build-chef-base-local"
+fi
+'''
