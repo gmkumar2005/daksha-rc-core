@@ -217,7 +217,7 @@ jobs:
           echo "Branch/Ref: ${{ github.ref }}"
           echo "Branch name: ${{ github.ref_name }}"
           echo "Default branch: ${{ github.event.repository.default_branch }}"
-          echo "Is default branch: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}"
+          echo "Is default branch: ${{ github.ref_name == github.event.repository.default_branch }}"
           echo "Is main branch: ${{ github.ref == 'refs/heads/main' }}"
 
       - name: Extract metadata and generate tags
@@ -229,7 +229,7 @@ jobs:
             type=ref,event=pr
             type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref_name == github.event.repository.default_branch }}
             type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version != '' }}
             type=raw,value=${{ steps.latest_tag.outputs.tag }},enable=${{ github.event_name == 'push' && steps.latest_tag.outputs.tag != '0.0.0' }}
 
@@ -247,13 +247,15 @@ jobs:
           # Get base tags from metadata
           BASE_TAGS="${{ steps.meta.outputs.tags }}"
           
-          # Ensure latest tag is always included for main branch pushes
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] && [[ "${{ github.event_name }}" == "push" ]]; then
+          # Ensure latest tag is always included for default branch pushes
+          if [[ "${{ github.ref_name }}" == "${{ github.event.repository.default_branch }}" ]] && [[ "${{ github.event_name }}" == "push" ]]; then
             LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-            if [[ "$BASE_TAGS" != *"$LATEST_TAG"* ]]; then
-              echo "Adding missing latest tag for main branch"
+            # Use grep for an exact match to avoid partial matches, e.g. "latest-beta"
+            if ! echo "${BASE_TAGS}" | grep -qxF "$LATEST_TAG"; then
+              echo "Adding missing latest tag for default branch push"
               if [[ -n "$BASE_TAGS" ]]; then
-                BASE_TAGS="$BASE_TAGS,$LATEST_TAG"
+                # Append with a newline for the while-read loop below
+                BASE_TAGS=$(printf '%s\n%s' "$BASE_TAGS" "$LATEST_TAG")
               else
                 BASE_TAGS="$LATEST_TAG"
               fi
@@ -268,23 +270,23 @@ jobs:
           echo "Processing base tags: $BASE_TAGS"
           while IFS= read -r tag; do
             if [[ -n "$tag" ]]; then
-              VERSION=$(echo "$tag" | sed 's/.*://')
-              BASE_IMAGE=$(echo "$tag" | sed 's/:.*//')
-          
-              # Multi-platform tag (original)
+              # The input from the 'meta' action is newline-separated.
+              # Convert to comma-separated for the build-push action.
               if [[ -n "$MULTI_PLATFORM_TAGS" ]]; then
                 MULTI_PLATFORM_TAGS="${MULTI_PLATFORM_TAGS},$tag"
               else
                 MULTI_PLATFORM_TAGS="$tag"
               fi
           
-              # Platform-specific tags
+              # Create platform-specific tags
+              VERSION=$(echo "$tag" | sed 's/.*://')
+              BASE_IMAGE=$(echo "$tag" | sed 's/:.*//')
               AMD64_TAG="${BASE_IMAGE}:${VERSION}-amd64"
               ARM64_TAG="${BASE_IMAGE}:${VERSION}-arm64"
           
               if [[ -n "$AMD64_TAGS" ]]; then
-                AMD64_TAGS="${AMD64_TAGS},$AMD64_TAG"
-                ARM64_TAGS="${ARM64_TAGS},$ARM64_TAG"
+                AMD64_TAGS="${AMD64_TAGS},${AMD64_TAG}"
+                ARM64_TAGS="${ARM64_TAGS},${ARM64_TAG}"
               else
                 AMD64_TAGS="$AMD64_TAG"
                 ARM64_TAGS="$ARM64_TAG"
@@ -296,8 +298,14 @@ jobs:
             fi
           done <<< "$BASE_TAGS"
           
-          # Combine all tags
-          ALL_TAGS="$MULTI_PLATFORM_TAGS,$AMD64_TAGS,$ARM64_TAGS"
+          # Combine all tags for the final push
+          ALL_TAGS="$MULTI_PLATFORM_TAGS"
+          if [[ -n "$AMD64_TAGS" ]]; then
+            ALL_TAGS="$ALL_TAGS,$AMD64_TAGS"
+          fi
+          if [[ -n "$ARM64_TAGS" ]]; then
+            ALL_TAGS="$ALL_TAGS,$ARM64_TAGS"
+          fi
           
           # Store outputs
           echo "multi-platform-tags=$MULTI_PLATFORM_TAGS" >> $GITHUB_OUTPUT
@@ -408,44 +416,7 @@ jobs:
               VERSION=$(echo "$tag" | sed 's/.*://')
               TYPE="Multi-platform"
               [[ "$VERSION" == "latest" ]] && TYPE="$TYPE (Latest)"
-              [[ "$VERSION" == "${{ steps.latest_tag.outputs.tag }}" ]] && TYPE="$TYPE ⭐"
-              echo "| \`$tag\` | $TYPE | linux/amd64, linux/arm64 | \`docker pull $tag\` |" >> $GITHUB_STEP_SUMMARY
+              PULL_CMD="`docker pull $tag`"
+              echo "| **$VERSION** | $TYPE | `linux/amd64`, `linux/arm64` | $PULL_CMD |" >> $GITHUB_STEP_SUMMARY
             fi
           done
-          
-          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
-          
-          ### 🔧 Platform-Specific Images
-          | Tag | Platform | Pull Command |
-          |-----|----------|--------------|
-          EOF
-          
-          # Add platform-specific tags
-          echo "${{ steps.all_tags.outputs.amd64-tags }}" | tr ',' '\n' | while IFS= read -r tag; do
-            if [[ -n "$tag" ]]; then
-              echo "| \`$tag\` | linux/amd64 | \`docker pull $tag\` |" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
-          
-          echo "${{ steps.all_tags.outputs.arm64-tags }}" | tr ',' '\n' | while IFS= read -r tag; do
-            if [[ -n "$tag" ]]; then
-              echo "| \`$tag\` | linux/arm64 | \`docker pull $tag\` |" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
-          
-          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
-          
-          ### 🚀 Quick Start
-          ```bash
-          # Pull and run latest version
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          docker run -p 8080:8080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          
-          # Pull specific version
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.latest_tag.outputs.tag }}
-          ```
-          
-          ### 🔗 Links
-          - [📦 Package Registry](https://github.com/${{ env.IMAGE_NAME }}/pkgs/container/rc-web)
-          - [🏗️ Build Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          EOF
