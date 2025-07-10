@@ -211,6 +211,15 @@ jobs:
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "Latest git tag: ${TAG}"
 
+      - name: Debug branch and event information
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Branch/Ref: ${{ github.ref }}"
+          echo "Branch name: ${{ github.ref_name }}"
+          echo "Default branch: ${{ github.event.repository.default_branch }}"
+          echo "Is default branch: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}"
+          echo "Is main branch: ${{ github.ref == 'refs/heads/main' }}"
+
       - name: Extract metadata and generate tags
         id: meta
         uses: docker/metadata-action@v5
@@ -220,9 +229,17 @@ jobs:
             type=ref,event=pr
             type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version != '' }}
             type=raw,value=${{ steps.latest_tag.outputs.tag }},enable=${{ github.event_name == 'push' && steps.latest_tag.outputs.tag != '0.0.0' }}
+
+      - name: Debug metadata output
+        run: |
+          echo "Generated tags from metadata:"
+          echo "${{ steps.meta.outputs.tags }}"
+          echo ""
+          echo "Generated labels:"
+          echo "${{ steps.meta.outputs.labels }}"
 
       - name: Generate all tags (multi-platform + platform-specific)
         id: all_tags
@@ -230,12 +247,25 @@ jobs:
           # Get base tags from metadata
           BASE_TAGS="${{ steps.meta.outputs.tags }}"
           
+          # Ensure latest tag is always included for main branch pushes
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] && [[ "${{ github.event_name }}" == "push" ]]; then
+            LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            if [[ "$BASE_TAGS" != *"$LATEST_TAG"* ]]; then
+              echo "Adding missing latest tag for main branch"
+              if [[ -n "$BASE_TAGS" ]]; then
+                BASE_TAGS="$BASE_TAGS,$LATEST_TAG"
+              else
+                BASE_TAGS="$LATEST_TAG"
+              fi
+            fi
+          fi
+          
           # Generate platform-specific tags
           AMD64_TAGS=""
           ARM64_TAGS=""
           MULTI_PLATFORM_TAGS=""
           
-          echo "Generating tags..."
+          echo "Processing base tags: $BASE_TAGS"
           while IFS= read -r tag; do
             if [[ -n "$tag" ]]; then
               VERSION=$(echo "$tag" | sed 's/.*://')
@@ -275,10 +305,12 @@ jobs:
           echo "arm64-tags=$ARM64_TAGS" >> $GITHUB_OUTPUT
           echo "all-tags=$ALL_TAGS" >> $GITHUB_OUTPUT
           
-          echo "Summary:"
+          echo ""
+          echo "Final tag summary:"
           echo "  Multi-platform tags: $MULTI_PLATFORM_TAGS"
           echo "  AMD64 tags: $AMD64_TAGS"
           echo "  ARM64 tags: $ARM64_TAGS"
+          echo "  All tags: $ALL_TAGS"
 
       - name: Build and push Docker images
         id: build
