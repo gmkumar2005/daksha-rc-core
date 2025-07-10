@@ -140,26 +140,72 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.PUSH_PKG_TO_RC_ORG }}
 
+      - name: Get latest git tag
+        id: latest_tag
+        run: |
+          # Get the latest tag, fallback to a default if no tags exist
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Latest git tag: ${TAG}"
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/daksha-rc/rc-web
           tags: |
-            type=ref,event=branch
             type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version != '' }}
+            type=raw,value=${{ steps.latest_tag.outputs.tag }},enable=${{ github.event_name == 'push' }}
+ 
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        id: build
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./rc-web/Dockerfile.simple
+          file: ./Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=Multi-platform Rust web application
+
+      - name: Success Notification
+        if: success()
+        run: |
+          echo "🎉 Docker Build and Push Successful!"
+          echo "================================================"
+          echo "📦 IMAGES PUSHED:"
+          echo "Repository: ghcr.io/daksha-rc/rc-web"
+          echo ""
+          echo "🏷️  TAGS:"
+          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              echo "  ✅ $tag"
+            fi
+          done
+          echo ""
+          echo "🏗️  PLATFORMS:"
+          echo "  ✅ linux/amd64"
+          echo "  ✅ linux/arm64"
+          echo ""
+          echo "📋 BUILD DETAILS:"
+          echo "  Build ID: ${{ steps.build.outputs.imageid }}"
+          echo "  Digest: ${{ steps.build.outputs.digest }}"
+          echo "  Metadata: ${{ steps.build.outputs.metadata }}"
+          echo ""
+          echo "🔗 REGISTRY URLS:"
+          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              echo "  🌐 https://github.com/daksha-rc/rc-web/pkgs/container/rc-web"
+            fi
+          done
+          echo ""
+          echo "================================================"
+          echo "✨ Ready to deploy!"
