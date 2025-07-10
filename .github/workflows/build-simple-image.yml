@@ -191,14 +191,74 @@ jobs:
             type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version != '' }}
             type=raw,value=${{ steps.latest_tag.outputs.tag }},enable=${{ github.event_name == 'push' }}
 
-      - name: Build and push Docker image
+      - name: Generate platform-specific tags
+        id: platform_tags
+        run: |
+          # Get all tags from metadata
+          TAGS="${{ steps.meta.outputs.tags }}"
+          
+          # Initialize arrays for platform-specific tags
+          AMD64_TAGS=""
+          ARM64_TAGS=""
+          ALL_PLATFORM_TAGS=""
+          
+          # Process each tag and create platform-specific variants
+          echo "Processing tags to create platform-specific versions..."
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              # Extract version from tag (everything after the last colon)
+              VERSION=$(echo "$tag" | sed 's/.*://')
+              BASE_IMAGE=$(echo "$tag" | sed 's/:.*//')
+          
+              # Create platform-specific tags
+              AMD64_TAG="${BASE_IMAGE}:${VERSION}-amd64"
+              ARM64_TAG="${BASE_IMAGE}:${VERSION}-arm64"
+          
+              # Add to arrays
+              if [[ -n "$AMD64_TAGS" ]]; then
+                AMD64_TAGS="${AMD64_TAGS},$AMD64_TAG"
+              else
+                AMD64_TAGS="$AMD64_TAG"
+              fi
+          
+              if [[ -n "$ARM64_TAGS" ]]; then
+                ARM64_TAGS="${ARM64_TAGS},$ARM64_TAG"
+              else
+                ARM64_TAGS="$ARM64_TAG"
+              fi
+          
+              if [[ -n "$ALL_PLATFORM_TAGS" ]]; then
+                ALL_PLATFORM_TAGS="${ALL_PLATFORM_TAGS},$AMD64_TAG,$ARM64_TAG"
+              else
+                ALL_PLATFORM_TAGS="$AMD64_TAG,$ARM64_TAG"
+              fi
+          
+              echo "  Original: $tag"
+              echo "  AMD64: $AMD64_TAG"
+              echo "  ARM64: $ARM64_TAG"
+            fi
+          done <<< "$TAGS"
+          
+          # Combine original tags with platform-specific tags
+          COMBINED_TAGS="$TAGS,$ALL_PLATFORM_TAGS"
+          
+          echo "amd64-tags=$AMD64_TAGS" >> $GITHUB_OUTPUT
+          echo "arm64-tags=$ARM64_TAGS" >> $GITHUB_OUTPUT
+          echo "all-tags=$COMBINED_TAGS" >> $GITHUB_OUTPUT
+          
+          echo "Generated platform-specific tags:"
+          echo "AMD64 tags: $AMD64_TAGS"
+          echo "ARM64 tags: $ARM64_TAGS"
+          echo "All tags: $COMBINED_TAGS"
+
+      - name: Build and push multi-platform Docker image
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./rc-web/Dockerfile.simple
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.platform_tags.outputs.all-tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
@@ -216,32 +276,78 @@ jobs:
           echo "  Registry: GitHub Container Registry (ghcr.io)"
           echo "  Namespace: daksha-rc"
           echo "  Image Name: rc-web"
+          echo "  Latest Git Tag: ${{ steps.latest_tag.outputs.tag }}"
           echo ""
           echo "🏗️  BUILD INFORMATION:"
           echo "  Build ID: ${{ steps.build.outputs.imageid }}"
           echo "  Digest: ${{ steps.build.outputs.digest }}"
           echo "  Build Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "  Built From: ${{ github.ref_name }} (${{ github.sha }})"
+          echo "  Latest Tag Found: ${{ steps.latest_tag.outputs.tag }}"
           echo "  Workflow: ${{ github.workflow }}"
           echo "  Run ID: ${{ github.run_id }}"
           echo "  Run Number: ${{ github.run_number }}"
           echo ""
           echo "🏷️  TAGS AND VERSIONS CREATED:"
-          echo "  Total Tags: $(echo '${{ steps.meta.outputs.tags }}' | wc -l)"
+          
+          # Count total tags
+          TOTAL_TAGS=$(echo "${{ steps.platform_tags.outputs.all-tags }}" | tr ',' '\n' | wc -l)
+          echo "  Total Tags: $TOTAL_TAGS"
+          echo "  Source Tag: ${{ steps.latest_tag.outputs.tag }}"
           echo ""
+          
+          # Display multi-platform tags
+          echo "🌐 MULTI-PLATFORM TAGS:"
           COUNTER=1
           echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
             if [[ -n "$tag" ]]; then
-              # Extract tag version from full image name
               TAG_VERSION=$(echo "$tag" | sed 's/.*://')
-              echo "  [$COUNTER] 🏷️  $tag"
+          
+              if [[ "$TAG_VERSION" == "${{ steps.latest_tag.outputs.tag }}" ]]; then
+                echo "  [$COUNTER] 🏷️  $tag ⭐ (Latest Git Tag)"
+              else
+                echo "  [$COUNTER] 🏷️  $tag"
+              fi
+          
               echo "      └── Version: $TAG_VERSION"
-              echo "      └── Full Image: $tag"
+              echo "      └── Platforms: linux/amd64, linux/arm64"
               echo "      └── Pull Command: docker pull $tag"
               echo ""
               COUNTER=$((COUNTER + 1))
             fi
           done
+          
+          # Display platform-specific tags
+          echo "🔧 PLATFORM-SPECIFIC TAGS:"
+          echo ""
+          echo "  AMD64 Tags:"
+          COUNTER=1
+          echo "${{ steps.platform_tags.outputs.amd64-tags }}" | tr ',' '\n' | while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              TAG_VERSION=$(echo "$tag" | sed 's/.*://')
+              echo "    [$COUNTER] 🏷️  $tag"
+              echo "        └── Version: $TAG_VERSION"
+              echo "        └── Platform: linux/amd64 only"
+              echo "        └── Pull Command: docker pull $tag"
+              echo ""
+              COUNTER=$((COUNTER + 1))
+            fi
+          done
+          
+          echo "  ARM64 Tags:"
+          COUNTER=1
+          echo "${{ steps.platform_tags.outputs.arm64-tags }}" | tr ',' '\n' | while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              TAG_VERSION=$(echo "$tag" | sed 's/.*://')
+              echo "    [$COUNTER] 🏷️  $tag"
+              echo "        └── Version: $TAG_VERSION"
+              echo "        └── Platform: linux/arm64 only"
+              echo "        └── Pull Command: docker pull $tag"
+              echo ""
+              COUNTER=$((COUNTER + 1))
+            fi
+          done
+          
           echo ""
           echo "🌐 SUPPORTED PLATFORMS:"
           echo "  ✅ linux/amd64 (Intel/AMD 64-bit)"
@@ -255,22 +361,28 @@ jobs:
           echo "  📚 Documentation: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry"
           echo "  🔧 Usage Examples:"
           echo ""
-          echo "     # Pull latest image"
+          echo "     # Pull latest multi-platform image"
           echo "     docker pull ghcr.io/daksha-rc/rc-web:latest"
           echo ""
-          echo "     # Pull specific version (if available)"
+          echo "     # Pull specific version (latest git tag: ${{ steps.latest_tag.outputs.tag }})"
           echo "     docker pull ghcr.io/daksha-rc/rc-web:${{ steps.latest_tag.outputs.tag }}"
+          echo ""
+          echo "     # Pull platform-specific images"
+          echo "     docker pull ghcr.io/daksha-rc/rc-web:${{ steps.latest_tag.outputs.tag }}-amd64"
+          echo "     docker pull ghcr.io/daksha-rc/rc-web:${{ steps.latest_tag.outputs.tag }}-arm64"
           echo ""
           echo "     # Run container"
           echo "     docker run -p 8080:8080 ghcr.io/daksha-rc/rc-web:latest"
           echo ""
-          echo "     # Pull for specific platform"
+          echo "     # Pull for specific platform (alternative method)"
           echo "     docker pull --platform linux/amd64 ghcr.io/daksha-rc/rc-web:latest"
           echo "     docker pull --platform linux/arm64 ghcr.io/daksha-rc/rc-web:latest"
           echo ""
           echo "🎯 DEPLOYMENT READY!"
           echo "  All images have been successfully built and pushed to the registry."
           echo "  Multi-platform support ensures compatibility across different architectures."
+          echo "  Platform-specific tags available for targeted deployments."
+          echo "  Latest version available: ${{ steps.latest_tag.outputs.tag }}"
           echo ""
           echo "=================================================================="
           echo "✨ Build completed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
@@ -281,14 +393,48 @@ jobs:
         run: |
           echo "## 🎉 Docker Build Success Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Images Created" >> $GITHUB_STEP_SUMMARY
-          echo "| Tag | Version | Platform Support | Pull Command |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|---------|------------------|--------------|" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Build Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Latest Git Tag**: \`${{ steps.latest_tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build ID**: \`${{ steps.build.outputs.imageid }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Digest**: \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry**: GitHub Container Registry (ghcr.io)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Built from**: ${{ github.ref_name }} (\`${{ github.sha }}\`)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Multi-Platform Images" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | Version | Latest Tag | Platform Support | Pull Command |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|---------|------------|------------------|--------------|" >> $GITHUB_STEP_SUMMARY
           
           echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
             if [[ -n "$tag" ]]; then
               TAG_VERSION=$(echo "$tag" | sed 's/.*://')
-              echo "| \`$tag\` | \`$TAG_VERSION\` | linux/amd64, linux/arm64 | \`docker pull $tag\` |" >> $GITHUB_STEP_SUMMARY
+              if [[ "$TAG_VERSION" == "${{ steps.latest_tag.outputs.tag }}" ]]; then
+                LATEST_INDICATOR="⭐ Yes"
+              else
+                LATEST_INDICATOR="No"
+              fi
+              echo "| \`$tag\` | \`$TAG_VERSION\` | $LATEST_INDICATOR | linux/amd64, linux/arm64 | \`docker pull $tag\` |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Platform-Specific Images" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | Version | Platform | Pull Command |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|---------|----------|--------------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Add AMD64 platform-specific tags
+          echo "${{ steps.platform_tags.outputs.amd64-tags }}" | tr ',' '\n' | while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              TAG_VERSION=$(echo "$tag" | sed 's/.*://')
+              echo "| \`$tag\` | \`$TAG_VERSION\` | linux/amd64 | \`docker pull $tag\` |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          # Add ARM64 platform-specific tags
+          echo "${{ steps.platform_tags.outputs.arm64-tags }}" | tr ',' '\n' | while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              TAG_VERSION=$(echo "$tag" | sed 's/.*://')
+              echo "| \`$tag\` | \`$TAG_VERSION\` | linux/arm64 | \`docker pull $tag\` |" >> $GITHUB_STEP_SUMMARY
             fi
           done
           
@@ -297,9 +443,15 @@ jobs:
           echo "- [📦 Package Registry](https://github.com/daksha-rc/rc-web/pkgs/container/rc-web)" >> $GITHUB_STEP_SUMMARY
           echo "- [🏗️ Build Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ℹ️ Build Information" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build ID**: \`${{ steps.build.outputs.imageid }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Digest**: \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
-          echo "- **Registry**: GitHub Container Registry (ghcr.io)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Built from**: ${{ github.ref_name }} (\`${{ github.sha }}\`)" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Quick Start" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Pull latest multi-platform version" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ghcr.io/daksha-rc/rc-web:${{ steps.latest_tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Pull platform-specific versions" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ghcr.io/daksha-rc/rc-web:${{ steps.latest_tag.outputs.tag }}-amd64" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ghcr.io/daksha-rc/rc-web:${{ steps.latest_tag.outputs.tag }}-arm64" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Run container" >> $GITHUB_STEP_SUMMARY
+          echo "docker run -p 8080:8080 ghcr.io/daksha-rc/rc-web:${{ steps.latest_tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
