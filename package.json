@@ -1,0 +1,21 @@
+{
+  "name": "daksha-rc-core",
+  "version": "1.0.0",
+  "description": "Rust web application with automated semantic versioning",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/daksha-rc/daksha-rc-core.git"
+  },
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "semantic-release": "semantic-release",
+    "semantic-release:dry-run": "semantic-release --dry-run"
+  },
+  "devDependencies": {
+    "semantic-release": "^23.0.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^9.2.6"
+  }
+}
