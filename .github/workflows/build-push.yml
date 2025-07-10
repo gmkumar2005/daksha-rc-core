@@ -1,4 +1,4 @@
-name: Multi-platform Rust Build
+name: Single Job Multi-Platform Build & Push (Two Commands)
 
 on:
   push:
@@ -18,197 +18,94 @@ on:
         default: 'latest'
 
 env:
-  # --- Configuration Variables ---
-  REGISTRY: ghcr.io
-  IMAGE_NAME: daksha-rc/rc-web
-  # ---
+  IMAGE_REPO: ghcr.io/daksha-rc/rc-web # Your image repository prefix
 
 jobs:
-  # Matrix build for individual platform images
-  build-platform-images:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
+  build-and-push-multi-platform:
+    runs-on: ubuntu-latest # Single Linux runner for both architectures
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Get current Git tag
+        id: get_git_tag
+        run: |
+          # Get the current git tag
+          GIT_TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
+          echo "GIT_TAG=$GIT_TAG" >> $GITHUB_OUTPUT # Make GIT_TAG available to subsequent steps
+
       - name: Set up QEMU for multi-platform builds
+        # This is essential to enable building ARM64 on an x86_64 Linux runner
         uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
 
       - name: Set up Docker Buildx
+        # This configures BuildKit, which nerdctl leverages for multi-platform builds.
+        # It integrates with the QEMU setup.
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
+      - name: Install containerd and nerdctl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y containerd.io
+
+          NERDCTL_VERSION="1.7.0" # Check https://github.com/containerd/nerdctl/releases for latest
+          HOST_ARCH=$(dpkg --print-architecture) # Detect runner architecture (should be amd64)
+          wget https://github.com/containerd/nerdctl/releases/download/v${NERDCTL_VERSION}/nerdctl-${NERDCTL_VERSION}-linux-${HOST_ARCH}.tar.gz
+          sudo tar C/usr/local/bin -xzf nerdctl-${NERDCTL_VERSION}-linux-${HOST_ARCH}.tar.gz
+
+          containerd --version
+          nerdctl --version
+
+      - name: Login to Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.PUSH_PKG_TO_RC_ORG }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker image
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,format=long
-            type=raw,value=latest
-            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'latest' }}
-
-      - name: Build and Push Platform-Specific Image
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./rc-web/Dockerfile
-          platforms: ${{ matrix.platform }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Platform-specific caching
-          cache-from: |
-            type=gha,scope=${{ github.workflow }}-${{ github.ref_name }}-${{ matrix.platform }}
-          cache-to: |
-            type=gha,mode=max,scope=${{ github.workflow }}-${{ github.ref_name }}-${{ matrix.platform }}
-          # Add platform suffix to distinguish images
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
-
-      - name: Export digest
+      - name: Build Multi-Platform Docker Image
         run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: digests-${{ strategy.job-index }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
-
-  # Create and push multi-platform manifest
-  create-manifest:
-    runs-on: ubuntu-latest
-    needs: build-platform-images
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-
-    steps:
-      - name: Download digests
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          pattern: digests-*
-          merge-multiple: true
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.PUSH_PKG_TO_RC_ORG }}
-
-      - name: Extract metadata (tags, labels) for Docker image
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,format=long
-            type=raw,value=latest
-            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'latest' }}
-
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
-
-      - name: Inspect image
-        run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
-
-  # Optional: Create individual platform tags for debugging
-  create-platform-tags:
-    runs-on: ubuntu-latest
-    needs: build-platform-images
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
-
-    steps:
-      - name: Download digests
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          pattern: digests-*
-          merge-multiple: true
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.PUSH_PKG_TO_RC_ORG }}
-
-      - name: Extract metadata for platform-specific tags
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=schedule,suffix=-${{ matrix.platform }}
-            type=ref,event=branch,suffix=-${{ matrix.platform }}
-            type=ref,event=pr,suffix=-${{ matrix.platform }}
-            type=semver,pattern={{version}},suffix=-${{ matrix.platform }}
-            type=sha,format=long,suffix=-${{ matrix.platform }}
-            type=raw,value=latest-${{ matrix.platform }}
-          flavor: |
-            suffix=-${{ matrix.platform }},onlatest=true
-
-      - name: Create platform-specific tags
-        working-directory: /tmp/digests
-        run: |
-          # Get the digest for this platform
-          PLATFORM_DIGEST=$(ls | head -1)
+          GIT_TAG="${{ steps.get_git_tag.outputs.GIT_TAG }}"
+          BUILD_COMMAND="nerdctl build --platform=linux/amd64,linux/arm64"
           
-          # Create platform-specific tags
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:${PLATFORM_DIGEST}
+          # Always add the latest tag
+          BUILD_COMMAND+=" -t ${{ env.IMAGE_REPO }}:latest"
+
+          # Add git tag if available
+          if [ -n "$GIT_TAG" ]; then
+              echo "Git tag found: $GIT_TAG. Adding tag to build command."
+              BUILD_COMMAND+=" -t ${{ env.IMAGE_REPO }}:$GIT_TAG"
+          else
+              echo "No git tag found."
+          fi
+
+          # Add Dockerfile path and build context
+          BUILD_COMMAND+=" -f rc-web/Dockerfile ." # Make sure your Dockerfile path is correct
+
+          echo "Executing build command:"
+          echo "$BUILD_COMMAND"
+          eval "$BUILD_COMMAND" # Use eval to execute the dynamically built command string
+
+      - name: Push Multi-Platform Docker Image
+        # This step will push the manifest list and the underlying images.
+        # This will only run on 'push' to 'main' branch, or if GIT_TAG exists,
+        # otherwise only `latest` is pushed.
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || steps.get_git_tag.outputs.GIT_TAG != ''
+
+        run: |
+          GIT_TAG="${{ steps.get_git_tag.outputs.GIT_TAG }}"
+
+          # Always push the latest tag
+          echo "Pushing latest multi-platform image: ${{ env.IMAGE_REPO }}:latest"
+          nerdctl push --all-platforms ${{ env.IMAGE_REPO }}:latest
+
+          # Conditionally push the git tag
+          if [ -n "$GIT_TAG" ]; then
+              echo "Pushing multi-platform image with Git tag: ${{ env.IMAGE_REPO }}:$GIT_TAG"
+              nerdctl push --all-platforms ${{ env.IMAGE_REPO }}:$GIT_TAG
+          else
+              echo "No Git tag to push."
+          fi
