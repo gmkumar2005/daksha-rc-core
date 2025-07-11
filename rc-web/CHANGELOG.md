@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v2.1.0...rc-web-v2.1.1) (2025-07-11)
+
+
+### Bug Fixes
+
+* Success notification script error ([6729c1e](https://github.com/gmkumar2005/daksha-rc-core/commit/6729c1ee1878df3b54d1e8527b3305f7264c2329))
+
 ## [2.1.0](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v2.0.0...rc-web-v2.1.0) (2025-07-11)
 
 
