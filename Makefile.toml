@@ -45,207 +45,6 @@ command = "cargo"
 args = ["tarpaulin", "--out", "html", "--", "--test-threads", "2"]
 disabled = true
 
-
-[tasks.install-kubectl]
-description = "Install kubectl if not present"
-category = "Setup"
-linux.script_runner = "bash"
-linux.script = "scripts/install-kubectl-linux.sh"
-linux.env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-mac.script_runner = "bash"
-mac.script = "scripts/install-kubectl-mac.sh"
-mac.env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-
-[tasks.setup-kind-cluster]
-description = "Create Kind cluster and install Traefik ingress controller"
-category = "Kubernetes"
-script_runner = "bash"
-script = "scripts/setup-kind-cluster.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-dependencies = ["install-kubectl"]
-
-[tasks.deploy-demo-apps]
-description = "Deploy httpbin and whoami demo applications to Kind cluster"
-category = "Kubernetes"
-script_runner = "bash"
-script = "scripts/deploy-demo-apps.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-
-[tasks.kind-demo]
-description = "Complete Kind cluster setup with Traefik and demo apps deployment"
-category = "Kubernetes"
-dependencies = ["setup-kind-cluster", "deploy-demo-apps"]
-
-[tasks.install-cnpg]
-description = "Install CloudNativePG (CNPG) CRDs and wait for availability"
-category = "Database"
-script_runner = "bash"
-script = "scripts/install-cnpg.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-
-[tasks.deploy-rc-app]
-description = "Deploy rc-app using Helm with health and readiness checks"
-category = "Application"
-script_runner = "bash"
-script = "scripts/deploy-rc-app.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-dependencies = ["install-cnpg"]
-
-[tasks.full-demo]
-description = "Complete demo environment: Kind cluster, Traefik, CNPG, demo apps, and rc-app"
-category = "Demo"
-dependencies = ["kind-demo", "deploy-rc-app"]
-
-# Git Tag Management
-# This task retrieves the latest Git tag for use in Docker image tagging
-[tasks.get-git-tag]
-description = "get-git-tag: get the latest Git tag"
-category = "Git"
-script_runner = "bash"
-script = "scripts/get-git-tag.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-
-# Container Image Building with Git Tag Integration
-# This task builds container images for rc-web using Podman with the latest Git tag
-# Features:
-# - Uses latest Git tag as primary version tag
-# - Creates additional tags for commit SHA and 'latest'
-# - Builds for current platform only (use build-image-all for multi-platform)
-# - Creates platform-specific image tags (e.g., v0.1.8-amd64)
-# - Adds OCI-compliant labels with metadata
-# - Includes error handling and visual feedback
-# - Uses only Podman (no Docker dependencies)
-[tasks.clean-build-cache]
-description = "clean-build-cache: clean container build cache to free disk space"
-category = "Container"
-script_runner = "bash"
-script = "scripts/clean-build-cache.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-
-# Base Image Building for Improved Caching
-# This task builds the base builder image with all build dependencies
-# Features:
-# - Creates reusable base image with Rust toolchain and build dependencies
-# - Significantly speeds up subsequent application builds
-# - Preserves base image during cleanup operations
-# - Platform-specific base images with proper tagging
-# - Only rebuilds if base image is missing or explicitly requested
-[tasks.build-base-image]
-description = "build-base-image: build reusable base builder image with all build dependencies"
-category = "Container"
-script_runner = "bash"
-script = "scripts/build-base-image.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-
-[tasks.build-image]
-description = "build-image: build container image for current platform only with platform-specific tags (TAG=version to override git tag)"
-category = "Container"
-script_runner = "bash"
-script = "scripts/build-image.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-
-# Multi-Platform Container Image Building with Git Tag Integration
-# This task builds multi-platform container images for rc-web using Podman with the latest Git tag
-# Features:
-# - Uses latest Git tag as primary version tag
-# - Creates platform-specific tags (e.g., v0.1.8-amd64, v0.1.8-arm64)
-# - Creates multi-platform manifests for seamless pulling
-# - Builds for amd64 and arm64 architectures using podman build --arch
-# - Creates multi-platform manifests using podman manifest commands
-# - Adds OCI-compliant labels with metadata
-# - Includes error handling and visual feedback
-# - Uses only Podman (no Docker dependencies)
-[tasks.build-image-all]
-description = "build-image-all: build multi-arch container images (amd64/arm64) with platform-specific tags and manifests (TAG=version to override git tag)"
-category = "Container"
-script_runner = "bash"
-script = "scripts/build-image-all.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-
-# Container Image Publishing with Git Tag Integration
-# This task pushes the built container images and manifests to the container registry
-# Features:
-# - Validates local images/manifests exist before pushing
-# - Pushes platform-specific images (e.g., v0.1.8-amd64, v0.1.8-arm64)
-# - Pushes multi-platform manifests (git tag, commit SHA, latest)
-# - Provides detailed feedback and error handling
-# - Uses only Podman push (no Docker dependencies)
-# - Requires 'build-image' or 'build-image-all' task to be run first
-[tasks.push-image]
-description = "push-image: push container images and manifests with Git tags to registry using Podman (TAG=version to override git tag)"
-category = "Container"
-script_runner = "bash"
-script = "scripts/push-image.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-
-# Combined Build and Push Workflow
-# This composite task runs both build-image and push-image in sequence
-# Builds and pushes container images for current platform using Podman
-# Useful for CI/CD pipelines and one-command deployments
-[tasks.build-image-clean]
-description = "build-image-clean: build multi-platform container image with aggressive cleanup for low disk space"
-category = "Container"
-dependencies = ["clean-build-cache"]
-run_task = "build-image"
-
-[tasks.build-and-push]
-description = "build-and-push: build and push container images for current platform with Git tags using Podman (TAG=version to override git tag)"
-category = "Container"
-dependencies = ["build-image", "push-image"]
-
-[tasks.build-and-push-all]
-description = "build-and-push-all: build and push multi-platform container images with Git tags using Podman (TAG=version to override git tag)"
-category = "Container"
-dependencies = ["build-image-all", "push-image"]
-
-[tasks.build-and-push-clean]
-description = "build-and-push-clean: build and push images for current platform with cleanup for low disk space environments (TAG=version to override git tag)"
-category = "Container"
-dependencies = ["clean-build-cache", "build-image", "push-image"]
-
-[tasks.build-and-push-all-clean]
-description = "build-and-push-all-clean: build and push multi-platform images with cleanup for low disk space environments (TAG=version to override git tag)"
-category = "Container"
-dependencies = ["clean-build-cache", "build-image-all", "push-image"]
-
-# Build Examples and Documentation
-# This task shows examples of how to use the TAG parameter with build tasks
-[tasks.build-examples]
-description = "build-examples: show examples of using TAG parameter with build tasks"
-category = "Documentation"
-script_runner = "bash"
-script = "scripts/build-examples.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
-
-# Parameterized Tasks for Custom Tags
-# These tasks allow easy specification of custom tags via command line arguments
-
-[tasks.build-with-tag]
-description = "build-with-tag: build container image for current platform with specified tag (usage: cargo make build-with-tag --env TAG=v1.0.0)"
-category = "Container"
-run_task = "build-image"
-
-[tasks.build-all-with-tag]
-description = "build-all-with-tag: build multi-platform container images with specified tag (usage: cargo make build-all-with-tag --env TAG=v1.0.0)"
-category = "Container"
-run_task = "build-image-all"
-
-[tasks.push-with-tag]
-description = "push-with-tag: push container images with specified tag (usage: cargo make push-with-tag --env TAG=v1.0.0)"
-category = "Container"
-run_task = "push-image"
-
-[tasks.build-and-push-with-tag]
-description = "build-and-push-with-tag: build and push current platform images with specified tag (usage: cargo make build-and-push-with-tag --env TAG=v1.0.0)"
-category = "Container"
-dependencies = ["build-image", "push-image"]
-
-[tasks.build-and-push-all-with-tag]
-description = "build-and-push-all-with-tag: build and push multi-platform images with specified tag (usage: cargo make build-and-push-all-with-tag --env TAG=v1.0.0)"
-category = "Container"
-dependencies = ["build-image-all", "push-image"]
-
-
 [tasks.check-disk-space]
 description = "check-disk-space: comprehensive disk space monitoring for host and Podman VM"
 category = "System"
@@ -260,70 +59,192 @@ script_runner = "bash"
 script = "scripts/debug-mirrord.sh"
 env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
 
-# Basic Image Tasks
-# These tasks build and manage the basic Alpine image using Dockerfile.basic
+[tasks.build-image]
+description = "build-image: build Docker image using nerdctl"
+category = "Docker"
+command = "nerdctl"
+args = ["build", "-t", "ghcr.io/daksha-rc/rc-web:latest", "-f", "rc-web/Dockerfile", "."]
 
-[tasks.get-basic-image-tag]
-description = "get-basic-image-tag: get tag for basic image (from TAG env var or git tag)"
-category = "Container"
+[tasks.build-push]
+description = "build-push: build multi-platform Docker image and push to registry"
+category = "Docker"
 script_runner = "bash"
-script = "scripts/get-basic-image-tag.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+script = '''
+# Get the current git tag
+GIT_TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
 
-[tasks.build-basic-image-amd64]
-description = "build-basic-image-amd64: build basic image for amd64 platform (TAG=version to override git tag)"
-category = "Container"
+# Build with latest tag and optionally with git tag
+if [ -n "$GIT_TAG" ]; then
+    echo "Building with tags: latest and $GIT_TAG"
+    nerdctl build --platform=linux/amd64,linux/arm64 \
+        -t ghcr.io/daksha-rc/rc-web:latest \
+        -t ghcr.io/daksha-rc/rc-web:$GIT_TAG \
+        -f rc-web/Dockerfile .
+    nerdctl push --all-platforms ghcr.io/daksha-rc/rc-web:latest
+    nerdctl push --all-platforms ghcr.io/daksha-rc/rc-web:$GIT_TAG
+else
+    echo "No git tag found, building with latest tag only"
+    nerdctl build --platform=linux/amd64,linux/arm64 \
+        -t ghcr.io/daksha-rc/rc-web:latest \
+        -f rc-web/Dockerfile .
+    nerdctl push --all-platforms ghcr.io/daksha-rc/rc-web:latest
+fi
+'''
+
+[tasks.build-chef-base]
+description = "build-chef-base: Build and push cargo-chef base image with system dependencies"
+category = "Docker"
 script_runner = "bash"
-script = "scripts/build-basic-image-amd64.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+script = '''
+#!/bin/bash
+set -e
 
-[tasks.build-basic-image-arm64]
-description = "build-basic-image-arm64: build basic image for arm64 platform (TAG=version to override git tag)"
-category = "Container"
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Get version from Cargo.toml or use timestamp
+VERSION=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/' | head -1)
+if [ -z "$VERSION" ]; then
+    VERSION=$(date +%Y%m%d%H%M%S)
+fi
+
+REGISTRY_URL="ghcr.io/daksha-rc"
+IMAGE_NAME="cargo-chef-base"
+DOCKERFILE="Dockerfile.chef"
+
+# Build tags
+LATEST_TAG="${REGISTRY_URL}/${IMAGE_NAME}:latest"
+VERSION_TAG="${REGISTRY_URL}/${IMAGE_NAME}:${VERSION}"
+RUST_VERSION_TAG="${REGISTRY_URL}/${IMAGE_NAME}:rust-1.86.0"
+
+echo -e "${YELLOW}Building cargo-chef base image...${NC}"
+echo "Version: ${VERSION}"
+echo "Tags: ${LATEST_TAG}, ${VERSION_TAG}, ${RUST_VERSION_TAG}"
+
+# Build with multiple tags
+echo -e "${YELLOW}Building image...${NC}"
+nerdctl build \
+    -t "${LATEST_TAG}" \
+    -t "${VERSION_TAG}" \
+    -t "${RUST_VERSION_TAG}" \
+    -f "${DOCKERFILE}" \
+    .
+
+echo -e "${YELLOW}Pushing images...${NC}"
+
+# Push all tags
+echo -e "${YELLOW}Pushing ${LATEST_TAG}...${NC}"
+nerdctl push "${LATEST_TAG}"
+
+echo -e "${YELLOW}Pushing ${VERSION_TAG}...${NC}"
+nerdctl push "${VERSION_TAG}"
+
+echo -e "${YELLOW}Pushing ${RUST_VERSION_TAG}...${NC}"
+nerdctl push "${RUST_VERSION_TAG}"
+
+echo -e "${GREEN}✅ Successfully built and pushed cargo-chef base image${NC}"
+echo -e "${GREEN}   Latest: ${LATEST_TAG}${NC}"
+echo -e "${GREEN}   Version: ${VERSION_TAG}${NC}"
+echo -e "${GREEN}   Rust: ${RUST_VERSION_TAG}${NC}"
+'''
+
+[tasks.build-chef-base-local]
+description = "build-chef-base-local: Build cargo-chef base image locally (no push)"
+category = "Docker"
 script_runner = "bash"
-script = "scripts/build-basic-image-arm64.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+script = '''
+#!/bin/bash
+set -e
 
-[tasks.build-basic-image-all]
-description = "build-basic-image-all: build basic image for all platforms (amd64/arm64) with manifests (TAG=version to override git tag)"
-category = "Container"
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Get version from Cargo.toml or use timestamp
+VERSION=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/' | head -1)
+if [ -z "$VERSION" ]; then
+    VERSION=$(date +%Y%m%d%H%M%S)
+fi
+
+REGISTRY_URL="ghcr.io/daksha-rc"
+IMAGE_NAME="cargo-chef-base"
+DOCKERFILE="Dockerfile.chef"
+
+# Build tags
+LATEST_TAG="${REGISTRY_URL}/${IMAGE_NAME}:latest"
+VERSION_TAG="${REGISTRY_URL}/${IMAGE_NAME}:${VERSION}"
+RUST_VERSION_TAG="${REGISTRY_URL}/${IMAGE_NAME}:rust-1.86.0"
+LOCAL_TAG="${IMAGE_NAME}:latest"
+
+echo -e "${YELLOW}Building cargo-chef base image locally...${NC}"
+echo "Version: ${VERSION}"
+echo "Tags: ${LATEST_TAG}, ${VERSION_TAG}, ${RUST_VERSION_TAG}, ${LOCAL_TAG}"
+
+# Build with multiple tags including local tag
+echo -e "${YELLOW}Building image...${NC}"
+nerdctl build \
+    -t "${LATEST_TAG}" \
+    -t "${VERSION_TAG}" \
+    -t "${RUST_VERSION_TAG}" \
+    -t "${LOCAL_TAG}" \
+    -f "${DOCKERFILE}" \
+    .
+
+echo -e "${GREEN}✅ Successfully built cargo-chef base image locally${NC}"
+echo -e "${GREEN}   Latest: ${LATEST_TAG}${NC}"
+echo -e "${GREEN}   Version: ${VERSION_TAG}${NC}"
+echo -e "${GREEN}   Rust: ${RUST_VERSION_TAG}${NC}"
+echo -e "${GREEN}   Local: ${LOCAL_TAG}${NC}"
+echo -e "${YELLOW}ℹ️  Use 'cargo make build-chef-base' to build and push to registry${NC}"
+'''
+
+[tasks.inspect-chef-base]
+description = "inspect-chef-base: inspect the cargo-chef base image"
+category = "Docker"
 script_runner = "bash"
-script = "scripts/build-basic-image-all.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+script = '''
+#!/bin/bash
 
-[tasks.push-basic-image]
-description = "push-basic-image: push basic images and manifests to registry (TAG=version to override git tag)"
-category = "Container"
-script_runner = "bash"
-script = "scripts/push-basic-image.sh"
-env = { "BASH_SILENCE_DEPRECATION_WARNING" = "1" }
+# Configuration
+REGISTRY="ghcr.io"
+NAMESPACE="daksha-rc"
+IMAGE_NAME="cargo-chef-base"
+FULL_IMAGE_NAME="${REGISTRY}/${NAMESPACE}/${IMAGE_NAME}"
 
-[tasks.build-and-push-basic-image]
-description = "build-and-push-basic-image: build and push basic images for current platform (TAG=version to override git tag)"
-category = "Container"
-dependencies = ["build-basic-image-all", "push-basic-image"]
+# Colors for output
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
 
-[tasks.build-and-push-basic-image-clean]
-description = "build-and-push-basic-image-clean: build and push basic images with cleanup for low disk space (TAG=version to override git tag)"
-category = "Container"
-dependencies = [
-    "clean-build-cache",
-    "build-basic-image-all",
-    "push-basic-image",
-]
+echo -e "${YELLOW}Inspecting cargo-chef base image...${NC}"
 
-# Parameterized Tasks for Basic Image with Custom Tags
-[tasks.build-basic-with-tag]
-description = "build-basic-with-tag: build basic image for current platform with specified tag (usage: cargo make build-basic-with-tag --env TAG=v1.0.0)"
-category = "Container"
-run_task = "build-basic-image-all"
+# Check if image exists locally
+if nerdctl images | grep -q "${FULL_IMAGE_NAME}"; then
+    echo -e "${GREEN}✅ Image found locally${NC}"
 
-[tasks.push-basic-with-tag]
-description = "push-basic-with-tag: push basic images with specified tag (usage: cargo make push-basic-with-tag --env TAG=v1.0.0)"
-category = "Container"
-run_task = "push-basic-image"
+    # Show image details
+    echo -e "${YELLOW}Image details:${NC}"
+    nerdctl images | grep "${FULL_IMAGE_NAME}" | head -5
 
-[tasks.build-and-push-basic-with-tag]
-description = "build-and-push-basic-with-tag: build and push basic images with specified tag (usage: cargo make build-and-push-basic-with-tag --env TAG=v1.0.0)"
-category = "Container"
-dependencies = ["build-basic-image-all", "push-basic-image"]
+    # Show image history
+    echo -e "${YELLOW}Image layers:${NC}"
+    nerdctl history "${FULL_IMAGE_NAME}:latest" 2>/dev/null || \
+    nerdctl history "${FULL_IMAGE_NAME}:local" 2>/dev/null || \
+    echo "No image found with :latest or :local tag"
+
+    # Show image info
+    echo -e "${YELLOW}Image info:${NC}"
+    nerdctl inspect "${FULL_IMAGE_NAME}:latest" 2>/dev/null | \
+    jq -r '.[] | {Id: .Id, Created: .Created, Size: .Size, Architecture: .Architecture, Os: .Os}' 2>/dev/null || \
+    nerdctl inspect "${FULL_IMAGE_NAME}:local" 2>/dev/null | \
+    jq -r '.[] | {Id: .Id, Created: .Created, Size: .Size, Architecture: .Architecture, Os: .Os}' 2>/dev/null || \
+    echo "Unable to inspect image (jq might not be installed)"
+else
+    echo "Image not found locally. Try running: cargo make build-chef-base-local"
+fi
+'''

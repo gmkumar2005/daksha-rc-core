@@ -1,0 +1,51 @@
+# Custom cargo-chef base image with common build dependencies
+# This image extends the official cargo-chef with frequently needed system libraries
+FROM lukemathwalker/cargo-chef:latest-rust-1.86.0-bookworm
+
+# Metadata labels for the custom base image
+LABEL org.opencontainers.image.title="Daksha RC Cargo Chef Base"
+LABEL org.opencontainers.image.description="Custom cargo-chef base image with OpenSSL and PostgreSQL development libraries"
+LABEL org.opencontainers.image.source="https://github.com/daksha-rc/daksha-rc-core"
+LABEL org.opencontainers.image.vendor="Daksha RC"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# Set environment to non-interactive to avoid prompts during build
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install common build dependencies for Rust web applications
+# - pkg-config: Helps Rust build scripts find system libraries
+# - libssl-dev: OpenSSL development headers (for reqwest, tokio-tls, etc.)
+# - libpq-dev: PostgreSQL client library headers (for sqlx, diesel)
+# - ca-certificates: SSL certificate bundle for HTTPS verification
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Set build environment variables for better performance
+ENV PKG_CONFIG_ALLOW_CROSS=1
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
+
+# Verify installations
+RUN pkg-config --version && \
+    pkg-config --exists openssl && \
+    pkg-config --exists libpq && \
+    echo "All dependencies verified successfully"
+
+# Reset environment
+ENV DEBIAN_FRONTEND=
+
+# Document the image contents
+RUN echo "Daksha RC Cargo Chef Base Image" > /etc/image-info && \
+    echo "Based on: lukemathwalker/cargo-chef:latest-rust-1.86.0-bookworm" >> /etc/image-info && \
+    echo "Additional packages: pkg-config, libssl-dev, libpq-dev, ca-certificates" >> /etc/image-info && \
+    echo "Build date: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /etc/image-info
+
+# Set working directory (inherited from parent, but explicit for clarity)
+WORKDIR /app
+
+# The image is ready to use as a base for cargo-chef workflows
+CMD ["cargo", "chef", "--help"]

@@ -13,7 +13,8 @@
     "helm": {
       "version":            "latest",
       "excluded_platforms": ["aarch64-darwin"]
-    }
+    },
+    "colima": "latest"
   },
   "shell": {
     "init_hook": ["echo 'Welcome to devbox!' > /dev/null"],

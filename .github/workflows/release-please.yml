@@ -1,0 +1,19 @@
+name: Release Please
+
+on:
+  push:
+    branches: [ main, 53_caching ]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          target-branch: ${{ github.ref_name }}
+          token: ${{ secrets.PUSH_PKG_TO_RC_ORG }}
