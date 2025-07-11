@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v0.3.0...rc-web-v0.4.0) (2025-07-11)
+
+
+### Features
+
+* disabled integration tests ([959fd07](https://github.com/gmkumar2005/daksha-rc-core/commit/959fd07cc317736fc5ee38ae6ab22d161b1807c4))
+* optimized rust ci [#2](https://github.com/gmkumar2005/daksha-rc-core/issues/2) ([4d2af76](https://github.com/gmkumar2005/daksha-rc-core/commit/4d2af762c03a2bcaf09815860d36b0b6cdb479a4))
+* optimized rust ci [#3](https://github.com/gmkumar2005/daksha-rc-core/issues/3) ([f1a7c22](https://github.com/gmkumar2005/daksha-rc-core/commit/f1a7c22aa659000d9bd73aacac12a035fcdd4422))
+* optimized rust ci code ftm [#4](https://github.com/gmkumar2005/daksha-rc-core/issues/4) ([a431533](https://github.com/gmkumar2005/daksha-rc-core/commit/a43153372bbcf5b60e0932164ee10e123e01e4f0))
+
+
+### Bug Fixes
+
+* code ftm removed dead code [#6](https://github.com/gmkumar2005/daksha-rc-core/issues/6) ([e343f3c](https://github.com/gmkumar2005/daksha-rc-core/commit/e343f3c541fd8ce7d09589d86caafc0d2d4795fb))
+* optimized rust ci code ftm [#5](https://github.com/gmkumar2005/daksha-rc-core/issues/5) ([7d158eb](https://github.com/gmkumar2005/daksha-rc-core/commit/7d158eb862f4b9586da94d08b45b89313d000aa5))
+
 ## [0.3.0](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v0.2.0...rc-web-v0.3.0) (2025-07-11)
 
 
