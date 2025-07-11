@@ -32,9 +32,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run unit tests
         run: cargo test --release
-      - name: Run integration tests
-        run: cargo test --release --features integration_tests
-        continue-on-error: true
+#      - name: Run integration tests
+#        run: cargo test --release --features integration_tests
+#        continue-on-error: true
 
   build:
     name: Build

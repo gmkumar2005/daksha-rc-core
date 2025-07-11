@@ -16,8 +16,6 @@ pub fn routes() -> Scope {
         .service(readyz)
 }
 /// Simple hello
-///
-///
 /// Returns a greeting message. `Hello, World!`
 #[utoipa::path(
     get,
