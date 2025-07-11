@@ -3,9 +3,9 @@ name: Rust CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main, 53_caching ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main, 53_caching ]
 
 env:
   CARGO_TERM_COLOR: always
