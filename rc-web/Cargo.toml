@@ -2,7 +2,7 @@
 name = "rc-web"
 edition = "2021"
 rust-version = "1.80.1"
-version = "0.2.0"
+version = "0.3.0"
 license = "MIT"
 [dependencies]
 actix = { workspace = true }
