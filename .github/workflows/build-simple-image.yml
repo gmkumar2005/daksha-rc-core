@@ -187,12 +187,9 @@ jobs:
             type=raw,value=latest-amd64,enable=${{ github.event_name == 'release' }}
             type=raw,value=latest-arm64,enable=${{ github.event_name == 'release' }}
             type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{major}},enable=${{ github.event_name == 'release' }}
             type=semver,pattern={{version}}-amd64,enable=${{ github.event_name == 'release' }}
             type=semver,pattern={{version}}-arm64,enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{major}}.{{minor}}-amd64,enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{major}}.{{minor}}-arm64,enable=${{ github.event_name == 'release' }}
+
 
       - name: Build and push Docker image (multi-arch, all tags)
         id: docker-build
