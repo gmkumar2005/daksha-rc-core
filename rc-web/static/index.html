@@ -7,15 +7,5 @@
 </head>
 <body>
 <div id="logo-container"><img src="/static/logo_dark.png" style="max-height:64px;"></div>
-<div id="swagger-ui"></div>
-<script src="swagger-ui-bundle.js"></script>
-<script>
-    window.onload = () => {
-      window.ui = SwaggerUIBundle({
-        url: "/api-docs/openapi.json",
-        dom_id: '#swagger-ui',
-      });
-    }
-</script>
 </body>
 </html>
