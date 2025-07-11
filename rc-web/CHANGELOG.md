@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v0.4.0...rc-web-v1.0.0) (2025-07-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* The image API has changed completely. Old image format configurations will no longer work and must be updated.
+
+### Features
+
+* redesign image processing pipeline ([7fd78af](https://github.com/gmkumar2005/daksha-rc-core/commit/7fd78af5cbc2e01412b6019c002f69fcc2589223))
+
 ## [0.4.0](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v0.3.0...rc-web-v0.4.0) (2025-07-11)
 
 
