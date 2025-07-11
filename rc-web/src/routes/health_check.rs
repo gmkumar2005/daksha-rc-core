@@ -7,7 +7,6 @@ use chrono::Utc;
 use log::debug;
 use serde_json::{json, Value};
 use sqlx::PgPool;
-use std::time::Duration;
 
 pub fn routes() -> Scope {
     web::scope("")

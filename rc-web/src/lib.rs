@@ -17,6 +17,8 @@ pub mod models;
 pub mod projections;
 pub mod routes;
 pub mod services;
+mod test;
+
 type DecisionMaker =
     PgDecisionMaker<DomainEvent, disintegrate::serde::json::Json<DomainEvent>, NoSnapshot>;
 
