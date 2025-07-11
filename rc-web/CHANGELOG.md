@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v0.2.0...rc-web-v0.3.0) (2025-07-11)
+
+
+### Features
+
+* dropped docker-compose ([020ab4e](https://github.com/gmkumar2005/daksha-rc-core/commit/020ab4ecd0bbc8ccbb5789c5359ea566c56e7d5c))
+
 ## [0.2.0](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v0.1.10...rc-web-v0.2.0) (2025-07-11)
 
 
