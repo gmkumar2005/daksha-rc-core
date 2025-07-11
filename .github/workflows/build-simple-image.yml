@@ -15,14 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: rust:1.86.0
-    # Only run if this is a release-please PR merge
-    if: |
-      (github.event_name == 'push' && 
-       contains(github.event.head_commit.message, 'chore(main): release') || 
-       contains(github.event.head_commit.message, 'chore: release') ||
-       contains(github.event.head_commit.message, 'chore(53_caching): release')) ||
-      github.event_name == 'release'
-
     strategy:
       matrix:
         include:
@@ -137,15 +129,9 @@ jobs:
       - name: Determine version for Docker tags
         id: version
         run: |
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            VERSION="${{ github.event.release.tag_name }}"
-            echo "Using release tag: $VERSION"
-          else
-            # For release-please merges, get the latest tag
-            VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev-${{ github.ref_name }}")
-            echo "Using latest tag: $VERSION"
-          fi
-          
+          # Since we only trigger on release events, this will always be a release
+          VERSION="${{ github.event.release.tag_name }}"
+          echo "Using release tag: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Final version: $VERSION"
 
@@ -184,14 +170,14 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest
-            type=raw,value=${{ steps.version.outputs.version }},enable=${{ steps.version.outputs.version != '' && steps.version.outputs.version != 'dev-main' && steps.version.outputs.version != 'dev-53_caching' }}
-            type=raw,value=${{ steps.version.outputs.version }}-amd64,enable=${{ steps.version.outputs.version != '' && steps.version.outputs.version != 'dev-main' && steps.version.outputs.version != 'dev-53_caching' }}
-            type=raw,value=${{ steps.version.outputs.version }}-arm64,enable=${{ steps.version.outputs.version != '' && steps.version.outputs.version != 'dev-main' && steps.version.outputs.version != 'dev-53_caching' }}
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=${{ steps.version.outputs.version }}-amd64
+            type=raw,value=${{ steps.version.outputs.version }}-arm64
             type=raw,value=latest-amd64
             type=raw,value=latest-arm64
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{version}}-amd64,enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{version}}-arm64,enable=${{ github.event_name == 'release' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{version}}-amd64
+            type=semver,pattern={{version}}-arm64
 
       - name: Build and push Docker image (multi-arch, all tags)
         id: docker-build
@@ -211,14 +197,6 @@ jobs:
       - name: Success notification
         if: success()
         run: |
-          # Create a formatted list of built images
-          TAGS_LIST=""
-          while IFS= read -r tag; do
-            if [[ -n "$tag" ]]; then
-              TAGS_LIST="$TAGS_LIST\n- \`$tag\`"
-            fi
-          done <<< "${{ steps.meta.outputs.tags }}"
-          
           # Create GitHub step summary
           cat << 'EOF' >> $GITHUB_STEP_SUMMARY
           ## 🎉 Docker Build & Release Success
@@ -243,25 +221,12 @@ jobs:
           - **Branch**: `${{ github.ref_name }}`
           - **Commit**: `${{ github.sha }}`
           - **Trigger**: `${{ github.event_name }}`
-          EOF
-          
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            cat << 'EOF' >> $GITHUB_STEP_SUMMARY
           
           ### 🚀 Release Information
           - **Release Tag**: `${{ github.event.release.tag_name }}`
           - **Release Name**: `${{ github.event.release.name }}`
           - **Release URL**: [${{ github.event.release.html_url }}](${{ github.event.release.html_url }})
           EOF
-          else
-            cat << 'EOF' >> $GITHUB_STEP_SUMMARY
-          
-          ### 🔄 Release-Please Merge
-          - **Branch**: `${{ github.ref_name }}`
-          - **Commit**: `${{ github.sha }}`
-          - **Triggered by release-please merge**
-          EOF
-          fi
           
           if [[ -n "${{ steps.git-info.outputs.commits }}" ]]; then
             cat << 'EOF' >> $GITHUB_STEP_SUMMARY
@@ -306,11 +271,7 @@ jobs:
           echo "${{ steps.meta.outputs.tags }}" | sed 's/^/  - /'
           echo "🔧 Version: ${{ steps.version.outputs.version }}"
           echo "📝 Commits since last release: ${{ steps.git-info.outputs.commit-count }}"
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "🚀 Release: ${{ github.event.release.tag_name }}"
-          else
-            echo "🔄 Release-Please merge: ${{ github.ref_name }}"
-          fi
+          echo "🚀 Release: ${{ github.event.release.tag_name }}"
 
   notify-failure:
     name: Notify on Failure
@@ -355,20 +316,8 @@ jobs:
           - **Triggered by**: `${{ github.event_name }}`
           - **Actor**: `${{ github.actor }}`
           - **Workflow Run**: [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          EOF
-          
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            cat << 'EOF' >> $GITHUB_STEP_SUMMARY
           - **Release Tag**: `${{ github.event.release.tag_name }}`
           - **Release URL**: [${{ github.event.release.html_url }}](${{ github.event.release.html_url }})
-          EOF
-          else
-            cat << 'EOF' >> $GITHUB_STEP_SUMMARY
-          - **Release-Please Merge**: `${{ github.ref_name }}`
-          EOF
-          fi
-          
-          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
           
           ### 📝 Recent Commits
           EOF
@@ -389,8 +338,4 @@ jobs:
           echo "💥 Failed jobs:"
           echo -e "$FAILED_JOBS"
           echo "🔍 Check the workflow logs and step summary for details"
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "🚀 Release trigger: ${{ github.event.release.tag_name }}"
-          else
-            echo "🔄 Release-Please merge trigger: ${{ github.ref_name }}"
-          fi
+          echo "🚀 Release trigger: ${{ github.event.release.tag_name }}"
