@@ -1,0 +1,341 @@
+name: Simple-Image-CI
+
+on:
+  release:
+    types: [published]
+
+env:
+  CARGO_TERM_COLOR: always
+  REGISTRY: ghcr.io
+  IMAGE_NAME: daksha-rc/rc-web
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    container:
+      image: rust:1.86.0
+    strategy:
+      matrix:
+        include:
+          - platform: amd64
+            target: x86_64-unknown-linux-gnu
+            artifact-name: rust-binary-amd64
+          - platform: arm64
+            target: aarch64-unknown-linux-gnu
+            artifact-name: rust-binary-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup caching
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.target }}-
+            ${{ runner.os }}-cargo-
+
+      - name: Manual cache setup for local run
+        run: mkdir -p ~/.cargo/registry ~/.cargo/git target
+
+      - name: Install cross-compilation target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Setup ARM64 cross-compilation
+        if: matrix.platform == 'arm64'
+        run: |
+          dpkg --add-architecture arm64
+          apt-get update
+          apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            libc6-dev-arm64-cross \
+            libssl-dev:arm64 \
+            libpq-dev:arm64 \
+            pkg-config
+          cat >> $GITHUB_ENV << 'EOF'
+          CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc
+          CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
+          AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+          PKG_CONFIG_ALLOW_CROSS=1
+          PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/lib/pkgconfig
+          OPENSSL_DIR=/usr
+          OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu
+          OPENSSL_INCLUDE_DIR=/usr/include/openssl
+          EOF
+
+      - name: Build Release Binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: target/${{ matrix.target }}/release/rc-web
+          retention-days: 1
+
+  docker-build:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: build
+    if: always() && (needs.build.result == 'success')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Download AMD64 build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-binary-amd64
+          path: artifacts/amd64/
+
+      - name: Download ARM64 build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-binary-arm64
+          path: artifacts/arm64/
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p target/x86_64-unknown-linux-gnu/release
+          mkdir -p target/aarch64-unknown-linux-gnu/release
+          mv artifacts/amd64/rc-web target/x86_64-unknown-linux-gnu/release/rc-web
+          mv artifacts/arm64/rc-web target/aarch64-unknown-linux-gnu/release/rc-web
+          chmod +x target/x86_64-unknown-linux-gnu/release/rc-web
+          chmod +x target/aarch64-unknown-linux-gnu/release/rc-web
+          ls -la target/*/release/rc-web
+          rm -rf artifacts
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.PUSH_PKG_TO_RC_ORG }}
+
+      - name: Determine version for Docker tags
+        id: version
+        run: |
+          # Since we only trigger on release events, this will always be a release
+          VERSION="${{ github.event.release.tag_name }}"
+          echo "Using release tag: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Final version: $VERSION"
+
+      - name: Get commit and PR information
+        id: git-info
+        run: |
+          # Get the previous tag/release
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          
+          # Get commits since last release
+          COMMITS=$(git log --oneline ${PREV_TAG}..HEAD --pretty=format:"- %s (%an)" | head -20)
+          
+          # Get merged PRs since last release
+          PRS=$(git log --oneline ${PREV_TAG}..HEAD --grep="Merge pull request" --pretty=format:"- %s" | head -10)
+          
+          # Store in outputs (escape newlines)
+          echo "prev-tag=$PREV_TAG" >> $GITHUB_OUTPUT
+          {
+            echo "commits<<EOF"
+            echo "$COMMITS"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+          
+          {
+            echo "prs<<EOF"
+            echo "$PRS"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+          
+          echo "commit-count=$(echo "$COMMITS" | wc -l)" >> $GITHUB_OUTPUT
+
+      - name: Extract metadata and generate tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=${{ steps.version.outputs.version }}-amd64
+            type=raw,value=${{ steps.version.outputs.version }}-arm64
+            type=raw,value=latest-amd64
+            type=raw,value=latest-arm64
+            type=semver,pattern={{version}}
+            type=semver,pattern={{version}}-amd64
+            type=semver,pattern={{version}}-arm64
+
+      - name: Build and push Docker image (multi-arch, all tags)
+        id: docker-build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./rc-web/Dockerfile.simple
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
+
+      - name: Success notification
+        if: success()
+        run: |
+          # Create GitHub step summary
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          ## 🎉 Docker Build & Release Success
+          
+          ### 📦 Images Built and Pushed
+          EOF
+          
+          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              echo "- \`$tag\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 🔧 Build Information
+          - **Version**: `${{ steps.version.outputs.version }}`
+          - **Build ID**: `${{ steps.docker-build.outputs.imageid }}`
+          - **Digest**: `${{ steps.docker-build.outputs.digest }}`
+          - **Platforms**: `linux/amd64`, `linux/arm64`
+          - **Registry**: `${{ env.REGISTRY }}`
+          - **Branch**: `${{ github.ref_name }}`
+          - **Commit**: `${{ github.sha }}`
+          - **Trigger**: `${{ github.event_name }}`
+          
+          ### 🚀 Release Information
+          - **Release Tag**: `${{ github.event.release.tag_name }}`
+          - **Release Name**: `${{ github.event.release.name }}`
+          - **Release URL**: [${{ github.event.release.html_url }}](${{ github.event.release.html_url }})
+          EOF
+          
+          if [[ -n "${{ steps.git-info.outputs.commits }}" ]]; then
+            cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 📝 Recent Commits (since ${{ steps.git-info.outputs.prev-tag }})
+          EOF
+            echo "${{ steps.git-info.outputs.commits }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ -n "${{ steps.git-info.outputs.prs }}" ]]; then
+            cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 🔀 Merged Pull Requests
+          EOF
+            echo "${{ steps.git-info.outputs.prs }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 🔗 Usage Examples
+          ```bash
+          # Pull latest multi-arch image (auto-selects platform)
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          
+          # Pull specific platform images
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-amd64
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-arm64
+          
+          # Pull specific version
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-amd64
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-arm64
+          
+          # Run container
+          docker run -p 8080:8080 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          ```
+          EOF
+          
+          # Console output
+          echo "🎉 SUCCESS: Docker images built and pushed successfully!"
+          echo "📦 Images:"
+          echo "${{ steps.meta.outputs.tags }}" | sed 's/^/  - /'
+          echo "🔧 Version: ${{ steps.version.outputs.version }}"
+          echo "📝 Commits since last release: ${{ steps.git-info.outputs.commit-count }}"
+          echo "🚀 Release: ${{ github.event.release.tag_name }}"
+
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [build, docker-build]
+    if: failure()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Failure notification
+        run: |
+          # Determine which job failed
+          FAILED_JOBS=""
+          if [[ "${{ needs.build.result }}" == "failure" ]]; then
+            FAILED_JOBS="$FAILED_JOBS\n- ❌ **Build Job**: Binary compilation failed"
+          fi
+          if [[ "${{ needs.docker-build.result }}" == "failure" ]]; then
+            FAILED_JOBS="$FAILED_JOBS\n- ❌ **Docker Build Job**: Image build/push failed"
+          fi
+          
+          # Get recent commits for context
+          RECENT_COMMITS=$(git log --oneline -5 --pretty=format:"- %s (%an)")
+          
+          # Create failure summary
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          ## ❌ Build Pipeline Failed
+          
+          ### 💥 Failed Jobs
+          EOF
+          
+          echo -e "$FAILED_JOBS" >> $GITHUB_STEP_SUMMARY
+          
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 🔍 Context Information
+          - **Branch**: `${{ github.ref_name }}`
+          - **Commit**: `${{ github.sha }}`
+          - **Triggered by**: `${{ github.event_name }}`
+          - **Actor**: `${{ github.actor }}`
+          - **Workflow Run**: [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - **Release Tag**: `${{ github.event.release.tag_name }}`
+          - **Release URL**: [${{ github.event.release.html_url }}](${{ github.event.release.html_url }})
+          
+          ### 📝 Recent Commits
+          EOF
+          
+          echo "$RECENT_COMMITS" >> $GITHUB_STEP_SUMMARY
+          
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          
+          ### 🔧 Troubleshooting
+          - Check the failed job logs above
+          - Ensure all tests pass locally
+          - Check Docker file and build context
+          - Verify secrets and permissions
+          EOF
+          
+          # Console output
+          echo "❌ FAILURE: Build pipeline failed!"
+          echo "💥 Failed jobs:"
+          echo -e "$FAILED_JOBS"
+          echo "🔍 Check the workflow logs and step summary for details"
+          echo "🚀 Release trigger: ${{ github.event.release.tag_name }}"

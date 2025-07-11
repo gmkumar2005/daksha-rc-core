@@ -24,29 +24,11 @@ if ! command -v mirrord >/dev/null 2>&1; then
     exit 1
 fi
 
-# Check if rc-app deployment exists
-echo -e "${YELLOW}🔍 Checking for rc-app deployment...${NC}"
-if ! kubectl get deployment dev-rc-app -n default >/dev/null 2>&1; then
-    echo -e "${RED}❌ rc-app deployment not found. Please run 'cargo make deploy-rc-app' first.${NC}"
-    exit 1
-fi
 
-# Check if deployment has exactly one replica
-echo -e "${YELLOW}🔍 Verifying deployment has single pod...${NC}"
-REPLICA_COUNT=$(kubectl get deployment dev-rc-app -n default -o jsonpath='{.spec.replicas}')
-if [ "$REPLICA_COUNT" != "1" ]; then
-    echo -e "${RED}❌ Deployment has $REPLICA_COUNT replicas, expected 1${NC}"
-    echo -e "${YELLOW}💡 Scale to 1 replica: kubectl scale deployment dev-rc-app --replicas=1${NC}"
-    exit 1
-fi
-
-# Wait for deployment to be ready
-echo -e "${YELLOW}⏳ Waiting for deployment to be ready...${NC}"
-kubectl wait --for=condition=Available deployment/dev-rc-app -n default --timeout=60s
 
 # Get the pod name
 echo -e "${YELLOW}🔍 Getting pod name...${NC}"
-POD_NAME=$(kubectl get pods -l app.kubernetes.io/instance=dev -n default -o jsonpath='{.items[0].metadata.name}')
+POD_NAME=$(kubectl get pod -l app.kubernetes.io/name=rc-app -o jsonpath='{.items[0].metadata.name}')
 
 if [ -z "$POD_NAME" ]; then
     echo -e "${RED}❌ No pod found for rc-app${NC}"

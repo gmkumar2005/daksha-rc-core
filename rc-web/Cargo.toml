@@ -2,7 +2,7 @@
 name = "rc-web"
 edition = "2021"
 rust-version = "1.80.1"
-version = "0.1.0-SNAPSHOT"
+version = "2.1.1"
 license = "MIT"
 [dependencies]
 actix = { workspace = true }
@@ -12,6 +12,7 @@ actix-web = { workspace = true }
 actix-web-httpauth = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+cached = { workspace = true }
 chrono = { workspace = true }
 config = { workspace = true }
 ctor = { workspace = true }
