@@ -1,8 +1,6 @@
 name: Simple-Image-CI
 
 on:
-  push:
-    branches: [main, 53_caching]
   release:
     types: [published]
 
