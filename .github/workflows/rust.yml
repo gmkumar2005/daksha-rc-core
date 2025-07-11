@@ -1,9 +1,6 @@
 name: Rust CI
 
-
 on:
-  push:
-    branches: [ main, 53_caching ]
   pull_request:
     branches: [ main, 53_caching ]
 
@@ -11,48 +8,41 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  buildandtest:
-    name: cargo
+  check:
+    name: Check and lint
     runs-on: ubuntu-latest
     container:
-      image: rust:1.86.0 # Works with both GitHub and act locally
-
+      image: rust:1.86.0
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup caching
-        uses: actions/cache@v4
-        if: ${{ env.ACT != 'true' }} # Use cache only on GitHub, skip in act
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Manual cache setup for local run
-        if: ${{ env.ACT == 'true' }} # Run only when act is used
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Check code
         run: |
-          echo "Running locally with act, manually setting up cache..."
-          mkdir -p ~/.cargo/registry ~/.cargo/git target
+          cargo check --all-targets
+          cargo fmt --check
+          cargo clippy -- -D warnings
 
-      #      - name: Install Rust Toolchain
-      #        uses: dtolnay/rust-toolchain@stable
-      #        id: rust-toolchain
-      #        with:
-      #          toolchain: stable
-      #          components: rustfmt, clippy # Add other components if needed
-      #          cache: true
-      #          cache-key: ${{ runner.os }}-rust-${{ steps.rust-toolchain.outputs.rustc_version }}-${{ hashFiles('Cargo.lock') }}
-
-      - name: Build
-        run: cargo build
-
-      - name: Run Tests
-        run: cargo test
-      - name: Run Integration Tests
-        run: cargo test --features integration_tests
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    container:
+      image: rust:1.86.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Run unit tests
+        run: cargo test --release
+      - name: Run integration tests
+        run: cargo test --release --features integration_tests
         continue-on-error: true
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    container:
+      image: rust:1.86.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Build release
+        run: cargo build --release
