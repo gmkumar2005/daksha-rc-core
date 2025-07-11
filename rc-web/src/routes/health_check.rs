@@ -108,13 +108,16 @@ async fn readyz(db_pool: web::Data<PgPool>) -> impl Responder {
     }
 }
 
-
 /// Cached database health check
 /// Cached database health check
-#[cached(time = 30, result = true, key = "String", convert = r#"{ "db_health".to_string() }"#)]
+#[cached(
+    time = 30,
+    result = true,
+    key = "String",
+    convert = r#"{ "db_health".to_string() }"#
+)]
 async fn check_db_health(db_pool: &PgPool) -> Result<(), sqlx::Error> {
     debug!("Checking DB health");
     sqlx::query("SELECT 1").execute(db_pool).await?;
     Ok(())
 }
-
