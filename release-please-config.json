@@ -3,7 +3,7 @@
     "rc-web": {
       "release-type": "rust",
       "package-name": "rc-web",
-      "path": "rc-web"
+      "path": "."
     }
   }
 }
