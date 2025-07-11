@@ -16,3 +16,4 @@ jobs:
         id: release
         with:
           target-branch: ${{ github.ref_name }}
+          token: ${{ secrets.PUSH_PKG_TO_RC_ORG }}
