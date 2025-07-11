@@ -1,0 +1,23 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+      - 53_caching
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        id: release
+        with:
+          target-branch: ${{ github.ref_name }}
+
+      # Add any release-specific steps here if needed
+      # For example: publishing to crates.io, creating GitHub releases with artifacts, etc.
