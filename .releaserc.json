@@ -1,7 +1,10 @@
 {
   "branches": [
     "main",
-    "53_caching"
+    {
+      "name": "53_caching",
+      "prerelease": "beta"
+    }
   ],
   "plugins": [
     "@semantic-release/commit-analyzer",
