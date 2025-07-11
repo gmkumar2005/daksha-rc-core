@@ -1,17 +1,10 @@
 name: Simple-Image-CI
 
 on:
-  push:
-    branches: [main, 53_caching]
   pull_request:
     branches: [main, 53_caching]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version tag for the Docker image (e.g., 1.0.0, v2.1.3)'
-        required: true
-        type: string
-        default: 'latest'
+  release:
+    types: [published]
 
 env:
   CARGO_TERM_COLOR: always
@@ -128,53 +121,11 @@ jobs:
           path: target/${{ matrix.target }}/release/rc-web
           retention-days: 1
 
-  semantic-release:
-    name: Semantic Release
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/53_caching')
-    outputs:
-      new-release-published: ${{ steps.semantic.outputs.new-release-published }}
-      new-release-version: ${{ steps.semantic.outputs.new-release-version }}
-      new-release-major-version: ${{ steps.semantic.outputs.new-release-major-version }}
-      new-release-minor-version: ${{ steps.semantic.outputs.new-release-minor-version }}
-      new-release-patch-version: ${{ steps.semantic.outputs.new-release-patch-version }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'yarn'
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: Run semantic-release
-        id: semantic
-        run: yarn semantic-release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Output release information
-        run: |
-          echo "New release published: ${{ steps.semantic.outputs.new-release-published }}"
-          echo "New release version: ${{ steps.semantic.outputs.new-release-version }}"
-          echo "New release major version: ${{ steps.semantic.outputs.new-release-major-version }}"
-          echo "New release minor version: ${{ steps.semantic.outputs.new-release-minor-version }}"
-          echo "New release patch version: ${{ steps.semantic.outputs.new-release-patch-version }}"
-
   docker-build:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
-    needs: [build, semantic-release]
-    if: always() && (needs.build.result == 'success') && (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/53_caching') || startsWith(github.ref, 'refs/tags/'))
+    needs: build
+    if: always() && (needs.build.result == 'success') && (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/'))
 
     steps:
       - name: Checkout repository
@@ -219,12 +170,9 @@ jobs:
       - name: Determine version for Docker tags
         id: version
         run: |
-          if [[ "${{ needs.semantic-release.outputs.new-release-published }}" == "true" ]]; then
-            VERSION="${{ needs.semantic-release.outputs.new-release-version }}"
-            echo "Using semantic-release version: $VERSION"
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.version }}" != "" ]]; then
-            VERSION="${{ github.event.inputs.version }}"
-            echo "Using manually provided version: $VERSION"
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            echo "Using release tag: $VERSION"
           else
             VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev-${{ github.ref_name }}")
             echo "Using fallback version: $VERSION"
@@ -268,10 +216,11 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=pr
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/53_caching' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
             type=raw,value=${{ steps.version.outputs.version }},enable=${{ steps.version.outputs.version != '' }}
-            type=raw,value=${{ needs.semantic-release.outputs.new-release-major-version }},enable=${{ needs.semantic-release.outputs.new-release-published == 'true' }}
-            type=raw,value=${{ needs.semantic-release.outputs.new-release-major-version }}.${{ needs.semantic-release.outputs.new-release-minor-version }},enable=${{ needs.semantic-release.outputs.new-release-published == 'true' }}
+            type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' }}
+            type=semver,pattern={{major}},enable=${{ github.event_name == 'release' }}
 
       - name: Build and push Docker image (multi-arch, all tags)
         id: docker-build
@@ -320,16 +269,16 @@ jobs:
           - **Registry**: `${{ env.REGISTRY }}`
           - **Branch**: `${{ github.ref_name }}`
           - **Commit**: `${{ github.sha }}`
+          - **Trigger**: `${{ github.event_name }}`
           EOF
           
-          if [[ "${{ needs.semantic-release.outputs.new-release-published }}" == "true" ]]; then
+          if [[ "${{ github.event_name }}" == "release" ]]; then
             cat << 'EOF' >> $GITHUB_STEP_SUMMARY
           
-          ### 🚀 New Release Information
-          - **New Release**: `v${{ needs.semantic-release.outputs.new-release-version }}`
-          - **Major Version**: `${{ needs.semantic-release.outputs.new-release-major-version }}`
-          - **Minor Version**: `${{ needs.semantic-release.outputs.new-release-minor-version }}`
-          - **Patch Version**: `${{ needs.semantic-release.outputs.new-release-patch-version }}`
+          ### 🚀 Release Information
+          - **Release Tag**: `${{ github.event.release.tag_name }}`
+          - **Release Name**: `${{ github.event.release.name }}`
+          - **Release URL**: [${{ github.event.release.html_url }}](${{ github.event.release.html_url }})
           EOF
           fi
           
@@ -370,11 +319,14 @@ jobs:
           echo "${{ steps.meta.outputs.tags }}" | sed 's/^/  - /'
           echo "🔧 Version: ${{ steps.version.outputs.version }}"
           echo "📝 Commits since last release: ${{ steps.git-info.outputs.commit-count }}"
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "🚀 Release: ${{ github.event.release.tag_name }}"
+          fi
 
   notify-failure:
     name: Notify on Failure
     runs-on: ubuntu-latest
-    needs: [test, build, semantic-release, docker-build]
+    needs: [test, build, docker-build]
     if: failure()
 
     steps:
@@ -392,9 +344,6 @@ jobs:
           fi
           if [[ "${{ needs.build.result }}" == "failure" ]]; then
             FAILED_JOBS="$FAILED_JOBS\n- ❌ **Build Job**: Binary compilation failed"
-          fi
-          if [[ "${{ needs.semantic-release.result }}" == "failure" ]]; then
-            FAILED_JOBS="$FAILED_JOBS\n- ❌ **Semantic Release Job**: Version release failed"
           fi
           if [[ "${{ needs.docker-build.result }}" == "failure" ]]; then
             FAILED_JOBS="$FAILED_JOBS\n- ❌ **Docker Build Job**: Image build/push failed"
@@ -420,6 +369,16 @@ jobs:
           - **Triggered by**: `${{ github.event_name }}`
           - **Actor**: `${{ github.actor }}`
           - **Workflow Run**: [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+          
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          - **Release Tag**: `${{ github.event.release.tag_name }}`
+          - **Release URL**: [${{ github.event.release.html_url }}](${{ github.event.release.html_url }})
+          EOF
+          fi
+          
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
           
           ### 📝 Recent Commits
           EOF
@@ -430,7 +389,6 @@ jobs:
           
           ### 🔧 Troubleshooting
           - Check the failed job logs above
-          - Verify commit message format for semantic-release
           - Ensure all tests pass locally
           - Check Docker file and build context
           - Verify secrets and permissions
@@ -441,3 +399,6 @@ jobs:
           echo "💥 Failed jobs:"
           echo -e "$FAILED_JOBS"
           echo "🔍 Check the workflow logs and step summary for details"
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "🚀 Release trigger: ${{ github.event.release.tag_name }}"
+          fi

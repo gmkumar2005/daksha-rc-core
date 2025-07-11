@@ -246,3 +246,14 @@ nerdctl push --all-platforms ghcr.io/daksha-rc/rc-web:latest
 
 echo $(cat /Users/mallru/.ssh/PUSH_PKG_TO_RC_ORG.token) | nerdctl login ghcr.io -u gmkumar2005 --password-stdin
 ```
+
+```shell
+release-please release-pr \
+--repo-url=https://github.com/gmkumar2005/daksha-rc-core \
+--package-name=rc-web \
+--release-type=simple \
+--token="$GITHUB_TOKEN" \
+--target-branch=53_caching \
+--dry-run
+
+```
