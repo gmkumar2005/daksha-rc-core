@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v2.0.0...rc-web-v2.1.0) (2025-07-11)
+
+
+### Features
+
+* removed duplicate runs ([42bbc75](https://github.com/gmkumar2005/daksha-rc-core/commit/42bbc753e6bc5d1f32717ced5be065486b913165))
+
 ## [2.0.0](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v1.0.1...rc-web-v2.0.0) (2025-07-11)
 
 
