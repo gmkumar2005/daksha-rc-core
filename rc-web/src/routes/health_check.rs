@@ -2,7 +2,6 @@ use crate::middleware::claims::Claims;
 use crate::HEALTH;
 use actix_web::{get, post, web, HttpResponse, Responder, Scope};
 use cached::proc_macro::cached;
-use cached::SizedCache;
 use chrono::Utc;
 use log::debug;
 use serde_json::{json, Value};
