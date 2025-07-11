@@ -1,7 +1,7 @@
 {
   "Servers": {
     "1": {
-      "Name": "Daksha RC Postgres",
+      "Name": "Daksha RC Postgres1",
       "Group": "Servers",
       "Host": "postgres",
       "Port": 5432,
