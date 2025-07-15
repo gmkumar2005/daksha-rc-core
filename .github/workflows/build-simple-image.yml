@@ -107,13 +107,13 @@ jobs:
 
       - name: Prepare artifacts
         run: |
-          mkdir -p target/x86_64-unknown-linux-gnu/release
-          mkdir -p target/aarch64-unknown-linux-gnu/release
-          mv artifacts/amd64/rc-web target/x86_64-unknown-linux-gnu/release/rc-web
-          mv artifacts/arm64/rc-web target/aarch64-unknown-linux-gnu/release/rc-web
-          chmod +x target/x86_64-unknown-linux-gnu/release/rc-web
-          chmod +x target/aarch64-unknown-linux-gnu/release/rc-web
-          ls -la target/*/release/rc-web
+          mkdir -p build_output/x86_64-unknown-linux-gnu/release
+          mkdir -p build_output/aarch64-unknown-linux-gnu/release
+          mv artifacts/amd64/rc-web build_output/x86_64-unknown-linux-gnu/release/rc-web
+          mv artifacts/arm64/rc-web build_output/aarch64-unknown-linux-gnu/release/rc-web
+          chmod +x build_output/x86_64-unknown-linux-gnu/release/rc-web
+          chmod +x build_output/aarch64-unknown-linux-gnu/release/rc-web
+          ls -la build_output/*/release/rc-web
           rm -rf artifacts
 
       - name: Set up Docker Buildx
