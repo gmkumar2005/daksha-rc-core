@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v2.3.0...rc-web-v2.3.1) (2025-07-15)
+
+
+### Bug Fixes
+
+* Verification of the workflow in 37_Deploy-k8s [#2](https://github.com/gmkumar2005/daksha-rc-core/issues/2) ([984be6e](https://github.com/gmkumar2005/daksha-rc-core/commit/984be6e7012b359b9ccb7cab11509538ba2d711d))
+
 ## [2.3.0](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v2.2.0...rc-web-v2.3.0) (2025-07-15)
 
 
