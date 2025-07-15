@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.3.0](https://github.com/gmkumar2005/daksha-rc-core/compare/rc-web-v2.2.0...rc-web-v2.3.0) (2025-07-15)
+
+
+### Features
+
+* Added caching in healtz ([aa3907b](https://github.com/gmkumar2005/daksha-rc-core/commit/aa3907bc83e276b6f8dd42ca46f96492f9ca3824))
+* Added caching in healtz ([a616139](https://github.com/gmkumar2005/daksha-rc-core/commit/a6161391550f372d1cc98ee729716dc185c01a88))
+* API responses ([dfaf27c](https://github.com/gmkumar2005/daksha-rc-core/commit/dfaf27cb8c113bee1aaadea879cdacea5518943a))
+* Create entity_projections when activated ([4c3cafa](https://github.com/gmkumar2005/daksha-rc-core/commit/4c3cafad349c08f655cf128cc2f0f84b564b3fc2))
+* Database connection scripts ([e80f547](https://github.com/gmkumar2005/daksha-rc-core/commit/e80f54768c0b4056ca07a0423c3524faa675b89e))
+* definitions table enhancements ([c2a6823](https://github.com/gmkumar2005/daksha-rc-core/commit/c2a6823308ffdb76c8e1c49e1fbfc92d2c2f663e))
+* Documentation updates ([af1e176](https://github.com/gmkumar2005/daksha-rc-core/commit/af1e176b42fe90fc5fb1e184e0d32237cc334426))
+
+
+### Bug Fixes
+
+* 123: sqlx migrations run at startup, os_id introduced ([a447a89](https://github.com/gmkumar2005/daksha-rc-core/commit/a447a8990cfa0795bf9858da9c46f4e11d4c1ac1))
+* Verification of the workflow in 37_Deploy-k8s [#1](https://github.com/gmkumar2005/daksha-rc-core/issues/1) ([7ccbf76](https://github.com/gmkumar2005/daksha-rc-core/commit/7ccbf768e5de0e7e9695d356fe03858fa3258aa3))
+* Verification of the workflow in the main [#1](https://github.com/gmkumar2005/daksha-rc-core/issues/1) ([e843009](https://github.com/gmkumar2005/daksha-rc-core/commit/e84300961b1b75317915eb6e32ade0fa8da6cbc8))
+* Verification of the workflow in the main [#1](https://github.com/gmkumar2005/daksha-rc-core/issues/1) ([bf56afd](https://github.com/gmkumar2005/daksha-rc-core/commit/bf56afd1e16a1d4e091e59976fffe3e3d456a7c8))
+
 ## [2.2.0](https://github.com/Daksha-RC/daksha-rc-core/compare/rc-web-v2.1.1...rc-web-v2.2.0) (2025-07-11)
 
 
