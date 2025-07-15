@@ -2,7 +2,7 @@ name: Release Please
 
 on:
   push:
-    branches: [ main, 53_caching ]
+    branches: [ main, 37_Deploy-k8s]
 
 permissions:
   contents: write

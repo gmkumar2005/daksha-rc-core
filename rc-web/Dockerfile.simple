@@ -1,6 +1,10 @@
 # Dockerfile.simple
 FROM rust:1.86.0-slim AS runtime
 
+# TARGETARCH is automatically supplied by buildx for multi-platform builds.
+# It will be 'amd64' or 'arm64'.
+ARG TARGETARCH
+
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
@@ -15,8 +19,20 @@ RUN useradd -r -s /bin/false -m -d /app appuser
 # Set working directory
 WORKDIR /app
 
-# Copy the pre-built binary (now in the root context)
-COPY rc-web /app/rc-web
+# Copy the entire target directory which contains binaries for all platforms.
+# The CI job prepares this directory before running docker build.
+COPY target /tmp/target
+
+# Move the correct binary for the target architecture into the app directory
+# and then clean up the temporary files to keep the image small.
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+        mv /tmp/target/x86_64-unknown-linux-gnu/release/rc-web /app/rc-web; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        mv /tmp/target/aarch64-unknown-linux-gnu/release/rc-web /app/rc-web; \
+    else \
+        echo "Unsupported architecture: $TARGETARCH" && exit 1; \
+    fi && \
+    rm -rf /tmp/target
 
 # Change ownership to app user
 RUN chown -R appuser:appuser /app
