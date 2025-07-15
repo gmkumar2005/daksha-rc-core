@@ -107,13 +107,27 @@ jobs:
 
       - name: Prepare artifacts
         run: |
-          mkdir -p target/x86_64-unknown-linux-gnu/release
-          mkdir -p target/aarch64-unknown-linux-gnu/release
-          mv artifacts/amd64/rc-web target/x86_64-unknown-linux-gnu/release/rc-web
-          mv artifacts/arm64/rc-web target/aarch64-unknown-linux-gnu/release/rc-web
-          chmod +x target/x86_64-unknown-linux-gnu/release/rc-web
-          chmod +x target/aarch64-unknown-linux-gnu/release/rc-web
-          ls -la target/*/release/rc-web
+          echo "--- Preparing artifacts for Docker build ---"
+          
+          echo "[Debug] Listing downloaded artifacts before move:"
+          ls -laR artifacts
+          
+          echo "Creating target directory structure..."
+          mkdir -p build_output/linux/amd64
+          mkdir -p build_output/linux/arm64
+          
+          echo "Moving binaries to new structure..."
+          mv artifacts/amd64/rc-web build_output/linux/amd64/rc-web
+          mv artifacts/arm64/rc-web build_output/linux/arm64/rc-web
+          
+          echo "Setting execute permissions..."
+          chmod +x build_output/linux/amd64/rc-web
+          chmod +x build_output/linux/arm64/rc-web
+          
+          echo "--- Artifacts prepared. Final structure in 'build_output': ---"
+          ls -laR build_output
+          
+          echo "--- Cleaning up downloaded artifacts directory ---"
           rm -rf artifacts
 
       - name: Set up Docker Buildx
