@@ -13,7 +13,7 @@ env $(envsubst < .env | xargs) cargo sqlx migrate run --source ../migrations
 
 ```shell
 
-mirrord exec cargo run  --target pod/dev-rc-app-ffc4969db-4zjcv
+mirrord exec cargo run  --target pod/dev-rc-app-c541b982-8647569d99-c2zbj
 
 RUST_LOG=debug mirrord exec cargo run --target pod/dev-rc-app-ffc4969db-4zjcv
 
@@ -256,4 +256,10 @@ release-please release-pr \
 --target-branch=53_caching \
 --dry-run
 
+```
+
+```shell
+
+cilium upgrade --version 1.17.4 --set gatewayAPI.enabled=true --reuse-values
+cilium upgrade --set gatewayAPI.enabled=true --reuse-values
 ```

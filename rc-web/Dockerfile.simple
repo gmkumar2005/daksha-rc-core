@@ -1,5 +1,5 @@
 # Dockerfile.simple
-FROM rust:1.86.0-slim AS runtime
+FROM debian:bookworm-slim AS runtime
 
 # TARGETARCH is automatically supplied by buildx for multi-platform builds.
 # It will be 'amd64' or 'arm64'.
