@@ -64,3 +64,4 @@ config/local*
 # Backup files
 *.bak
 *.backup
+.idx

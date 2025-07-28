@@ -39,12 +39,17 @@ in
     pkgs.pkg-config # Essential for build scripts to find C libraries
     pkgs.perl       # openssl's build system might sometimes need perl
   ];
+  services.postgres = {
+    enable = true;
+    enableTcp = true;
+  };
  env = {
     OPENSSL_DIR = "${pkgs.openssl}";
     OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
     OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
     PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
     LD_LIBRARY_PATH = "${pkgs.openssl.out}/lib";
+    DATABASE_URL="postgres://postgres@localhost:5432/postgres";
   };
   idx = {
     extensions = [
