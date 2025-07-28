@@ -1,80 +1,90 @@
 { pkgs, ... }:
 
 let
-  # Import the oxalica/rust-overlay
-  # It's highly recommended to pin this to a specific commit for reproducibility
-  # Example:
-  # rust-overlay = import (builtins.fetchTarball {
-  #   url = "https://github.com/oxalica/rust-overlay/archive/0d4c7b8c7b8c7b8c7b8c7b8c7b8c7b8c7b8c7b8c.tar.gz"; # Replace with a real commit hash
-  #   sha256 = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Replace with the actual sha256
-  # });
-  # For now, sticking with master for easier copy-paste, but be aware:
   rust-overlay = import (builtins.fetchTarball {
     url = "https://github.com/oxalica/rust-overlay/archive/master.tar.gz";
   });
 
-  # Apply the overlay to your pkgs set
   pkgs_with_rust = import pkgs.path {
     system = pkgs.system;
     overlays = [ rust-overlay ];
   };
 
-  # Define the specific Rust toolchain version you want
   rustToolchain = pkgs_with_rust.rust-bin.stable."1.86.0".default;
-
 in
 {
-  # Which nixpkgs channel to use.
-  channel = "stable-25.05"; # or "unstable"
+  channel = "stable-25.05";
 
-  # Use https://search.nixos.org/packages to find packages
   packages = [
-    rustToolchain # This includes rustc, cargo, rustfmt, and clippy
+    rustToolchain
     pkgs.cargo-make
     pkgs.sqlx-cli
     pkgs.just
     pkgs.postgresql
-    pkgs.gcc        # C compiler/linker
-    pkgs.openssl    # OpenSSL runtime library
-    pkgs.pkg-config # Essential for build scripts to find C libraries
-    pkgs.perl       # openssl's build system might sometimes need perl
+    pkgs.gcc
+    pkgs.openssl
+    pkgs.pkg-config
+    pkgs.perl
   ];
-  services.postgres = {
-    enable = true;
-  };
+
   env = {
     OPENSSL_DIR = "${pkgs.openssl}";
     OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
     OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
     PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
     LD_LIBRARY_PATH = "${pkgs.openssl.out}/lib";
-    # DATABASE_URL="postgres://postgres@localhost:5432/postgres";
+    DATABASE_URL= "postgres://daksha-rc:daksha-rc@localhost:5432/daksha-rc";
   };
-  idx = {
-    extensions = [
-      # "vscodevim.vim"
-    ];
 
+  services.postgres.enable = true;
+
+  idx = {
+    extensions = [ ];
     previews = {
       enable = true;
-      previews = {
-        # web = {
-        #   command = ["npm" "run" "dev"];
-        #   manager = "web";
-        #   env = {
-        #     PORT = "$PORT";
-        #   };
-        # };
-      };
+      previews = { };
     };
-
     workspace = {
-      onCreate = {
-        # npm-install = "npm install";
-      };
+      onCreate = { };
+
       onStart = {
-        # watch-backend = "npm run watch-backend";
+        init-postgres = ''
+          export PGDATA=$PWD/pgdata
+          export PGHOST=/tmp/postgres
+          export PGPORT=5432
+
+          mkdir -p "$PGDATA"
+
+          if [ ! -f "$PGDATA/PG_VERSION" ]; then
+            echo "🔧 Initializing PostgreSQL cluster..."
+            initdb -D "$PGDATA" --auth=trust --username=postgres
+          fi
+
+          echo "🚀 Starting PostgreSQL..."
+          pg_ctl -D "$PGDATA" -o "-k $PGHOST" -w start
+
+          echo "📦 Seeding roles and databases..."
+
+          cat > init.sql <<EOF
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'postgres') THEN
+    CREATE ROLE postgres WITH LOGIN SUPERUSER;
+  END IF;
+END \$\$;
+
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_database WHERE datname = 'postgres') THEN
+    CREATE DATABASE postgres OWNER postgres;
+  END IF;
+END \$\$;
+EOF
+
+          psql -h "$PGHOST" -d postgres -f init.sql
+        '';
       };
     };
   };
 }
+ 
