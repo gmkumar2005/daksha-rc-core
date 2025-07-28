@@ -39,22 +39,12 @@ in
     pkgs.pkg-config # Essential for build scripts to find C libraries
     pkgs.perl       # openssl's build system might sometimes need perl
   ];
-
-  # Sets environment variables in the workspace
-  env = {
-    # Explicitly tell openssl-sys where to find OpenSSL's headers and libs for compilation
-    # This points to the 'dev' output of the openssl package in the Nix store.
-    OPENSSL_DIR = "${pkgs.openssl.dev}";
-
-    # Ensure pkg-config knows where to look for openssl's .pc files
+ env = {
+    OPENSSL_DIR = "${pkgs.openssl}";
+    OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
+    OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
     PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
-
-    # Sometimes, particularly if openssl-sys is trying to link dynamically,
-    # it needs to know where the shared libraries are at runtime (during its build script execution).
-    # This is often a fallback, but can be crucial.
-    LD_LIBRARY_PATH = "${pkgs.openssl.dev}/lib"; # For Linux environments
-    # If target is macOS, you might also need:
-    # DYLD_LIBRARY_PATH = "${pkgs.openssl.dev}/lib";
+    LD_LIBRARY_PATH = "${pkgs.openssl.out}/lib";
   };
   idx = {
     extensions = [
